@@ -121,7 +121,7 @@ export default function CartPage() {
         const serviceId = cartItems[0]?.service_id || cartItems[0]?.serviceId || 1;
 
         const res = await axios.get(
-          `${API_BASE_URL}/service-details?service_id=${serviceId}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
+          `${API_BASE_URL}/service?service_id=${serviceId}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
         );
 
         if (res.data?.status && res.data?.data?.subServices) {

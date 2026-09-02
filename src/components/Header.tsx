@@ -485,8 +485,15 @@ const Header = () => {
 
   const getProfileImage = (img?: string | null) => {
     if (!img) return "/profile.png";
-    if (img.startsWith("http") || img.startsWith("/")) return img;
-    return `https://app.tasprocompany.in/storage/customers/${img}`;
+    let formatted = img;
+    if (formatted.includes("127.0.0.1:8000") || formatted.includes("localhost:8000")) {
+      formatted = formatted.replace(/^http:\/\/(127\.0\.0\.1|localhost):8000/, "https://app.tasprocompany.in");
+    }
+    if (formatted.startsWith("http://app.tasprocompany.in") || formatted.startsWith("http://taskpro.itmingo.com")) {
+      formatted = formatted.replace(/^http:\/\//, "https://");
+    }
+    if (formatted.startsWith("http") || formatted.startsWith("/")) return formatted;
+    return `https://app.tasprocompany.in/storage/customers/${formatted}`;
   };
 
   useEffect(() => {

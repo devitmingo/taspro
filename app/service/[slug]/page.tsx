@@ -389,10 +389,10 @@ const ACRepairLayout = () => {
     const fetchServiceDetails = async () => {
       try {
         const primaryUrl = serviceId
-          ? `${API_BASE_URL}/service-details?service_id=${serviceId}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
+          ? `${API_BASE_URL}/service?service_id=${serviceId}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
           : slug
-            ? `${API_BASE_URL}/service-details?slug=${slug}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
-            : `${API_BASE_URL}/service-details?id=${subCategoryId}`;
+            ? `${API_BASE_URL}/service?slug=${slug}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
+            : `${API_BASE_URL}/service?id=${subCategoryId}`;
 
         let res = await fetch(primaryUrl, {
           headers: { accept: "application/json" },
@@ -402,10 +402,10 @@ const ACRepairLayout = () => {
 
         if (!data?.status) {
           const fallbackUrl = serviceId
-            ? `${API_BASE_URL}/service-details?service_id=${serviceId}`
+            ? `${API_BASE_URL}/service?service_id=${serviceId}`
             : slug
-              ? `${API_BASE_URL}/service-details?slug=${slug}`
-              : `${API_BASE_URL}/service-details?id=${subCategoryId}`;
+              ? `${API_BASE_URL}/service?slug=${slug}`
+              : `${API_BASE_URL}/service?id=${subCategoryId}`;
           res = await fetch(fallbackUrl, {
             headers: { accept: "application/json" },
           });
@@ -426,10 +426,10 @@ const ACRepairLayout = () => {
   }, [serviceId, subCategoryId, slug, selectedLoc]);
 
   const fallbackBrands = [
-    { name: "LG", logo: "/lg.png" },
-    // { name: "Samsung", logo: "/sam.png" },
-    { name: "Whirlpool", logo: "/whirl.png" },
-    { name: "VOLTAS", logo: "/volt.png" },
+    { name: "LG", logo: "/tas.logo.png" },
+    { name: "Samsung", logo: "/sam.png" },
+    { name: "Whirlpool", logo: "/tas.logo.png" },
+    { name: "VOLTAS", logo: "/Volt.png" },
     { name: "DAIKIN", logo: "/daikin.png" },
     { name: "Blue Star", logo: "/blueStar.png" },
     { name: "HITACHI", logo: "/hit.png" },
@@ -439,12 +439,12 @@ const ACRepairLayout = () => {
   const brands =
     apiService?.covered_brands?.map((brand: any) => {
       const matchedFallback = fallbackBrands.find(
-        (item) => item.name.toLowerCase() === brand.name?.toLowerCase(),
+        (item) => item.name?.toLowerCase() === brand.name?.toLowerCase(),
       );
 
       return {
         ...brand,
-        image: brand.image || matchedFallback?.logo || "/brand-placeholder.png",
+        image: brand.image || matchedFallback?.logo || "/tas.logo.png",
       };
     }) || fallbackBrands.map((item) => ({ name: item.name, image: item.logo }));
 

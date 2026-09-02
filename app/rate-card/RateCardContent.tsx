@@ -18,7 +18,7 @@ const RateCardContent = () => {
     const fetchRateCard = async () => {
       try {
         const res = await fetch(
-          `${API_BASE_URL}/service-details?service_id=${serviceId}&state_name=Chhattisgarh&city_name=Raipur`,
+          `${API_BASE_URL}/service?service_id=${serviceId}&state_name=Chhattisgarh&city_name=Raipur`,
           { headers: { accept: "application/json" } },
         );
 
