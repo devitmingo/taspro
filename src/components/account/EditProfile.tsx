@@ -25,7 +25,7 @@ export default function EditProfile({
       return img;
     }
 
-    return `https://taskpro.itmingo.com/${img}`;
+    return `https://app.tasprocompany.in/${img}`;
   };
   const [gender, setGender] = useState(profile?.gender || "Male");
   const { login } = useAuth();

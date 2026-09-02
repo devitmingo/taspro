@@ -14,6 +14,11 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "app.tasprocompany.in",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "taskpro.itmingo.com",
         pathname: "/**",
       },

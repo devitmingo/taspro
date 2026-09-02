@@ -486,7 +486,7 @@ const Header = () => {
   const getProfileImage = (img?: string | null) => {
     if (!img) return "/profile.png";
     if (img.startsWith("http") || img.startsWith("/")) return img;
-    return `https://taskpro.itmingo.com/storage/customers/${img}`;
+    return `https://app.tasprocompany.in/storage/customers/${img}`;
   };
 
   useEffect(() => {
