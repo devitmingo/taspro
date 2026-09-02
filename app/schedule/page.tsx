@@ -134,7 +134,7 @@ const MySchedulePage = () => {
       time: "10:00 AM - 12:00 PM",
       rating: 4.8,
       reviews: 3287,
-      serviceImage: "/ac.png",
+      serviceImage: "/10.svg",
       address: "123 Main Street, Raipur",
       technician: "Raj Kumar",
       itemTotal: 1299,
@@ -150,7 +150,7 @@ const MySchedulePage = () => {
       time: "2:00 PM - 4:00 PM",
       rating: 4.9,
       reviews: 3287,
-      serviceImage: "/service-plumbing.jpg",
+      serviceImage: "/plumber.png",
       address: "456 Park Avenue, Raipur",
       technician: "Amit Sharma",
       itemTotal: 899,
@@ -166,7 +166,7 @@ const MySchedulePage = () => {
       time: "11:00 AM - 1:00 PM",
       rating: 4.8,
       reviews: 3287,
-      serviceImage: "/service-electrician.jpg",
+      serviceImage: "/electrician.png",
       address: "789 Oak Street, Raipur",
       technician: "Technician unavailable",
       itemTotal: 1599,
@@ -182,7 +182,7 @@ const MySchedulePage = () => {
       time: "9:00 AM - 11:00 AM",
       rating: 5,
       reviews: 3287,
-      serviceImage: "/service-cleaning.jpg",
+      serviceImage: "/bathroom.png",
       address: "321 Elm Road, Raipur",
       technician: "Cleaning Expert",
       itemTotal: 2499,
@@ -317,7 +317,7 @@ const MySchedulePage = () => {
                     status={
                       schedule.status as "Pending" | "Completed" | "Cancelled"
                     }
-                    // onChat={() => handleOpenChat(schedule)}
+                    serviceImage={schedule.serviceImage}
                     onViewDetails={() => {
                       setSelectedBooking(schedule);
                       setShowBookingDetailsPage(true);
@@ -352,12 +352,12 @@ const MySchedulePage = () => {
                         <div className="flex gap-4 w-full">
                           <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                             <img
-                              src={selectedBooking.serviceImage}
+                              src={selectedBooking.serviceImage || "/tas.logo.png"}
                               alt={selectedBooking.service}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain p-1"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src =
-                                  "/service-ac.jpg";
+                                  "/tas.logo.png";
                               }}
                             />
                           </div>

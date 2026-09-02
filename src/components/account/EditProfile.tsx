@@ -6,6 +6,7 @@ import { useState } from "react";
 import axios from "axios";
 import GradientButton2 from "@/components/ui/GradientButton2";
 import { useAuth } from "@/context/AuthContext";
+import { API_BASE_URL } from "@/config/api";
 import Swal from "sweetalert2";
 
 export default function EditProfile({
@@ -57,7 +58,7 @@ export default function EditProfile({
       }
 
       const res = await axios.post(
-        "https://app.tasprocompany.in/api/customers/update-profile",
+        `${API_BASE_URL}/customers/update-profile`,
         formData,
         {
           headers: {
@@ -71,7 +72,7 @@ export default function EditProfile({
         await fetchProfile();
 
         const profileRes = await axios.get(
-          "https://app.tasprocompany.in/api/customers/profile",
+          `${API_BASE_URL}/customers/profile`,
           {
             headers: {
               Accept: "application/json",
@@ -127,20 +128,20 @@ export default function EditProfile({
   return (
     <div className="w-full max-w-[390px] md:ml-12 mx-auto md:mx-0 flex flex-col items-center md:items-start">
       <form onSubmit={handleSubmit} className="w-full space-y-6">
-        <div className="w-full flex justify-between items-center mb-6 md:hidden">
+        <div className="w-full flex justify-between items-center mb-6">
           <button
             type="button"
             onClick={() => setActiveView("default")}
-            className="text-black dark:text-white font-medium flex items-center gap-2 hover:text-orange-500 transition"
+            className="text-black dark:text-white font-medium flex items-center gap-2 hover:text-orange-500 transition cursor-pointer"
           >
             <ArrowLeft size={20} />
-            Edit Profile
+            <span>Edit Profile</span>
           </button>
 
           <button
             type="submit"
             disabled={loading}
-            className="font-semibold bg-gradient-to-r from-[#FEC12D] to-[#FF552C] bg-clip-text text-transparent"
+            className="font-semibold bg-gradient-to-r from-[#FEC12D] to-[#FF552C] bg-clip-text text-transparent cursor-pointer"
           >
             {loading ? "Saving..." : "Save"}
           </button>

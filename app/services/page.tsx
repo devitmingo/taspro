@@ -15,9 +15,8 @@ import {
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ApplianceRepair from "@/components/ApplianceRepair";
-import DeepCleaningServices from "@/components/DeepCleaningServices";
+import DynamicCategorySection from "@/components/DynamicCategorySection";
 import OnDemandServices from "@/components/OnDemandServices";
-import HandymanServices from "@/components/HandymanServices";
 import MajorServices from "@/components/MajorServices";
 
 export default function ServicesPage() {
@@ -28,11 +27,11 @@ export default function ServicesPage() {
       <main>
         {/* Breadcrumb */}
         <div className="container-custom py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <a href="/" className="hover:text-primary">
               Home
             </a>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
             <span className="text-foreground">Services</span>
           </div>
         </div>
@@ -66,7 +65,7 @@ export default function ServicesPage() {
         {/* Deep Cleaning Services */}
         <section className="py-8 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <DeepCleaningServices />
+            <DynamicCategorySection title="Deep Cleaning Services" viewType={2} />
           </div>
         </section>
 
@@ -80,7 +79,7 @@ export default function ServicesPage() {
         {/* Handyman Services */}
         <section className="py-8 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <HandymanServices />
+            <DynamicCategorySection title="Handyman Services" viewType={1} />
           </div>
         </section>
 

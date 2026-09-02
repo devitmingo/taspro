@@ -3,77 +3,75 @@
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { MoreVertical, Star, ArrowLeft, Edit, Trash2 } from "lucide-react";
+import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
+import { useAuth } from "@/context/AuthContext";
 
 type Props = {
   setActiveView: (view: string) => void;
 };
 
 export default function MyReviews({ setActiveView }: Props) {
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenIndex(null);
+  const fetchReviews = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoading(false);
+        return;
       }
-    };
 
-    document.addEventListener("mousedown", handleClickOutside);
+      const res = await axios.get(`${API_BASE_URL}/customers/service-reviews`, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+      if (res.data?.status && Array.isArray(res.data.data)) {
+        const formatted = res.data.data.map((r: any) => ({
+          id: r.id,
+          name: r.service?.name || user?.firstName || "Service Review",
+          img: user?.profileImage || "/img/user1.png",
+          rating: Number(r.rating) || 5,
+          time: r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "Recent",
+          text: r.message || r.review || "No feedback text provided.",
+          bookingNo: r.booking?.booking_no,
+        }));
+        setReviews(formatted);
+      } else {
+        setReviews([]);
+      }
+    } catch (err) {
+      console.log("Error fetching reviews:", err);
+      setReviews([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReviews();
   }, []);
-
-  const reviews = [
-    {
-      name: "Darron Kulikowski",
-      img: "/img/user1.png",
-      rating: 1,
-      time: "4 months ago",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ",
-    },
-    {
-      name: "Emly William",
-      img: "/img/user2.png",
-      rating: 2,
-      time: "2 months ago",
-      text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore ",
-    },
-    {
-      name: "Darron Kulikowski",
-      img: "/img/user3.png",
-      rating: 3,
-      time: "4 months ago",
-      text: "Amazing service, highly recommended!",
-    },
-    {
-      name: "Emly William",
-      img: "/img/user4.png",
-      rating: 4,
-      time: "2 months ago",
-      text: "Good experience overall.",
-    },
-  ];
 
   return (
     <div className="md:px-6 w-full">
-      <div className="w-full flex justify-between items-center mb-6 md:hidden">
+      <div className="w-full flex justify-between items-center mb-6">
         {/* Back */}
         <button
           onClick={() => setActiveView("default")}
-          className="text-black dark:text-white font-medium flex items-center gap-2 hover:text-orange-500 transition"
+          className="text-black dark:text-white font-semibold flex items-center gap-2 hover:text-orange-500 transition cursor-pointer"
         >
           <ArrowLeft size={20} />
-          My Rating and Reviews
+          <span>My Rating and Reviews</span>
         </button>
       </div>
-
-      <h2 className="hidden md:block md:text-[18px] md:text-[#1B1B1B] dark:text-white md:font-semibold md:mb-6">
-        My Rating and Reviews
-      </h2>
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {[...Array(4)].map((_, i) => (

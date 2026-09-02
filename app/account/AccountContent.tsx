@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { API_BASE_URL } from "@/config/api";
 import SettingsList from "@/components/account/SettingsList";
 import ProfileCard from "@/components/account/ProfileCard";
 import GradientButton from "@/components/ui/GradientButton";
@@ -23,6 +24,8 @@ import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
 import { House, Wrench, ClipboardList, UserRound } from "lucide-react";
+import Breadcrumb from "@/components/account/Breadcrumb";
+
 export default function AccountContent() {
   const { user } = useAuth();
   const [activeView, setActiveView] = useState("default");
@@ -38,7 +41,7 @@ export default function AccountContent() {
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
-        "https://app.tasprocompany.in/api/customers/profile",
+        `${API_BASE_URL}/customers/profile`,
         {
           headers: {
             Accept: "application/json",
@@ -59,6 +62,29 @@ export default function AccountContent() {
     fetchProfile();
   }, []);
 
+  const getBreadcrumbs = () => {
+    const base = [{ label: "Home", href: "/" }];
+    if (activeView === "default") {
+      return [...base, { label: "Account" }];
+    }
+
+    const viewLabels: Record<string, string> = {
+      editProfile: "Edit Profile",
+      wallet: "My Wallet",
+      payment: "Saved Payment Methods",
+      language: "Change Language",
+      reviews: "My Rating & Reviews",
+      coupon: "My Coupons",
+      refer: "Refer & Earn",
+    };
+
+    return [
+      ...base,
+      { label: "Account", onClick: () => setActiveView("default") },
+      { label: viewLabels[activeView] || "Account" },
+    ];
+  };
+
   const renderContent = () => {
     switch (activeView) {
       case "editProfile":
@@ -70,11 +96,11 @@ export default function AccountContent() {
           />
         );
       case "refer":
-        return <ReferEarn setActiveView={setActiveView} />;
+        return <ReferEarn setActiveView={setActiveView} profile={profile} />;
       case "language":
         return <LanguageSelectorPage setActiveView={setActiveView} />;
       case "wallet":
-        return <MyWallet setActiveView={setActiveView} />;
+        return <MyWallet setActiveView={setActiveView} profile={profile} />;
       case "reviews":
         return <MyReviews setActiveView={setActiveView} />;
       case "coupon":
@@ -106,6 +132,11 @@ export default function AccountContent() {
 
 return (
   <div className="w-full bg-white dark:bg-gray-900 pb-24">
+    {/* Dynamic Breadcrumbs */}
+    <div className="mb-4">
+      <Breadcrumb items={getBreadcrumbs()} />
+    </div>
+
     {/* Content */}
     <div className="flex flex-col-reverse lg:flex-row">
       <div className="w-full lg:flex-1">{renderContent()}</div>

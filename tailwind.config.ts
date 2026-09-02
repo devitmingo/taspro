@@ -3,10 +3,10 @@ import type { Config } from "tailwindcss";
 export default {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx,ts,tsx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx,ts,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx,ts,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx,mdx,ts,tsx}",
   ],
   prefix: "",
   theme: {
@@ -22,13 +22,26 @@ export default {
         sans: ["Inter", "sans-serif"],
       },
       colors: {
+        orange: {
+          50: "#fff7ed",
+          100: "#ffedd5",
+          200: "#fed7aa",
+          300: "#fdba74",
+          400: "#fb923c",
+          500: "#f97316",
+          600: "#ea580c",
+          700: "#c2410c",
+          800: "#9a3412",
+          900: "#7c2d12",
+          DEFAULT: "#f97316",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
+          DEFAULT: "#FF6B00",
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
@@ -55,22 +68,6 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        orange: {
-          DEFAULT: "hsl(var(--orange))",
-          dark: "hsl(var(--orange-dark))",
-          light: "hsl(var(--orange-light))",
-        },
-        gray: {
-          100: "hsl(var(--gray-100))",
-          200: "hsl(var(--gray-200))",
-          300: "hsl(var(--gray-300))",
-          400: "hsl(var(--gray-400))",
-          500: "hsl(var(--gray-500))",
-          600: "hsl(var(--gray-600))",
-          700: "hsl(var(--gray-700))",
-          800: "hsl(var(--gray-800))",
-          900: "hsl(var(--gray-900))",
-        },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
       },
@@ -81,7 +78,6 @@ export default {
         xl: "1rem",
         "2xl": "1.25rem",
       },
-      plugins: [require("@tailwindcss/typography")],
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

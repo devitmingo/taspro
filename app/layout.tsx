@@ -9,12 +9,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import LayoutContent from "@/components/LayoutContent";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "TAS PRO - Professional Home Services",
   description:
     "Professional home services with certified technicians and guaranteed quality work",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -25,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.className} bg-white dark:bg-gray-900`}
+        className={`${inter.className} bg-white text-gray-900`}
         suppressHydrationWarning
       >
         <Script

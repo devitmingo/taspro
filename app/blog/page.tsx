@@ -9,6 +9,7 @@ import BlogCard from "@/components/BlogCards";
 import BlogDetail from "@/components/BlogDetail";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 type SidebarCardProps = {
   title: string;
@@ -43,7 +44,7 @@ const [blogLoading, setBlogLoading] = useState(false);
       setBlogLoading(true);
 
       const res = await axios.get(
-        `https://app.tasprocompany.in/api/blogs?page=${currentPage}`,
+        `${API_BASE_URL}/blogs?page=${currentPage}`,
         {
           headers: {
             Accept: "application/json",
@@ -79,7 +80,7 @@ const [blogLoading, setBlogLoading] = useState(false);
   const fetchBlogCategories = async () => {
     try {
       const res = await axios.get(
-        "https://app.tasprocompany.in/api/blog-categories",
+        `${API_BASE_URL}/blog-categories`,
         {
           headers: {
             Accept: "application/json",

@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -11,17 +9,21 @@ import {
   ChevronDown,
   Clock,
   X,
+  Heart,
+  AlertTriangle,
 } from "lucide-react";
+import { API_BASE_URL, getImageUrl } from "@/config/api";
 import Link from "next/link";
 import { SERVICES_DATA } from "@/data/services";
 import { useBooking } from "@/context/BookingContext";
-import DeepCleaningServices from "@/components/DeepCleaningServices";
+import DynamicCategorySection from "@/components/DynamicCategorySection";
 import ServicesSection from "@/components/ServicesSection";
 import ServiceDetailsModal from "@/components/ServiceDetailsModal";
+import YouMayLikeServices from "@/components/YouMayLikeServices";
 import { SelectCapacityModal } from "@/components/booking-flow/SelectCapacityModal";
 import { AMCDurationModal } from "@/components/AMCDurationModal";
-import { Heart } from "lucide-react";
 import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 
 
 type SubService = {
@@ -59,12 +61,12 @@ const ACRepairLayout = () => {
   const serviceId = searchParams?.get("service_id");
   const subCategoryId = searchParams?.get("sub_category_id");
   const source = searchParams?.get("source") || "";
-const [wishlistItems, setWishlistItems] = useState<number[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<number[]>([]);
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const brandsRef = useRef<HTMLDivElement | null>(null);
-const [showDifferentServiceModal, setShowDifferentServiceModal] =
-  useState(false);
-const [pendingCartItem, setPendingCartItem] = useState<any>(null);
+  const [showDifferentServiceModal, setShowDifferentServiceModal] =
+    useState(false);
+  const [pendingCartItem, setPendingCartItem] = useState<any>(null);
   const [serviceDetails, setServiceDetails] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>(
     service?.types?.[0]?.id || "",
@@ -81,123 +83,155 @@ const [pendingCartItem, setPendingCartItem] = useState<any>(null);
   const [showCapacityModal, setShowCapacityModal] = useState(false);
   const [showAMCModal, setShowAMCModal] = useState(false);
   const [selectedCapacity, setSelectedCapacity] = useState<string | null>(null);
-const [selectedWarrantyDays, setSelectedWarrantyDays] = useState<number>(30);
+  const [selectedWarrantyDays, setSelectedWarrantyDays] = useState<number>(30);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [canScroll, setCanScroll] = useState(false);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
-const {
-  cartItems,
-  addToCart,
-  removeFromCart,
-  selectedAddress,
-  setSelectedAddress,
-} = useBooking();
+  const {
+    cartItems,
+    addToCart,
+    removeFromCart,
+    selectedAddress,
+    setSelectedAddress,
+  } = useBooking();
   const [activeScroll, setActiveScroll] = useState<"tabs" | "brands">("tabs");
+  const [categoryServices, setCategoryServices] = useState<any[]>([]);
+  const [categorySectionTitle, setCategorySectionTitle] = useState<string>("Related Services");
 
   const apiService = serviceDetails?.data;
+
+  const [dbFaqs, setDbFaqs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPageSecondaryData = async () => {
+      try {
+        const [servRes, faqRes] = await Promise.allSettled([
+          fetch(`${API_BASE_URL}/services`).then((r) => r.json()),
+          fetch(`${API_BASE_URL}/faqs?type=User`, { headers: { Accept: "application/json" } }).then((r) => r.json()),
+        ]);
+
+        if (servRes.status === "fulfilled" && servRes.value) {
+          const data = servRes.value;
+          const allServices = Array.isArray(data) ? data : data?.data || [];
+          const currentCatId = apiService?.service_category_id || (service as any)?.category_id;
+          const filtered = allServices.filter(
+            (s: any) => Number(s.service_category_id) === Number(currentCatId)
+          );
+
+          const categoryTitles: Record<number, string> = {
+            1: "Appliances Repair & Service",
+            2: "Deep Cleaning Services",
+            3: "Handyman Services",
+            4: "TASpro Cleaning Packages",
+          };
+
+          if (currentCatId && categoryTitles[currentCatId]) {
+            setCategorySectionTitle(categoryTitles[currentCatId]);
+          } else if (apiService?.category_name) {
+            setCategorySectionTitle(`${apiService.category_name} Services`);
+          }
+
+          if (filtered.length > 0) {
+            setCategoryServices(filtered);
+          }
+        }
+
+        if (faqRes.status === "fulfilled" && faqRes.value?.status && Array.isArray(faqRes.value.data)) {
+          setDbFaqs(faqRes.value.data);
+        }
+      } catch (e) {
+        console.log("Fetch secondary page data error:", e);
+      }
+    };
+
+    fetchPageSecondaryData();
+  }, [apiService, service]);
+
   const offers = apiService?.offers || [];
-  const faqData = apiService?.faqs || [];
+  const serviceFaqs = Array.isArray(apiService?.faqs) ? apiService.faqs : [];
+  const faqData =
+    serviceFaqs.length > 0
+      ? [
+        ...serviceFaqs,
+        ...dbFaqs.filter(
+          (d: any) =>
+            !serviceFaqs.some(
+              (s: any) =>
+                s.question?.toLowerCase() === d.question?.toLowerCase()
+            )
+        ),
+      ]
+      : dbFaqs;
   const reviews = apiService?.reviews || [];
 
   const galleryImages = Array.isArray(apiService?.gallery_images)
     ? apiService.gallery_images
     : [];
 
-    const handleAddService = (subService: any) => {
-  const newItem = {
-    id: subService.id,
-    name: subService.name,
-    subService: subService.name,
-    serviceName: apiService?.name,
-    price: subService.discountedPrice,
-    discountedPrice: subService.discountedPrice,
-    originalPrice: subService.originalPrice,
-    quantity: 1,
-    service_id: Number(serviceId),
-    service_category_id: apiService?.service_category_id || apiService?.id,
-    service_sub_category_id: activeTab,
-    service_issue_id: subService.id,
+  const handleAddService = (subService: any) => {
+    const activeTabObj = (tabs || []).find((t: any) => String(t.id) === String(activeTab));
+    const subCatName = activeTabObj?.name || apiService?.name || service?.name || "";
+
+    const newItem = {
+      id: subService.id,
+      name: subService.name,
+      subService: subService.name,
+      subCategoryName: subCatName,
+      serviceName: subCatName,
+      service_name: subCatName,
+      price: subService.discountedPrice,
+      discountedPrice: subService.discountedPrice,
+      originalPrice: subService.originalPrice,
+      quantity: 1,
+      service_id: Number(serviceId),
+      service_category_id: apiService?.service_category_id || apiService?.id,
+      service_sub_category_id: activeTab,
+      service_issue_id: subService.id,
+    };
+
+    console.log(newItem);
+    console.log({
+      final_price: subService.final_price,
+      strike_price: subService.strike_price,
+      base_price: subService.base_price,
+    });
+    const hasDifferentService =
+      cartItems.length > 0 &&
+      cartItems.some((item: any) => Number(item.service_id) !== Number(serviceId));
+
+    if (hasDifferentService) {
+      setPendingCartItem(newItem);
+      setShowDifferentServiceModal(true);
+
+      return;
+    }
+
+    addToCart(newItem as any);
   };
-
-  console.log(newItem);
-  console.log({
-    final_price: subService.final_price,
-    strike_price: subService.strike_price,
-    base_price: subService.base_price,
-  });
-  const hasDifferentService =
-    cartItems.length > 0 &&
-    cartItems.some((item: any) => Number(item.service_id) !== Number(serviceId));
-
-  if (hasDifferentService) {
-    setPendingCartItem(newItem);
-    setShowDifferentServiceModal(true);
-    
-    return;
-  }
-
-  addToCart(newItem as any);
-};
 
   const safeImage = (img?: string | null) => {
-    return img && img.trim() !== "" ? img : "/tas.logo.png";
+    return getImageUrl(img, "/tas.logo.png");
   };
-const handleWishlist = async (serviceIssueId: number | string) => {
-  const id = Number(serviceIssueId);
-  const oldWishlist = [...wishlistItems];
+  const handleWishlist = async (serviceIssueId: number | string) => {
+    const id = Number(serviceIssueId);
+    const oldWishlist = [...wishlistItems];
 
-  const updatedWishlist = oldWishlist.includes(id)
-    ? oldWishlist.filter((itemId) => itemId !== id)
-    : [...oldWishlist, id];
+    const updatedWishlist = oldWishlist.includes(id)
+      ? oldWishlist.filter((itemId) => itemId !== id)
+      : [...oldWishlist, id];
 
-  // instant UI
-  setWishlistItems(updatedWishlist);
-  localStorage.setItem("wishlistItems", JSON.stringify(updatedWishlist));
+    // instant UI
+    setWishlistItems(updatedWishlist);
+    localStorage.setItem("wishlistItems", JSON.stringify(updatedWishlist));
 
-  try {
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(
-      `https://app.tasprocompany.in/api/customers/wish-lists/${id}`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    );
-
-    const data = await res.json();
-
-    if (!data?.status) {
-      setWishlistItems(oldWishlist);
-      localStorage.setItem("wishlistItems", JSON.stringify(oldWishlist));
-    }
-  } catch (error) {
-    setWishlistItems(oldWishlist);
-    localStorage.setItem("wishlistItems", JSON.stringify(oldWishlist));
-    console.log("Wishlist Error:", error);
-  }
-};
-const getWishId = (item: any) =>
-  Number(
-    item.service_issue_id ||
-      item.issue_id ||
-      item.service_issue?.id ||
-      item.issue?.id ||
-      item.id,
-  );
-
-useEffect(() => {
-  const fetchWishlistIds = async () => {
     try {
       const token = localStorage.getItem("token");
 
       const res = await fetch(
-        "https://app.tasprocompany.in/api/customers/wish-lists?state_name=Chhattisgarh&city_name=Raipur",
+        `${API_BASE_URL}/customers/wish-lists/${id}`,
         {
+          method: "POST",
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${token}`,
@@ -207,32 +241,99 @@ useEffect(() => {
 
       const data = await res.json();
 
-     const ids = (data?.data || [])
-       .map((item: any) => getWishId(item))
-       .filter(Boolean);
-
-     setWishlistItems(ids);
-     localStorage.setItem("wishlistItems", JSON.stringify(ids));
+      if (!data?.status) {
+        setWishlistItems(oldWishlist);
+        localStorage.setItem("wishlistItems", JSON.stringify(oldWishlist));
+      }
     } catch (error) {
-      console.log("Fetch wishlist ids error:", error);
+      setWishlistItems(oldWishlist);
+      localStorage.setItem("wishlistItems", JSON.stringify(oldWishlist));
+      console.log("Wishlist Error:", error);
     }
   };
+  const getWishId = (item: any) =>
+    Number(
+      item.service_issue_id ||
+      item.issue_id ||
+      item.service_issue?.id ||
+      item.issue?.id ||
+      item.id,
+    );
 
-  fetchWishlistIds();
+  useEffect(() => {
+    const fetchWishlistIds = async () => {
+      try {
+        const token = localStorage.getItem("token");
 
-  window.addEventListener("focus", fetchWishlistIds);
-  window.addEventListener("wishlistUpdated", fetchWishlistIds);
+        const res = await fetch(
+          `${API_BASE_URL}/customers/wish-lists?state_name=Chhattisgarh&city_name=Raipur`,
+          {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
 
-  return () => {
-    window.removeEventListener("focus", fetchWishlistIds);
-    window.removeEventListener("wishlistUpdated", fetchWishlistIds);
-  };
-}, []);
+        const data = await res.json();
+
+        const ids = (data?.data || [])
+          .map((item: any) => getWishId(item))
+          .filter(Boolean);
+
+        setWishlistItems(ids);
+        localStorage.setItem("wishlistItems", JSON.stringify(ids));
+      } catch (error) {
+        console.log("Fetch wishlist ids error:", error);
+      }
+    };
+
+    fetchWishlistIds();
+
+    window.addEventListener("focus", fetchWishlistIds);
+    window.addEventListener("wishlistUpdated", fetchWishlistIds);
+
+    return () => {
+      window.removeEventListener("focus", fetchWishlistIds);
+      window.removeEventListener("wishlistUpdated", fetchWishlistIds);
+    };
+  }, []);
+
+  const fallbackBanner =
+    typeof service?.image === "string"
+      ? service.image
+      : (service?.image as any)?.src ||
+      "/tas.logo.png";
+
+  const headerImage1 = apiService?.images?.header_image1;
+  const headerImage2 = apiService?.images?.header_image2;
+  const headerImage3 = apiService?.images?.header_image3;
+
+  const validHeaderImages = [headerImage1, headerImage2, headerImage3].filter(
+    (img) =>
+      typeof img === "string" &&
+      img.trim() !== "" &&
+      img !== "/tas.logo.png" &&
+      !img.toLowerCase().endsWith(".svg")
+  );
+
+  const rawBanners =
+    Array.isArray(apiService?.banners) && apiService.banners.length > 0
+      ? apiService.banners.filter(
+        (b: any) =>
+          typeof b === "string" &&
+          b.trim() !== "" &&
+          b !== "/tas.logo.png" &&
+          !b.toLowerCase().endsWith(".svg"),
+      )
+      : [];
 
   const banners =
-    apiService?.banners?.length > 0
-      ? apiService.banners
-      : [safeImage(apiService?.images?.header_image1)];
+    validHeaderImages.length > 0
+      ? validHeaderImages
+      : rawBanners.length > 0
+        ? rawBanners
+        : [fallbackBanner];
 
   const [currentBanner, setCurrentBanner] = useState(0);
 
@@ -254,19 +355,62 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [banners]);
 
+  const [selectedLoc, setSelectedLoc] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedLoc = localStorage.getItem("selected_location");
+        if (savedLoc) {
+          const parsed = JSON.parse(savedLoc);
+          return {
+            state: parsed.state || "Chhattisgarh",
+            city: parsed.city || "Durg",
+          };
+        }
+      } catch (e) {}
+    }
+    return { state: "Chhattisgarh", city: "Durg" };
+  });
+
+  useEffect(() => {
+    const handleLocChange = (e: any) => {
+      if (e.detail) {
+        setSelectedLoc({
+          state: e.detail.state || "Chhattisgarh",
+          city: e.detail.city || "Durg",
+        });
+      }
+    };
+
+    window.addEventListener("location-changed", handleLocChange);
+    return () => window.removeEventListener("location-changed", handleLocChange);
+  }, []);
+
   useEffect(() => {
     const fetchServiceDetails = async () => {
       try {
-        const url = serviceId
-          ? `https://app.tasprocompany.in/api/service-details?service_id=${serviceId}&state_name=Chhattisgarh&city_name=Raipur`
-          : `https://app.tasprocompany.in/api/service-details?id=${subCategoryId}`;
+        const primaryUrl = serviceId
+          ? `${API_BASE_URL}/service-details?service_id=${serviceId}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
+          : slug
+            ? `${API_BASE_URL}/service-details?slug=${slug}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
+            : `${API_BASE_URL}/service-details?id=${subCategoryId}`;
 
-        const res = await fetch(url, {
+        let res = await fetch(primaryUrl, {
           headers: { accept: "application/json" },
         });
 
-        const data = await res.json();
-        console.log("SERVICE DETAILS API DATA:", data);
+        let data = await res.json();
+
+        if (!data?.status) {
+          const fallbackUrl = serviceId
+            ? `${API_BASE_URL}/service-details?service_id=${serviceId}`
+            : slug
+              ? `${API_BASE_URL}/service-details?slug=${slug}`
+              : `${API_BASE_URL}/service-details?id=${subCategoryId}`;
+          res = await fetch(fallbackUrl, {
+            headers: { accept: "application/json" },
+          });
+          data = await res.json();
+        }
 
         if (data?.status) {
           setServiceDetails(data);
@@ -278,8 +422,8 @@ useEffect(() => {
       }
     };
 
-    if (serviceId || subCategoryId) fetchServiceDetails();
-  }, [serviceId, subCategoryId]);
+    if (serviceId || subCategoryId || slug) fetchServiceDetails();
+  }, [serviceId, subCategoryId, slug, selectedLoc]);
 
   const fallbackBrands = [
     { name: "LG", logo: "/lg.png" },
@@ -308,13 +452,14 @@ useEffect(() => {
     apiService?.subServices?.map((cat: any) => ({
       id: String(cat.sub_category_id),
       name: cat.sub_category_name,
+      image: cat.image || cat.icon,
       items: cat.items || [],
     })) || [];
 
-  const tabs = apiTabs.length > 0 ? apiTabs : service?.types || [];
+  const tabs = apiTabs;
   const currentType = tabs.find(
     (tab: any) => String(tab.id) === String(activeTab),
-  );
+  ) || tabs[0];
 
   const displayServices: SubService[] =
     currentType?.items?.map((item: any) => ({
@@ -325,10 +470,14 @@ useEffect(() => {
       rating: Number(item.rating || 0),
       reviews: item.reviews || 0,
       duration: `${item.duration_minutes || 30} min`,
-      discountedPrice: Number(
-        item.final_price ?? item.price ?? item.discount_price ?? 0,
+      discountedPrice: Math.round(
+        Number(
+          (item.price && Number(item.price) > 0) ? item.price : (item.final_price || item.base_price || item.discount_price || 0)
+        )
       ),
-      originalPrice: Number(item.strike_price || item.base_price || 0),
+      originalPrice: Math.round(
+        Number(item.strike_price || item.original_price || item.originalPrice || item.base_price || 0)
+      ),
       warrantyDays: item.warranty_days,
       warrantyDescription: item.warranty_description,
       packageTag: item.package_tag,
@@ -337,6 +486,51 @@ useEffect(() => {
     })) ||
     currentType?.subServices ||
     [];
+
+  const getServicesForTab = (tab: any): SubService[] => {
+    if (tab.items && tab.items.length > 0) {
+      return tab.items.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        title: item.name,
+        image: safeImage(item.image || item.icon),
+        rating: Number(item.rating || 0),
+        reviews: item.reviews || 0,
+        duration: `${item.duration_minutes || 30} min`,
+        discountedPrice: Math.round(
+          Number(
+            (item.price && Number(item.price) > 0) ? item.price : (item.final_price || item.base_price || item.discount_price || 0)
+          )
+        ),
+        originalPrice: Math.round(
+          Number(item.strike_price || item.original_price || item.originalPrice || item.base_price || 0)
+        ),
+        warrantyDays: item.warranty_days,
+        warrantyDescription: item.warranty_description,
+        packageTag: item.package_tag,
+        issueDescriptions: item.issue_descriptions || item.descriptions || [],
+        issueMoreDetails: item.issue_more_details || item.details || [],
+      }));
+    }
+    return tab.subServices || [];
+  };
+
+  useEffect(() => {
+    if (!tabs || tabs.length === 0) return;
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 250;
+      for (let i = tabs.length - 1; i >= 0; i--) {
+        const tabId = String(tabs[i].id);
+        const el = document.getElementById(`category-section-${tabId}`);
+        if (el && el.offsetTop <= scrollPosition) {
+          setActiveTab(tabId);
+          break;
+        }
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [tabs]);
 
   const checkScrollState = (ref: React.RefObject<HTMLDivElement>) => {
     const slider = ref.current;
@@ -400,119 +594,176 @@ useEffect(() => {
     setOpenIndex(openIndex === index ? null : index);
   };
 
-const updateQuantity = (
-  service: any,
-  type: "increase" | "decrease"
-) => {
-  if (type === "increase") {
-    addToCart({
-      ...service,
-      quantity: 1,
-    });
-  } else {
-    removeFromCart(service.id);
-  }
-};
+  const updateQuantity = (
+    service: any,
+    type: "increase" | "decrease"
+  ) => {
+    if (type === "increase") {
+      addToCart({
+        ...service,
+        quantity: 1,
+      });
+    } else {
+      removeFromCart(service.id);
+    }
+  };
 
-const totalSavings = cartItems.reduce(
-  (acc, item: any) =>
-    acc +
-    ((item.originalPrice || 0) + 50 - (item.discountedPrice || 0)) *
-      item.quantity,
-  0,
-);
+  const getItemActivePrices = (cartItem: any) => {
+    let matchedItem: any = null;
+    if (tabs && tabs.length > 0) {
+      for (const tab of tabs) {
+        if (tab.items && tab.items.length > 0) {
+          const found = tab.items.find((i: any) => String(i.id) === String(cartItem.id));
+          if (found) {
+            matchedItem = found;
+            break;
+          }
+        }
+      }
+    }
+
+    if (matchedItem) {
+      const disc = Math.round(
+        Number(
+          (matchedItem.price && Number(matchedItem.price) > 0)
+            ? matchedItem.price
+            : (matchedItem.final_price || matchedItem.base_price || matchedItem.discount_price || cartItem.discountedPrice || cartItem.price || 0)
+        )
+      );
+      const orig = Math.round(
+        Number(
+          matchedItem.strike_price || matchedItem.original_price || matchedItem.originalPrice || matchedItem.base_price || cartItem.originalPrice || 0
+        )
+      );
+      return { discountedPrice: disc, originalPrice: orig };
+    }
+
+    return {
+      discountedPrice: Math.round(Number(cartItem.discountedPrice || cartItem.price || 0)),
+      originalPrice: Math.round(Number(cartItem.originalPrice || cartItem.price || 0)),
+    };
+  };
+
+  const totalSavings = Math.round(
+    cartItems.reduce((acc, item: any) => {
+      const { discountedPrice: disc, originalPrice: orig } = getItemActivePrices(item);
+      const actualOrig = orig > disc ? orig : (disc > 0 ? Math.round(disc * 1.25) : 0);
+      const savingsPerUnit = Math.max(actualOrig - disc, 0);
+      return acc + savingsPerUnit * (item.quantity || 1);
+    }, 0)
+  );
 
   return (
     <>
-      <section>
+      <section className="bg-white dark:bg-gray-900 pb-6 pt-3">
         <div className="w-full max-w-7xl mx-auto lg:px-5">
-          <div className="text-sm sm:text-base md:text-lg text-gray-600 px-5 py-4 sm:block hidden">
-            <Link href="/" className="hover:text-[#FF6A00]">
-              Home
-            </Link>
+          <div className="flex flex-col-reverse md:flex-row gap-6 md:gap-10 items-start justify-between w-full sm:px-5">
+            <div className="w-full md:max-w-xl">
+              <div className="text-xs text-gray-500 py-1 mb-2 sm:block hidden">
+                <Link href="/" className="hover:text-[#FF6A00]">
+                  Home
+                </Link>
 
-            <span className="mx-2">/</span>
-            <span className="text-gray-900 dark:text-white font-semibold">
-              {apiService?.name || service?.name}
-            </span>
-          </div>
-
-          <div className="flex flex-col-reverse md:flex-row gap-4 sm:gap-10 items-start w-full sm:px-5">
-            <div className="w-[450px] pr-10">
-              <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 dark:text-white leading-snug">
-                Best {apiService?.name || service?.name} <br />
-                Service in {service?.city || "Your City"}
-              </h1>
-
-              <div className="mt-2 sm:mt-4 flex flex-wrap items-center gap-2 text-xs sm:text-base">
-                <Star className="w-5 h-5 fill-orange-500 text-orange-500" />
-
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {displayServices?.[0]?.rating || 0}
-                </span>
-
-                <span className="text-gray-600 dark:text-gray-300">
-                  ({apiService?.reviews?.length || 0} reviews)
-                </span>
-
-                <span className="text-gray-400">|</span>
-
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {service?.bookings || 0}
-                </span>
-
-                <span className="text-gray-600 dark:text-gray-300">
-                  (Bookings in {service?.city || "Your City"})
+                <span className="mx-1.5 text-gray-400">/</span>
+                <span className="text-gray-700 dark:text-gray-300 font-medium">
+                  {apiService?.name || service?.name}
                 </span>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl px-6 py-4 mt-6 relative max-w-lg sm:block hidden">
-                <div className="absolute -top-3 left-5 bg-white px-3 py-1 border rounded-lg flex items-center gap-2">
-                  <div className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs">
-                    ✓
-                  </div>
-                  <span className="text-sm font-medium text-gray-800">
-                    TAS<span className="text-orange-500">Pro</span> Cover
+              {(() => {
+                const name = apiService?.name || service?.name || "";
+                const hasService = /service$/i.test(name.trim());
+                const formattedName = name ? (hasService ? name : `${name} Service`) : "Service";
+                return (
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-snug">
+                    Best {formattedName} in {service?.city || "Raipur"}
+                  </h1>
+                );
+              })()}
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+                <div className="flex items-center gap-1">
+                  <Star className="w-4 h-4 fill-orange-500 text-orange-500 shrink-0" />
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    {displayServices?.[0]?.rating || 0}
+                  </span>
+                  <span>
+                    ({apiService?.reviews?.length ?? (displayServices?.[0]?.reviews || 0)} reviews)
                   </span>
                 </div>
 
-                <div className="mt-5 space-y-3">
-                  <div
-                    onClick={() => setShowWarrantyModal(true)}
-                    className="flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer hover:border-orange-500"
-                  >
-                    <div className="flex gap-2 items-center">
-                      <span>🏅</span>
-                      <span className="text-sm text-gray-500 hover:text-orange-600">
-                        {displayServices?.[0]?.warrantyDays || 0} Days Warranty
-                      </span>
-                    </div>
-                    <span>›</span>
-                  </div>
+                <span className="text-gray-300 dark:text-gray-600">|</span>
 
-                  <div className="flex justify-between items-center border rounded-xl px-4 py-3 hover:border-orange-500">
-                    <div className="flex gap-2 items-center">
-                      <span>💳</span>
-                      <Link
-                        href={`/rate-card?service_id=${serviceId}`}
-                        className="text-sm text-gray-500 hover:text-orange-600"
-                      >
-                        Standard rate card no hidden charges
-                      </Link>
-                    </div>
-                    <span>›</span>
-                  </div>
+                <div className="flex items-center gap-1">
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    {service?.bookings || 0}
+                  </span>
+                  <span>
+                    (Bookings in {service?.city || "Raipur"})
+                  </span>
                 </div>
               </div>
+
+              {Number(displayServices?.[0]?.warrantyDays || apiService?.warranty_days || 0) > 0 && (
+                <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-2xl px-6 py-4 mt-6 relative max-w-lg sm:block hidden">
+                  <div className="absolute -top-3 left-5 bg-white px-3 py-1 border rounded-lg flex items-center gap-2">
+                    <div className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs">
+                      ✓
+                    </div>
+                    <span className="text-sm font-medium text-gray-800">
+                      TAS<span className="text-orange-500">Pro</span> Cover
+                    </span>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div
+                      onClick={() => setShowWarrantyModal(true)}
+                      className="flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer hover:border-orange-500"
+                    >
+                      <div className="flex gap-2 items-center">
+                        <span>🏅</span>
+                        <span className="text-sm text-gray-500 hover:text-orange-600">
+                          {displayServices?.[0]?.warrantyDays || apiService?.warranty_days || 0} Days Warranty
+                        </span>
+                      </div>
+                      <span>›</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border rounded-xl px-4 py-3 hover:border-orange-500">
+                      <div className="flex gap-2 items-center">
+                        <span>💳</span>
+                        <Link
+                          href={`/rate-card?service_id=${serviceId}`}
+                          className="text-sm text-gray-500 hover:text-orange-600"
+                        >
+                          Standard rate card no hidden charges
+                        </Link>
+                      </div>
+                      <span>›</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="relative w-full rounded-[24px] overflow-hidden group">
+            <div
+              className="w-full md:w-[580px] lg:w-[660px] xl:w-[720px] h-[240px] sm:h-[300px] lg:h-[320px] relative rounded-[24px] overflow-hidden shadow-sm shrink-0 border border-gray-100/80"
+            >
+              <div className="relative w-full h-full rounded-[24px] overflow-hidden group">
                 {/* Banner Image */}
                 <img
-                  src={banners[currentBanner]}
-                  alt="banner"
-                  className="w-full h-full md:h-[300px]  object-cover transition-all duration-500"
+                  key={currentBanner}
+                  src={
+                    banners[currentBanner]
+                      ? getImageUrl(banners[currentBanner], "/tas.logo.png")
+                      : getImageUrl(fallbackBanner, "/tas.logo.png")
+                  }
+                  alt={service?.name || "Service Banner"}
+                  className="w-full h-full object-fill transition-all duration-500 rounded-[24px]"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/tas.logo.png";
+                  }}
                 />
 
                 {/* Left Button */}
@@ -542,11 +793,10 @@ const totalSavings = cartItems.reduce(
                       <button
                         key={index}
                         onClick={() => setCurrentBanner(index)}
-                        className={`h-2 rounded-full transition-all ${
-                          currentBanner === index
-                            ? "w-6 bg-white"
-                            : "w-2 bg-white/60"
-                        }`}
+                        className={`h-2 rounded-full transition-all ${currentBanner === index
+                          ? "w-6 bg-white"
+                          : "w-2 bg-white/60"
+                          }`}
                       />
                     ))}
                   </div>
@@ -558,8 +808,8 @@ const totalSavings = cartItems.reduce(
       </section>
 
       <div className="w-full max-w-7xl pt-5 mx-auto sm:px-5">
-        <div className="flex flex-col lg:flex-row gap-8 ">
-          <div className="w-full lg:w-[60%] lg:flex-none">
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          <div className="w-full lg:w-[60%] min-w-0">
             {offers.length > 0 && (
               <div className="sm:hidden mb-5 ">
                 <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
@@ -579,7 +829,10 @@ const totalSavings = cartItems.reduce(
               </div>
             )}
 
-            <div className="relative w-full flex items-center mb-5">
+            <div
+              style={{ position: "sticky", top: "80px", zIndex: 40 }}
+              className="bg-white dark:bg-gray-900 py-3 w-full flex items-center mb-5 shadow-sm"
+            >
               {activeScroll === "tabs" && canScroll && !atStart && (
                 <button
                   onClick={() => scroll(tabsRef, "left")}
@@ -589,35 +842,49 @@ const totalSavings = cartItems.reduce(
                 </button>
               )}
 
-              <div className="overflow-hidden">
+              <div className="overflow-hidden w-full">
                 <div
                   ref={tabsRef}
-                  className="flex gap-5 overflow-x-auto hide-scrollbar w-full py-2"
+                  className="flex gap-4 overflow-x-auto hide-scrollbar w-full py-2"
                 >
                   {tabs.map((tab: any) => (
                     <div key={tab.id} className="flex-shrink-0">
                       <div
-                        onClick={() => setActiveTab(String(tab.id))}
-                        className={`w-40 h-[105px] p-2 rounded-xl border flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${
-                          activeTab === String(tab.id)
-                            ? "border-[#FF6A00] shadow-[0_4px_12px_rgba(255,106,0,0.18)]"
-                            : "border-gray-200 bg-white"
-                        }`}
+                        onClick={() => {
+                          setActiveTab(String(tab.id));
+                          const el = document.getElementById(`category-section-${tab.id}`);
+                          if (el) {
+                            const yOffset = -210;
+                            const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                            window.scrollTo({ top: y, behavior: "smooth" });
+                          }
+                        }}
+                        className={`w-28 h-14 sm:w-32 sm:h-16 p-1 sm:p-1.5 rounded-xl border flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${activeTab === String(tab.id)
+                          ? "border-[#FF6A00] bg-orange-50/20 shadow-[0_4px_12px_rgba(255,106,0,0.15)] font-bold"
+                          : "border-gray-200 bg-white hover:border-gray-300 font-semibold"
+                          }`}
                       >
-                        {/* IMAGE */}
-                        <img
-                          src="/10.svg"
-                          alt={tab.name}
-                          className=" hidden sm:block w-14 h-10 object-contain mb-3"
-                        />
+                        {/* IMAGE / ICON */}
+                        {tab.icon && tab.icon.length < 5 ? (
+                          <span className="text-lg mb-0.5">{tab.icon}</span>
+                        ) : (
+                          <img
+                            src={safeImage(tab.image)}
+                            alt={tab.name}
+                            className="w-7 h-7 sm:w-8 sm:h-8 aspect-square object-contain mb-0.5 rounded-md flex-shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/tas.logo.png";
+                            }}
+                          />
+                        )}
 
                         {/* TEXT */}
                         <p
-                          className={`text-sm sm:text-[12px] font-semibold ${
-                            activeTab === String(tab.id)
-                              ? "text-[#FF6A00]"
-                              : "text-[#222]"
-                          }`}
+                          title={tab.name?.replace(/repair/gi, "").trim()}
+                          className={`text-[10px] sm:text-[11px] text-center font-medium truncate w-full block text-ellipsis whitespace-nowrap px-1 ${activeTab === String(tab.id)
+                            ? "text-[#FF6A00]"
+                            : "text-gray-700"
+                            }`}
                         >
                           {tab.name?.replace(/repair/gi, "").trim()}
                         </p>
@@ -636,174 +903,237 @@ const totalSavings = cartItems.reduce(
               )}
             </div>
 
-            <div className=" mt-14">
-              <div
-                className={`${
-                  displayServices.length > 2
-                    ? "max-h-[900px] overflow-y-auto pr-2 custom-scrollbar"
-                    : ""
-                }`}
-              >
-                <h3 className="text-lg sm:text-2xl font-semibold text-gray-800 dark:text-white sm:mb-3">
-                  Service
-                </h3>
-                {displayServices.map((subService) => (
+            <div className="mt-8 space-y-10">
+              {(tabs.length > 0
+                ? tabs
+                : [{ id: "default", name: "Service", subServices: displayServices }]
+              ).map((tab: any) => {
+                const tabServices = getServicesForTab(tab);
+                if (!tabServices || tabServices.length === 0) return null;
+
+                return (
                   <div
-                    key={subService.id}
-                    className="sm:w-[80%] w-full lg:max-w-lg"
+                    key={tab.id}
+                    id={`category-section-${tab.id}`}
+                    className="scroll-mt-[210px]"
                   >
-                    <div className="sm:shadow-none shadow-lg rounded-xl py-4 px-4 w-full">
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="relative w-28 h-28 rounded-lg overflow-hidden bg-gray-100">
-                            <img
-                              src={safeImage(subService.image)}
-                              alt={subService.name || "Service"}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                    <h3 className="text-lg sm:text-2xl font-semibold text-gray-800 dark:text-white mb-4 pb-2 border-b border-gray-200">
+                      {tab.name}
+                    </h3>
+                    <div className="space-y-4">
+                      {tabServices.map((subService) => {
+                        const cartItem = cartItems.find(
+                          (item: any) => String(item.id) === String(subService.id),
+                        );
 
-                          <button
-                            onClick={() => {
-                              if (source === "amc") {
-                                setSelectedService(subService);
-                                setShowCapacityModal(true);
-                              } else {
-                                handleAddService(subService);
-                              }
-                            }}
-                            className="-mt-4 border z-10 border-orange-500 text-orange-500 px-4 py-1 rounded-lg text-sm font-medium bg-white shadow-sm"
+                        return (
+                          <div
+                            key={subService.id}
+                            className="w-full max-w-2xl"
                           >
-                            Add
-                          </button>
-                        </div>
+                            <div className="sm:shadow-none shadow-lg border sm:border-0 border-gray-100 dark:border-gray-800 rounded-xl py-4 px-4 w-full bg-white dark:bg-gray-800">
+                              <div className="flex gap-4">
+                                <div className="flex flex-col items-center">
+                                  <div className="relative w-28 h-28 rounded-lg overflow-hidden bg-gray-100">
+                                    <img
+                                      src={safeImage(subService.image)}
+                                      alt={subService.name || "Service"}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = "/tas.logo.png";
+                                      }}
+                                    />
+                                  </div>
 
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              onClick={() => {
-                                setSelectedWarrantyDays(
-                                  subService.warrantyDays || 30,
-                                );
-                                setShowWarrantyModal(true);
-                              }}
-                              className="cursor-pointer text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-md"
-                            >
-                              {subService.warrantyDays || 0} Days Warranty
-                            </span>
+                                  {cartItem ? (
+                                    <div className="-mt-4 z-10 bg-white border border-orange-500 text-orange-500 rounded-lg flex items-center shadow-sm px-2 py-0.5 text-sm font-semibold gap-2">
+                                      <button
+                                        onClick={() => removeFromCart(cartItem.id)}
+                                        className="px-1 text-orange-500 hover:text-orange-600 font-bold"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="text-gray-900 font-medium min-w-[14px] text-center text-xs">
+                                        {cartItem.quantity}
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          if (source === "amc") {
+                                            setSelectedService(subService);
+                                            setShowCapacityModal(true);
+                                          } else {
+                                            handleAddService(subService);
+                                          }
+                                        }}
+                                        className="px-1 text-orange-500 hover:text-orange-600 font-bold"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        if (source === "amc") {
+                                          setSelectedService(subService);
+                                          setShowCapacityModal(true);
+                                        } else {
+                                          handleAddService(subService);
+                                        }
+                                      }}
+                                      className="-mt-4 border z-10 border-orange-500 text-orange-500 px-4 py-1 rounded-lg text-sm font-medium bg-white shadow-sm hover:bg-orange-50 transition"
+                                    >
+                                      Add
+                                    </button>
+                                  )}
+                                </div>
 
-                            <button
-                              onClick={() => handleWishlist(subService.id)}
-                              className="flex-shrink-0"
-                            >
-                              <Heart
-                                className={`w-6 h-6 transition-all duration-300 ${
-                                  wishlistItems.includes(Number(subService.id))
-                                    ? "text-red-500 fill-red-500"
-                                    : "text-gray-400"
-                                }`}
-                              />
-                            </button>
-                          </div>
-                          <div className=" flex justify-between items-start sm:flex-row flex-col">
-                            <div>
-                              <h4 className="font-semibold text-gray-900 dark:text-white mt-1">
-                                {subService.name}
-                              </h4>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span
+                                      onClick={() => {
+                                        setSelectedWarrantyDays(
+                                          subService.warrantyDays || 30,
+                                        );
+                                        setShowWarrantyModal(true);
+                                      }}
+                                      className="cursor-pointer text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-md"
+                                    >
+                                      {subService.warrantyDays || 0} Days Warranty
+                                    </span>
 
-                              <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
-                                <Star className="w-3 h-3 fill-orange-500 text-orange-500" />
-                                <span>
-                                  {typeof subService.rating === "number"
-                                    ? subService.rating.toFixed(1)
-                                    : "0.0"}
-                                </span>
-                                {/* <span>
-                                  ({Math.round(subService.reviews / 1000)}m
-                                  reviews)
-                                </span> */}
-                                <span>({subService.reviews} reviews)</span>
+                                    <div className="flex items-center gap-2">
+                                      {subService.packageTag && (
+                                        <span className="text-[11px] bg-green-100 text-green-700 font-semibold px-2.5 py-0.5 rounded-full border border-green-200">
+                                          {subService.packageTag}
+                                        </span>
+                                      )}
+                                      <button
+                                        onClick={() => handleWishlist(subService.id)}
+                                        className="flex-shrink-0"
+                                      >
+                                        <Heart
+                                          className={`w-6 h-6 transition-all duration-300 ${wishlistItems.includes(Number(subService.id))
+                                            ? "text-red-500 fill-red-500"
+                                            : "text-gray-400"
+                                            }`}
+                                        />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className=" flex justify-between items-start sm:flex-row flex-col">
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900 dark:text-white mt-1">
+                                        {subService.name}
+                                      </h4>
+
+                                      <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                                        <Star className="w-3 h-3 fill-orange-500 text-orange-500" />
+                                        <span>
+                                          {typeof subService.rating === "number"
+                                            ? subService.rating.toFixed(1)
+                                            : "0.0"}
+                                        </span>
+                                        <span>({subService.reviews} reviews)</span>
+                                      </div>
+
+                                      <div className="flex gap-2 py-2">
+                                        <Clock className="w-4 h-4" />
+                                        <p className="text-xs text-gray-700">
+                                          {subService.duration} approx
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex flex-col mt-2 items-end">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-gray-900 dark:text-white text-lg">
+                                          ₹{subService.discountedPrice}
+                                        </span>
+
+                                        {subService.originalPrice ? (
+                                          <span className="text-xs text-gray-400 line-through">
+                                            ₹{subService.originalPrice}
+                                          </span>
+                                        ) : null}
+                                      </div>
+
+                                      {(() => {
+                                        const orig = subService.originalPrice;
+                                        const disc = subService.discountedPrice;
+                                        const calcOff =
+                                          orig && disc && orig > disc
+                                            ? Math.round(((orig - disc) / orig) * 100)
+                                            : null;
+                                        const offText =
+                                          (subService as any).offer ||
+                                          (calcOff ? `${calcOff}% OFF` : null);
+
+                                        return offText ? (
+                                          <span className="text-green-600 text-xs font-semibold mt-1">
+                                            {offText}
+                                          </span>
+                                        ) : null;
+                                      })()}
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
 
-                              <div className="flex gap-2 py-2">
-                                <Clock className="w-4 h-4" />
-                                <p className="text-xs text-gray-700">
-                                  {subService.duration} approx
-                                </p>
-                              </div>
+                              <ul className="text-xs text-gray-500 mt-2 space-y-1">
+                                <li>
+                                  • Get 2X deeper dust removal with Foam + PowerJet
+                                  technology
+                                </li>
+                                <li>
+                                  • Intense cleaning of both indoor & outdoor units
+                                </li>
+                              </ul>
+
+                              <p
+                                onClick={() => {
+                                  setSelectedService(subService);
+                                  setShowModal(true);
+                                }}
+                                className="text-blue-600 text-xs mt-2 cursor-pointer"
+                              >
+                                More Details {">>"}
+                              </p>
                             </div>
-
-                            <div className="flex flex-col mt-2 items-end">
-                              {/* Wishlist Heart */}
-
-                              {/* Price */}
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-gray-900 dark:text-white text-lg">
-                                  ₹{subService.discountedPrice}
-                                </span>
-
-                                {subService.originalPrice ? (
-                                  <span className="text-xs text-gray-400 line-through">
-                                    ₹{subService.originalPrice}
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              {/* Offer Text */}
-                              <span className="text-green-600 text-xs font-medium mt-1">
-                                {subService.packageTag || "Offer Available"}
-                              </span>
-                            </div>
                           </div>
-                        </div>
-                      </div>
-
-                      <ul className="text-xs text-gray-500 mt-2 space-y-1">
-                        <li>
-                          • Get 2X deeper dust removal with Foam + PowerJet
-                          technology
-                        </li>
-                        <li>
-                          • Intense cleaning of both indoor & outdoor units
-                        </li>
-                      </ul>
-
-                      <p
-                        onClick={() => {
-                          setSelectedService(subService);
-                          setShowModal(true);
-                        }}
-                        className="text-blue-600 text-xs mt-2 cursor-pointer"
-                      >
-                        More Details {">>"}
-                      </p>
+                        );
+                      })}
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
           {showDifferentServiceModal && (
-            <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center  justify-center px-4">
-              <div className="bg-white w-full max-w-md p-6 shadow-xl rounded-xl">
-                <h2 className="text-2xl font-bold mb-5">
+            <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-white w-full max-w-md p-6 sm:p-7 shadow-2xl rounded-3xl border border-gray-100 relative text-center transform transition-all scale-100">
+                {/* Warning Badge Icon */}
+                <div className="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mx-auto mb-4 border border-orange-200/50 shadow-sm">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-2 tracking-tight">
                   Different Service Type
                 </h2>
 
-                <p className="text-xl leading-7 mb-8">
-                  Adding this service will clear your current cart. Do you want
-                  to continue?
+                <p className="text-sm text-gray-600 leading-relaxed mb-6 px-2">
+                  Adding this service will clear your current cart items. Do you want to continue?
                 </p>
 
-                <div className="flex justify-end gap-8">
+                <div className="flex gap-3">
                   <button
                     onClick={() => {
                       setShowDifferentServiceModal(false);
                       setPendingCartItem(null);
                     }}
-                    className="text-[#8FE3D6] font-bold text-lg"
+                    className="w-1/2 py-3 px-4 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold text-sm transition-all active:scale-95"
                   >
-                    CANCEL
+                    Cancel
                   </button>
 
                   <button
@@ -817,29 +1147,21 @@ const totalSavings = cartItems.reduce(
                         setPendingCartItem(null);
                       }, 100);
                     }}
-                    className="text-[#8FE3D6] font-bold text-lg"
+                    className="w-1/2 py-3 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm shadow-md shadow-orange-500/20 transition-all active:scale-95"
                   >
-                    CONTINUE
+                    Continue
                   </button>
                 </div>
               </div>
             </div>
           )}
-          <div className="flex-1  w-[30%] flex-shrink-0">
-            <div className="flex flex-col items-start lg:items-end space-y-0 sm:space-y-6 max-w-[30%]">
+          <div
+            style={{ position: "sticky", top: "92px", zIndex: 30 }}
+            className="w-full lg:w-[40%] lg:flex-shrink-0 self-start space-y-5"
+          >
+            <div className="flex flex-col space-y-4 w-full">
               <div
-                className="
-    bg-white
-    rounded-xl
-    border
-    border-gray-200
-    p-5
-    mb-5
-    sticky
-    top-20
-    w-full
-
-  "
+                className="bg-white rounded-xl border border-gray-200 p-5 w-full shadow-xs"
               >
                 {cartItems.length === 0 ? (
                   <div className="text-center">
@@ -862,11 +1184,10 @@ const totalSavings = cartItems.reduce(
                     </h3>
 
                     <div
-                      className={`cart-scroll mb-4 space-y-4 ${
-                        cartItems.length > 3
-                          ? "h-[110px] overflow-y-auto overscroll-contain pr-2 "
-                          : ""
-                      }`}
+                      className={`cart-scroll mb-4 space-y-4 ${cartItems.length > 3
+                        ? "h-[110px] overflow-y-auto overscroll-contain pr-2 "
+                        : ""
+                        }`}
                     >
                       <style jsx>{`
                         .cart-scroll {
@@ -884,9 +1205,12 @@ const totalSavings = cartItems.reduce(
                           key={item.id}
                           className="grid grid-cols-3 items-center gap-2"
                         >
-                          <div className="truncate">
-                            <p className="text-sm text-gray-400 truncate">
+                          <div className="truncate pr-1">
+                            <p className="text-sm font-semibold text-gray-900 truncate" title={item.name}>
                               {item.name}
+                            </p>
+                            <p className="text-xs text-gray-500 font-medium truncate mt-0.5" title={(item as any).subCategoryName || (item as any).serviceName || (item as any).service_name || ""}>
+                              {(item as any).subCategoryName || (item as any).serviceName || (item as any).service_name || "Service"}
                             </p>
                           </div>
 
@@ -911,35 +1235,47 @@ const totalSavings = cartItems.reduce(
                           </div>
 
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-gray-900">
-                              ₹{item.discountedPrice * item.quantity}
-                            </p>
-                            <p className="text-xs text-gray-400 line-through">
-                              ₹{item.originalPrice + 50}
-                            </p>
+                            {(() => {
+                              const { discountedPrice: disc, originalPrice: orig } = getItemActivePrices(item);
+                              const displayOrig = orig > disc ? orig : (disc > 0 ? Math.round(disc * 1.25) : 0);
+                              return (
+                                <>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    ₹{disc * item.quantity}
+                                  </p>
+                                  {displayOrig > disc ? (
+                                    <p className="text-xs text-gray-400 line-through">
+                                      ₹{displayOrig * item.quantity}
+                                    </p>
+                                  ) : null}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    <div className="pt-4 flex justify-between items-center">
+                    <div className="mt-4 p-3.5 bg-[#FFF7ED] border border-orange-200/60 rounded-xl flex justify-between items-center shadow-xs">
                       <div>
-                        <p className="font-semibold text-gray-900">
+                        <p className="font-bold text-gray-900 text-base">
                           ₹
-                          {cartItems.reduce(
-                            (acc, item) =>
-                              acc + item.discountedPrice * item.quantity,
-                            0,
+                          {Math.round(
+                            cartItems.reduce(
+                              (acc, item) =>
+                                acc + getItemActivePrices(item).discountedPrice * item.quantity,
+                              0,
+                            )
                           )}
                         </p>
-                        <p className="text-green-600 text-xs font-semibold">
-                          You save ₹{totalSavings} on this order
+                        <p className="text-green-700 text-xs font-semibold mt-0.5">
+                          You save ₹{Math.round(totalSavings)} on this order
                         </p>
                       </div>
 
                       <Link
                         href="/cart"
-                        className="bg-orange-500 text-white px-5 py-3 rounded-lg text-sm font-medium"
+                        className="bg-[#FF6A00] hover:bg-orange-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-colors whitespace-nowrap"
                       >
                         View Cart
                       </Link>
@@ -1017,9 +1353,8 @@ const totalSavings = cartItems.reduce(
                   </div>
 
                   <ChevronDown
-                    className={`w-5 h-5 text-gray-500 transition-transform ${
-                      showCoupons ? "rotate-180" : ""
-                    }`}
+                    className={`w-5 h-5 text-gray-500 transition-transform ${showCoupons ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -1057,39 +1392,52 @@ const totalSavings = cartItems.reduce(
 
         <BrandsSection brands={brands} brandsRef={brandsRef} />
 
-        <div className="sm:flex flex-col gap-1 my-5 hidden">
-          <h2 className="text-2xl font-semibold dark:text-white">
-            {apiService?.name} service in Raipur
-          </h2>
+        {apiService?.description && apiService.description.trim() !== "" && (
+          <div className="sm:flex flex-col gap-1 my-5 hidden">
+            <h2 className="text-2xl font-semibold dark:text-white">
+              {apiService?.name} service in Raipur
+            </h2>
 
-          <div
-            className="dark:text-gray-300 text-gray-700 leading-relaxed"
-            dangerouslySetInnerHTML={{
-              __html: apiService?.description || "",
-            }}
+            <div
+              className="dark:text-gray-300 text-gray-700 leading-relaxed"
+              dangerouslySetInnerHTML={{
+                __html: apiService.description,
+              }}
+            />
+          </div>
+        )}
+
+        {apiService?.hiring_guide && apiService.hiring_guide.trim() !== "" && (
+          <div className="sm:flex flex-col gap-1 hidden">
+            <h2 className="text-2xl font-semibold dark:text-white">
+              Hiring guide for {apiService?.name} service in Raipur
+            </h2>
+
+            <div
+              className="dark:text-gray-300 text-gray-700 leading-relaxed"
+              dangerouslySetInnerHTML={{
+                __html: apiService.hiring_guide,
+              }}
+            />
+          </div>
+        )}
+
+        {faqData && faqData.length > 0 && (
+          <FAQSection
+            faqData={faqData}
+            openIndex={openIndex}
+            toggleFAQ={toggleFAQ}
           />
-        </div>
+        )}
 
-        <div className="sm:flex flex-col gap-1 hidden">
-          <h2 className="text-2xl font-semibold dark:text-white">
-            Hiring guide for {apiService?.name} service in Raipur
-          </h2>
-
-          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-            {apiService?.hiring_guide || "No hiring guide available."}
-          </p>
-        </div>
-
-        <FAQSection
-          faqData={faqData}
-          openIndex={openIndex}
-          toggleFAQ={toggleFAQ}
-        />
+        <YouMayLikeServices />
       </div>
 
-      <div className=" sm:block hidden overflow-x-auto hide-scrollbar">
-        <DeepCleaningServices />
-      </div>
+      {categoryServices && categoryServices.length > 0 && (
+        <div className=" sm:block hidden overflow-x-auto hide-scrollbar">
+          <DynamicCategorySection title={categorySectionTitle} viewType={2} data={categoryServices} />
+        </div>
+      )}
       <MobilePhotos galleryImages={galleryImages} />
 
       {apiService?.need_from_you?.length > 0 && (
@@ -1189,6 +1537,9 @@ const totalSavings = cartItems.reduce(
 };
 
 const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
+  if (!reviews || !Array.isArray(reviews) || reviews.length === 0) {
+    return null;
+  }
   return (
     <div className="w-full mx-auto mb-2">
       <div className="relative max-w-7xl text-center rounded-2xl p-0 md:p-8 overflow-visible">
@@ -1239,11 +1590,10 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-5 h-5 ${
-                          i < Math.round(displayServices?.[0]?.rating || 0)
-                            ? "fill-orange-500 text-orange-500"
-                            : "fill-gray-300 text-gray-300"
-                        }`}
+                        className={`w-5 h-5 ${i < Math.round(displayServices?.[0]?.rating || 0)
+                          ? "fill-orange-500 text-orange-500"
+                          : "fill-gray-300 text-gray-300"
+                          }`}
                       />
                     ))}
                   </div>
@@ -1266,13 +1616,12 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
                         <Star className="w-4 h-4 fill-gray-400 text-gray-400" />
                         <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full ${
-                              star >= 4
-                                ? "bg-green-500"
-                                : star === 3
-                                  ? "bg-yellow-400"
-                                  : "bg-red-500"
-                            }`}
+                            className={`h-full rounded-full ${star >= 4
+                              ? "bg-green-500"
+                              : star === 3
+                                ? "bg-yellow-400"
+                                : "bg-red-500"
+                              }`}
                             style={{ width: `${percent}%` }}
                           />
                         </div>
@@ -1373,6 +1722,9 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
 };
 
 const BrandsSection = ({ brands, brandsRef }: any) => {
+  if (!brands || !Array.isArray(brands) || brands.length === 0) {
+    return null;
+  }
   return (
     <div className="mx-auto relative w-full overflow-hidden sm:mt-10">
       <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-5 ">
@@ -1383,11 +1735,14 @@ const BrandsSection = ({ brands, brandsRef }: any) => {
         <div className="flex gap-8 overflow-x-auto hide-scrollbar pb-3">
           {brands.map((brand: any, index: number) => (
             <div key={index} className="min-w-[70px] text-center">
-              <div className=" rounded-full border bg-white flex items-center justify-center">
-                <img
+              <div className="w-16 h-16 rounded-full border bg-white flex items-center justify-center p-2 mx-auto overflow-hidden">
+                <SafeImage
                   src={brand.image}
                   alt={brand.name}
-                  className=" object-contain"
+                  width={50}
+                  height={50}
+                  fallbackSrc="/tas.logo.png"
+                  className="w-full h-full object-contain"
                 />
               </div>
 
@@ -1414,17 +1769,20 @@ const BrandsSection = ({ brands, brandsRef }: any) => {
               key={index}
               className="flex-shrink-0 flex flex-col items-center"
             >
-              <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 flex flex-col items-center text-center border w-28 h-28">
+              <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 flex flex-col items-center justify-center text-center border w-28 h-28">
                 <div className="relative h-[60px] w-full flex items-center justify-center">
-                  <img
+                  <SafeImage
                     src={brand.image}
                     alt={brand.name}
-                    className="object-contain max-h-[60px]"
+                    width={80}
+                    height={60}
+                    fallbackSrc="/tas.logo.png"
+                    className="object-contain max-h-[60px] w-full"
                   />
                 </div>
               </div>
 
-              <p className="text-xs mt-2 dark:text-white text-center w-full line-clamp-2">
+              <p className="text-xs mt-2 text-gray-700 text-center w-full line-clamp-2">
                 {brand.name}
               </p>
             </div>
@@ -1467,16 +1825,16 @@ const FAQSection = ({ faqData, openIndex, toggleFAQ }: any) => {
               </span>
 
               <ChevronDown
-                className={`w-5 h-5 text-orange-500 sm:text-gray-700 dark:sm:text-white transition-transform ${
-                  openIndex === index ? "rotate-180" : ""
-                }`}
+                className={`w-5 h-5 text-orange-500 sm:text-gray-700 dark:sm:text-white transition-transform ${openIndex === index ? "rotate-180" : ""
+                  }`}
               />
             </button>
 
             {openIndex === index && (
-              <p className="text-gray-500 mt-4 sm:mt-3 leading-6 sm:leading-relaxed text-sm sm:text-base">
-                {faq.answer}
-              </p>
+              <div
+                className="text-gray-600 dark:text-gray-300 mt-3 sm:mt-3 leading-6 sm:leading-relaxed text-sm sm:text-base"
+                dangerouslySetInnerHTML={{ __html: faq.answer || "" }}
+              />
             )}
           </div>
         ))}
@@ -1499,9 +1857,8 @@ const MobilePhotos = ({ galleryImages }: any) => {
             .map((img: string, index: number) => (
               <div
                 key={index}
-                className={`overflow-hidden rounded-[28px] bg-gray-100 ${
-                  index === 0 ? "h-[360px]" : "h-[140px]"
-                }`}
+                className={`overflow-hidden rounded-[28px] bg-gray-100 ${index === 0 ? "h-[360px]" : "h-[140px]"
+                  }`}
               >
                 <img src={img} className="w-full h-full object-cover" />
               </div>
@@ -1514,9 +1871,8 @@ const MobilePhotos = ({ galleryImages }: any) => {
             .map((img: string, index: number) => (
               <div
                 key={index}
-                className={`overflow-hidden rounded-[28px] bg-gray-100 ${
-                  index === 1 ? "h-[360px]" : "h-[140px]"
-                }`}
+                className={`overflow-hidden rounded-[28px] bg-gray-100 ${index === 1 ? "h-[360px]" : "h-[140px]"
+                  }`}
               >
                 <img src={img} className="w-full h-full object-cover" />
               </div>

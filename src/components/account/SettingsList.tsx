@@ -19,6 +19,7 @@ import Toggle from "./Toggle";
 import { SelectAddressModal } from "../booking-flow/SelectAddressModal";
 import AddNewAddressModal from "../AddNewAddressModal";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 type ItemProps = {
   icon: React.ReactNode; // ✅ JSX allow karega
@@ -48,7 +49,7 @@ export default function SettingsList({ setActiveView }: Props) {
       setLoadingAddress(true);
 
       const res = await axios.get(
-        "https://app.tasprocompany.in/api/customers/customer-addresses",
+        `${API_BASE_URL}/customers/customer-addresses`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -100,7 +101,7 @@ export default function SettingsList({ setActiveView }: Props) {
     };
 
     await axios.post(
-      "https://app.tasprocompany.in/api/customers/customer-addresses",
+      `${API_BASE_URL}/customers/customer-addresses`,
       payload,
       {
         headers: {

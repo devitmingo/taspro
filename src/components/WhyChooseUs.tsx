@@ -175,7 +175,7 @@ import LayoutContainer from "./LayoutContainer";
 
 const features = [
   {
-    image: "/satis.png",
+    image: "/quality.png",
     title: "100% Satisfaction",
     description:
       "We Don’t provide service only but we change the perception and feeling along. If not free rework done.",
@@ -193,7 +193,7 @@ const features = [
       "We provide 110+ services at best price so that customers need not go outside of tashome in for further choice.",
   },
   {
-    image: "/quality.png",
+    image: "/satis.png",
     title: "Quality Assurance",
     description:
       "We Don’t tell our standards. We show it indeed. The work only is performed by our specialist champs.",
@@ -212,65 +212,91 @@ const features = [
   },
 ];
 const iconMap: Record<string, string> = {
-  "thumb-up": "/satis.png",
+  "thumb-up": "/quality.png",
   visibility: "/trans.png",
   "check-circle": "/one.png",
-  "verified-user": "/quality.png",
+  "verified-user": "/satis.png",
   "attach-money": "/best.png",
   dashboard: "/wide.png",
 };
-const WhyChooseUs = ({ data = [] }: { data?: any[] }) => {
-  const finalFeatures =
-    data.length > 0
-      ? data.map((item) => ({
-          image: iconMap[item.icon] || "/satis.png",
 
-          title: item.title,
-          description: item.description,
-          color: item.color,
-        }))
-      : features;
+const titleIconMap: Record<string, string> = {
+  "100% satisfaction": "/quality.png",
+  transparency: "/trans.png",
+  "one step solution": "/one.png",
+  "quality assurance": "/satis.png",
+  "best of cheapest": "/best.png",
+  "wide range of choice": "/wide.png",
+};
+
+const defaultIconImages = [
+  "/quality.png",
+  "/trans.png",
+  "/one.png",
+  "/satis.png",
+  "/best.png",
+  "/wide.png",
+];
+
+const WhyChooseUs = ({ data }: { data?: any[] }) => {
+  if (!data || !Array.isArray(data) || data.length === 0) return null;
+
+  const finalFeatures = data.map((item, index) => {
+    const lowerTitle = (item.title || "").toLowerCase();
+    const mappedFromIcon = item.icon ? iconMap[item.icon] : null;
+    const mappedFromTitle = titleIconMap[lowerTitle];
+    const fallbackImage = defaultIconImages[index % defaultIconImages.length];
+
+    const image = mappedFromIcon || mappedFromTitle || fallbackImage;
+
+    return {
+      image,
+      title: item.title,
+      description: item.description,
+      color: item.color,
+    };
+  });
 
   return (
-    <section className="py-5 ">
+    <section className="py-6 sm:py-10">
       <LayoutContainer className="relative">
-        {/* <div className="container-custom py-4 shadow-xl sm:shadow-none rounded-xl"> */}
-        <div className="text-center mb-5 sm:mb-10">
-          <h2 className="text-lg sm:text-2xl font-bold text-foreground dark:text-gray-200 mb-3">
-            Why Choose Us
-          </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl mx-auto">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent
-            egestas id erat a ornare. Donec bibendum venenatis mollis. Aliquam
-            id libero at mi bibendum venenatis at ac purus.
-          </p>
-        </div>
+        <div className="bg-[#EDEDED] rounded-3xl p-6 sm:p-10 md:p-12">
+          <div className="text-center mb-6 sm:mb-10">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
+              Why Choose Us
+            </h2>
+            <p className="text-gray-500 text-xs sm:text-sm max-w-3xl mx-auto leading-relaxed">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent
+              egestas id erat a ornare. Donec bibendum venenatis mollis. Aliquam
+              id libero at mi bibendum venenatis at ac purus.
+            </p>
+          </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {finalFeatures.map((feature, index) => (
-            <div
-              key={index}
-              className="flex gap-4 xl:p-5 hover:shadow-card-hover transition-all duration-200"
-            >
-              <div className="flex-shrink-0">
-                <img
-                  src={feature.image}
-                  alt={feature.title}
-                  className="w-5 h-5 sm:w-8 sm:h-8 object-contain"
-                />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {finalFeatures.map((feature, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-4"
+              >
+                <div className="flex-shrink-0 mt-1">
+                  <img
+                    src={feature.image}
+                    alt={feature.title}
+                    className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                  />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm sm:text-base mb-1">
+                    {feature.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-foreground text-xs sm:text-base dark:text-gray-200 mb-1">
-                  {feature.title}
-                </h3>
-                <p className="text-[10px] sm:text-sm text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-        {/* </div> */}
       </LayoutContainer>
     </section>
   );

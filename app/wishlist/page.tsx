@@ -4,6 +4,7 @@ import { ArrowLeft, Heart, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 import { useBooking } from "@/context/BookingContext";
 
 export default function WishlistPage() {
@@ -75,7 +76,7 @@ const toggleWishlist = async (item: any) => {
     const token = localStorage.getItem("token");
 
     const response = await axios.post(
-      `https://app.tasprocompany.in/api/customers/wish-lists/${id}`,
+      `${API_BASE_URL}/customers/wish-lists/${id}`,
       {},
       {
         headers: {
@@ -101,7 +102,7 @@ const toggleWishlist = async (item: any) => {
 
 
      const response = await axios.get(
-       "https://app.tasprocompany.in/api/customers/wish-lists",
+       `${API_BASE_URL}/customers/wish-lists`,
        {
          params: {
            state_name: "Chhattisgarh",

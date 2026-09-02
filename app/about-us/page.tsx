@@ -203,6 +203,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 export default function AboutPage() {
   const [aboutUs, setAboutUs] = useState("");
@@ -216,7 +217,7 @@ export default function AboutPage() {
   const fetchAboutUs = async () => {
     try {
   const res = await axios.get(
-    "https://app.tasprocompany.in/api/customer-policies",
+    `${API_BASE_URL}/customer-policies`,
     {
       headers: {
         Accept: "application/json",

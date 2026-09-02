@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronDown } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 
 const RateCardContent = () => {
   const router = useRouter();
@@ -17,7 +18,7 @@ const RateCardContent = () => {
     const fetchRateCard = async () => {
       try {
         const res = await fetch(
-          `https://app.tasprocompany.in/api/service-details?service_id=${serviceId}&state_name=Chhattisgarh&city_name=Raipur`,
+          `${API_BASE_URL}/service-details?service_id=${serviceId}&state_name=Chhattisgarh&city_name=Raipur`,
           { headers: { accept: "application/json" } },
         );
 

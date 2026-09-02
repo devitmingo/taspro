@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-
-const BASE_URL = "https://app.tasprocompany.in/api";
+import { API_BASE_URL as BASE_URL } from "@/config/api";
 // or your local API URL
 
 const PrivacyPage = () => {

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Camera, User, Mail, Phone, Check, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 import Swal from "sweetalert2";
 
 const CompleteProfileStep1 = () => {
@@ -120,7 +121,7 @@ if (!token) {
       }
 
       const response = await axios.post(
-        "https://app.tasprocompany.in/api/customers/update-profile",
+        `${API_BASE_URL}/customers/update-profile`,
         formData,
         {
           headers: {

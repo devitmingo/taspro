@@ -14,9 +14,6 @@
 }
 
 /* Smooth transitions */
-.transition-all {
-  transition: all 0.2s ease-in-out;
-}
 
 /* Custom scrollbar for horizontal scrolling */
 .overflow-x-auto::-webkit-scrollbar {
@@ -54,4 +51,19 @@
   .grid-responsive {
     grid-template-columns: 2fr 1fr;
   }
+}
+
+@keyframes modalBottomToCenter {
+  0% {
+    transform: translateY(100vh) scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-bottom-to-center {
+  animation: modalBottomToCenter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }

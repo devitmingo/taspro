@@ -1,21 +1,75 @@
 "use client";
+
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import GradientButton2 from "../ui/GradientButton2";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
 import RedeemModal from "./Modals/ReedemModal";
 import RedeemSuccessModal from "./Modals/ReedemSuccessModal";
-// import ShareModal from "./Modals/ShareModal";
+import ShareModal from "./Modals/ShareModal";
+import { useAuth } from "@/context/AuthContext";
 
 type Props = {
   setActiveView: (view: string) => void;
+  profile?: any;
 };
 
-export default function ReferEarn({ setActiveView }: Props) {
+export default function ReferEarn({ setActiveView, profile }: Props) {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+
+  // Dynamic user coins
+  const [coins, setCoins] = useState(453);
+
+  useEffect(() => {
+    if (profile?.coins !== undefined && profile?.coins !== null) {
+      setCoins(Number(profile.coins));
+    }
+  }, [profile]);
+
+  // Dynamic referral code and link
+  const userName = profile?.first_name || (user as any)?.firstName || "TAS";
+  const userMobile = profile?.mobile || (user as any)?.phone || "999";
+  const referralCode = `TAS${userName.slice(0, 3).toUpperCase()}${userMobile.slice(-4)}`;
+
+  const [origin, setOrigin] = useState("https://app.tasprocompany.in");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  const referralLink = `${origin}/login?ref=${referralCode}`;
+
+  const handleShare = async () => {
+    const shareData = {
+      title: "Join TASPRO Company",
+      text: `Use my referral code ${referralCode} to get instant discounts on expert home services on TASPRO!`,
+      url: referralLink,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // Share dismissed
+      }
+    } else {
+      const text = encodeURIComponent(
+        `Hey! Check out TASPRO for trusted home services (AC repair, Electrician, Plumbing & more). Use my referral code ${referralCode} to get instant discounts: ${referralLink}`
+      );
+      window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+    }
+  };
+
+  const handleRedeemSuccess = () => {
+    setIsOpen(false);
+    setIsSuccessOpen(true);
+    setCoins(0);
+  };
 
   const terms = [
     "The cash bonus offer is available exclusively to Premium subscribers of TASPRO Company.",
@@ -38,7 +92,6 @@ export default function ReferEarn({ setActiveView }: Props) {
   return (
     <div className="flex flex-col lg:flex-row gap-10 lg:gap-14 lg:ml-14 px-4 lg:px-0">
       {/* Terms Section */}
-
       <div className="rounded-lg max-w-3xl mx-auto w-full order-3 lg:order-1">
         <h3 className="font-semibold text-[18px] dark:text-white">
           Rules For Refer a friend
@@ -62,16 +115,17 @@ export default function ReferEarn({ setActiveView }: Props) {
 
       {/* Right Section */}
       <div className="flex flex-col items-center gap-6 w-full order-1 lg:order-2">
-        <div className="w-full flex justify-between items-center md:hidden">
+        <div className="w-full flex justify-between items-center mb-6">
           {/* Back */}
           <button
             onClick={() => setActiveView("default")}
-            className="text-black dark:text-white font-medium flex items-center gap-2 hover:text-orange-500 transition"
+            className="text-black dark:text-white font-semibold flex items-center gap-2 hover:text-orange-500 transition cursor-pointer"
           >
             <ArrowLeft size={20} />
-            Refer & Earn
+            <span>Refer & Earn</span>
           </button>
         </div>
+
         {/* Card */}
         <div className="bg-[#0B0B2A] text-white p-6 rounded-2xl md:rounded-2xl w-full md:max-w-[430px] flex flex-col items-center gap-6">
           <p className="text-orange-400 text-center font-semibold">
@@ -81,7 +135,7 @@ export default function ReferEarn({ setActiveView }: Props) {
           <div className="flex flex-col items-center">
             <div className="flex items-center gap-2">
               <img src="/icons/fi1.png" alt="rupees" className="w-8 h-8" />
-              <span className="text-[24px] font-semibold">453</span>
+              <span className="text-[24px] font-semibold">{coins}</span>
             </div>
             <p className="text-sm text-gray-300">Your Coins</p>
           </div>
@@ -116,19 +170,26 @@ export default function ReferEarn({ setActiveView }: Props) {
         </div>
       </div>
 
+      {/* Modals */}
       <RedeemModal
         isOpen={isOpen}
+        coins={coins}
         onClose={() => setIsOpen(false)}
-        onSuccess={() => {
-          setIsOpen(false);
-          setIsSuccessOpen(true);
-        }}
+        onSuccess={handleRedeemSuccess}
       />
+
       <RedeemSuccessModal
         isSuccessOpen={isSuccessOpen}
+        redeemedAmount={coins}
         onClose={() => setIsSuccessOpen(false)}
       />
-      {/* <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} /> */}
+
+      <ShareModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        referralCode={referralCode}
+        referralLink={referralLink}
+      />
     </div>
   );
 }

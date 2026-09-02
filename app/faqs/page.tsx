@@ -3,23 +3,16 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { API_BASE_URL as BASE_URL } from "@/config/api";
 
-interface FAQItem {
-  id?: number;
-  question: string;
-  answer: string;
-}
-
-const FaqPage = () => {
+export default function FaqPage() {
+  const [faqs, setFaqs] = useState<any[]>([]);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const [faqs, setFaqs] = useState<FAQItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     fetchFaqs();
   }, []);
-const BASE_URL = "https://app.tasprocompany.in/api";
 
   const fetchFaqs = async () => {
     try {
@@ -93,9 +86,10 @@ const BASE_URL = "https://app.tasprocompany.in/api";
 
                   {openIndex === index && (
                     <div className="mt-4 pl-4 border-l-2 border-orange-300">
-                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-7">
-                        {faq.answer}
-                      </p>
+                      <div
+                        className="text-sm sm:text-base text-gray-600 dark:text-gray-400 leading-7"
+                        dangerouslySetInnerHTML={{ __html: faq.answer || "" }}
+                      />
                     </div>
                   )}
                 </div>
@@ -110,6 +104,4 @@ const BASE_URL = "https://app.tasprocompany.in/api";
       </main>
     </div>
   );
-};
-
-export default FaqPage;
+}

@@ -69,13 +69,10 @@ const ServiceModal = ({
 
       {/* Modal */}
       <div
-        className={`relative bg-white rounded-2xl shadow-xl w-full max-h-[90vh] overflow-y-auto transform transition-transform duration-200 ${
-          isVisible
-            ? "scale-100 translate-y-0 opacity-100"
-            : "scale-95 translate-y-4 opacity-0"
+        className={`relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${
+          isVisible ? "animate-bottom-to-center" : "opacity-0"
         }`}
         style={{
-          width: "420px",
           borderRadius: "16px",
         }}
       >

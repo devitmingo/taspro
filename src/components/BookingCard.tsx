@@ -1,4 +1,5 @@
 import { Star } from "lucide-react";
+import SafeImage from "@/components/SafeImage";
 
 interface BookingCardProps {
   service: string;
@@ -22,12 +23,11 @@ const BookingCard: React.FC<BookingCardProps> = ({
   date,
   time,
   status,
-  serviceImage = "/ac.png",
+  serviceImage = "/10.svg",
   warrantyText,
   onViewDetails,
   onChat,
   isCompleted = false,
-
 }) => {
   return (
     <div
@@ -39,11 +39,14 @@ const BookingCard: React.FC<BookingCardProps> = ({
         {/* LEFT */}
         <div className="flex gap-3 w-full">
           {/* IMAGE */}
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-            <img
-              src={serviceImage}
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-2 border border-gray-100 flex-shrink-0">
+            <SafeImage
+              src={serviceImage || "/10.svg"}
               alt={service}
-              className="w-full h-full object-cover"
+              width={56}
+              height={56}
+              fallbackSrc="/tas.logo.png"
+              className="w-full h-full object-contain"
             />
           </div>
 
@@ -73,7 +76,17 @@ const BookingCard: React.FC<BookingCardProps> = ({
         {/* RIGHT */}
         <div className="flex sm:flex-col justify-between sm:items-end items-center gap-3 w-full sm:w-auto">
           {/* STATUS */}
-          <span className="bg-orange-100 text-orange-600 text-[clamp(11px,1vw,13px)] px-2 sm:px-3 py-1 rounded-md font-medium">
+          <span
+            className={`text-[clamp(11px,1vw,13px)] px-2.5 sm:px-3 py-1 rounded-md font-semibold tracking-wide ${
+              status?.toLowerCase() === "rescheduled"
+                ? "bg-amber-100 text-amber-800 border border-amber-300"
+                : status?.toLowerCase() === "completed"
+                ? "bg-green-100 text-green-700"
+                : status?.toLowerCase() === "rejected" || status?.toLowerCase() === "cancelled"
+                ? "bg-red-100 text-red-700"
+                : "bg-orange-100 text-orange-600"
+            }`}
+          >
             {status}
           </span>
 

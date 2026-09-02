@@ -142,7 +142,7 @@ const AllServicesPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Breadcrumb */}
           <div className="mb-6">
-            <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+            <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <a href="/" className="hover:text-primary">Home</a>
               <span>/</span>
               <span className="text-foreground">All Services</span>

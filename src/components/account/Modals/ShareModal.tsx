@@ -1,104 +1,204 @@
 "use client";
 
-import { Copy } from "lucide-react";
+import { useState } from "react";
+import { Copy, Check, Share2, MessageCircle, Mail, X } from "lucide-react";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  referralCode?: string;
+  referralLink?: string;
 };
 
-const ShareModal = ({ isOpen, onClose }: Props) => {
+const ShareModal = ({
+  isOpen,
+  onClose,
+  referralCode = "TASPRO",
+  referralLink = "https://app.tasprocompany.in",
+}: Props) => {
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
   if (!isOpen) return null;
 
-  const shareLink =
-    "https://www.figma.com/file/cSkqYkiSpzSXdwaiXd2FZj/Net-Card?type=design";
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(shareLink);
+  const copyLinkToClipboard = () => {
+    navigator.clipboard.writeText(referralLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const people = Array(8).fill({
-    name: "User Name",
-    img: "/img/referimg.png",
-  });
+  const copyCodeToClipboard = () => {
+    navigator.clipboard.writeText(referralCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
 
-  const socials = [
-    { name: "WhatsApp", icon: "/whatsapp.png" },
-    { name: "Facebook", icon: "/facebook.png" },
-    { name: "Twitter", icon: "/twitter.png" },
-    { name: "Instagram", icon: "/instagram.png" },
-    { name: "LinkedIn", icon: "/linkedin.png" },
-  ];
+  const shareText = `Hey! Check out TASPRO for trusted home services (AC repair, Electrician, Plumber, Cleaning). Use my referral code *${referralCode}* to get instant discounts! Sign up here: ${referralLink}`;
+
+  const shareWhatsApp = () => {
+    window.open(
+      `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`,
+      "_blank"
+    );
+  };
+
+  const shareSMS = () => {
+    window.open(`sms:?body=${encodeURIComponent(shareText)}`, "_blank");
+  };
+
+  const shareEmail = () => {
+    window.open(
+      `mailto:?subject=${encodeURIComponent("Join TASPRO - Get instant discounts!")}&body=${encodeURIComponent(shareText)}`,
+      "_blank"
+    );
+  };
+
+  const shareNative = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Join TASPRO Company",
+          text: `Use my referral code ${referralCode} on TASPRO!`,
+          url: referralLink,
+        });
+      } catch (e) {
+        // Cancelled
+      }
+    } else {
+      shareWhatsApp();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white w-[92%] max-w-[520px] rounded-[40px] sm:rounded-[52px] p-5 sm:p-8 relative shadow-xl">
-        {/* Close */}
-        <div className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 flex justify-end items-center w-full">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-gray-800 w-full max-w-md rounded-3xl p-6 sm:p-7 relative shadow-2xl space-y-5"
+      >
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center text-gray-500 dark:text-gray-300 transition cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Header */}
+        <div className="text-center pt-1">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            Refer a Friend
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Choose how you would like to invite your friends
+          </p>
+        </div>
+
+        {/* 1. WhatsApp Instant Share (Primary) */}
+        <button
+          onClick={shareWhatsApp}
+          className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-2xl flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition cursor-pointer"
+        >
+          <img src="/whatsapp.png" alt="WhatsApp" className="w-6 h-6 object-contain" onError={(e) => { (e.target as any).style.display = 'none'; }} />
+          <span className="text-sm sm:text-base">Share on WhatsApp</span>
+        </button>
+
+        {/* 2. Referral Code Copy Box */}
+        <div className="border-2 border-dashed border-orange-300 dark:border-orange-700/60 bg-orange-50/70 dark:bg-orange-950/30 rounded-2xl p-3.5 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
+              Referral Code
+            </p>
+            <p className="text-lg font-mono font-black text-gray-900 dark:text-white tracking-widest mt-0.5">
+              {referralCode}
+            </p>
+          </div>
+
           <button
-            onClick={onClose}
-            className="relative w-[50px] h-[50px] overflow-hidden cursor-pointer"
+            onClick={copyCodeToClipboard}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold shadow-sm transition cursor-pointer"
           >
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-[30px] h-[30px] bg-white"></div>
-            </div>
-            <img
-              src="/cancel.png"
-              alt="cancel"
-              className="absolute inset-0 w-full h-full"
-            />
+            {copiedCode ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Code</span>
+              </>
+            )}
           </button>
         </div>
 
-        {/* Title */}
-        <h2 className="text-center text-black font-semibold text-lg mb-4">
-          Share
-        </h2>
-
-        {/* Link Box */}
-        <div className="flex items-center justify-between border rounded-xl px-3 py-2 mb-5">
-          <span className="text-black text-xs sm:text-sm w-[70%] sm:w-[80%] break-words line-clamp-2">
-            {shareLink}
+        {/* 3. Link Copy Box */}
+        <div className="border border-gray-200 dark:border-gray-700 rounded-2xl p-3 bg-gray-50 dark:bg-gray-700/40 flex items-center justify-between gap-2">
+          <span className="text-xs text-gray-600 dark:text-gray-300 truncate font-mono flex-1">
+            {referralLink}
           </span>
-          <div className="flex flex-col items-center justify-center min-w-[50px]">
-            <Copy
-              size={30}
-              onClick={copyToClipboard}
-              className="cursor-pointer text-gray-900 rotate-180 hover:text-black"
-            />
-            <span className="text-[16px] text-gray-900 mt-1">Copy</span>
-          </div>
+          <button
+            onClick={copyLinkToClipboard}
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-900 hover:bg-black text-white dark:bg-gray-600 dark:hover:bg-gray-500 rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            {copiedLink ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-green-400" />
+                <span className="text-green-400">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Link</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {/* People (Perfect 4 per row, tight spacing) */}
-        <div className="flex flex-wrap mb-5 gap-4 sm:gap-6 justify-center">
-          {people.map((p, i) => (
-            <div key={i} className=" flex flex-col items-center mb-4">
-              <img
-                src={p.img}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover"
-                alt={p.name}
-              />
-              <p className="mt-1 text-[13px] sm:text-[15px] text-black text-center leading-tight px-1">
-                {p.name}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="w-full h-[1px] bg-[#E1E1E1] my-[25px] shadow-sm" />
-
-        {/* Social Icons */}
-        <div className="flex justify-between px-1 sm:px-2 gap-2">
-          {socials.map((s, i) => (
-            <div
-              key={i}
-              className="flex flex-col items-center w-[55px] sm:w-[60px]"
+        {/* 4. More Options Grid */}
+        <div className="pt-2">
+          <p className="text-[11px] text-gray-400 text-center uppercase tracking-wider mb-3">
+            More Options
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <button
+              onClick={shareNative}
+              className="flex flex-col items-center justify-center p-3 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-gray-700 transition cursor-pointer"
             >
-              <img src={s.icon} className="w-11 h-11" alt={s.name} />
-              <p className="mt-1 text-xs text-black">{s.name}</p>
-            </div>
-          ))}
+              <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-950/50 flex items-center justify-center text-orange-600 mb-1">
+                <Share2 className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-medium text-gray-700 dark:bg-gray-200">
+                More Apps
+              </span>
+            </button>
+
+            <button
+              onClick={shareSMS}
+              className="flex flex-col items-center justify-center p-3 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-gray-700 transition cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 mb-1">
+                <MessageCircle className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-medium text-gray-700 dark:bg-gray-200">
+                SMS
+              </span>
+            </button>
+
+            <button
+              onClick={shareEmail}
+              className="flex flex-col items-center justify-center p-3 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-orange-50 dark:hover:bg-gray-700 transition cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center text-red-600 mb-1">
+                <Mail className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-medium text-gray-700 dark:bg-gray-200">
+                Email
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

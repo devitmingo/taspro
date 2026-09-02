@@ -6,6 +6,7 @@ import { Modal } from "../Modals/Modal";
 import { FormInput } from "../Forms/FormInput";
 import { useToast } from "../../../hooks/use-toast";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 interface BankAccount {
   id: string;
@@ -48,7 +49,7 @@ const fetchBankAccounts = async () => {
     const token = localStorage.getItem("token");
 
     const res = await axios.get(
-      "https://app.tasprocompany.in/api/customers/customer-bank-details",
+      `${API_BASE_URL}/customers/customer-bank-details`,
       {
         headers: {
           Accept: "application/json",
@@ -130,7 +131,7 @@ useEffect(() => {
       const token = localStorage.getItem("token");
 
       const res = await axios.post(
-        "https://app.tasprocompany.in/api/customers/customer-bank-details",
+        `${API_BASE_URL}/customers/customer-bank-details`,
         {
           bank_name: newAccount.bankName,
           account_title: newAccount.accountHolderName,
@@ -192,7 +193,7 @@ useEffect(() => {
       const token = localStorage.getItem("token");
 
       const res = await axios.delete(
-        `https://app.tasprocompany.in/api/customers/customer-bank-details/${accountToDelete}`,
+        `${API_BASE_URL}/customers/customer-bank-details/${accountToDelete}`,
         {
           headers: {
             Accept: "application/json",

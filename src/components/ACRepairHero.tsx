@@ -10,8 +10,8 @@ export default function ACRepairHero() {
         {/* Left Column */}
         <div className="space-y-6">
           {/* Breadcrumb */}
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Home className="w-4 h-4" />
+          <div className="flex items-center space-x-1.5 text-xs text-gray-500">
+            <Home className="w-3.5 h-3.5" />
             <span>/</span>
             <span>AC & Appliance Repair</span>
             <span>/</span>

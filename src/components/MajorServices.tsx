@@ -33,8 +33,9 @@ const majorServices = [
   },
 ];
 
-const MajorServices = ({ data = [] }: { data?: any[] }) => {
-  const finalServices = data.length > 0 ? data : majorServices;
+const MajorServices = ({ data }: { data?: any[] }) => {
+  if (!data || !Array.isArray(data) || data.length === 0) return null;
+  const finalServices = data;
 
   const router = useRouter();
   const sliderRef = useRef<HTMLDivElement>(null);

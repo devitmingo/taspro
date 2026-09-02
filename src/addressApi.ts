@@ -1,7 +1,8 @@
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 const API = axios.create({
-  baseURL: "https://app.tasprocompany.in/api",
+  baseURL: API_BASE_URL,
 });
 
 // 🔥 interceptor (BEST WAY)

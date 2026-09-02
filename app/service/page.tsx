@@ -151,7 +151,7 @@ const ACRepairServicePage = () => {
       <div className="max-w-[1200px] mx-auto px-6 py-8">
         {/* Breadcrumb */}
         <section className="mb-6">
-          <div className="text-sm text-gray-500">
+          <div className="text-xs text-gray-500">
             Home / AC & Appliance Repair / AC Repair
           </div>
         </section>

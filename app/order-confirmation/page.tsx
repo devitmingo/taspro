@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 import { useBooking } from "@/context/BookingContext";
 
 import SuccessCard from "@/components/SuccessCard";
 import CustomerDetails from "@/components/CustomerDetails";
 import CouponCard from "@/components/CouponCard";
 import AmountSummary from "@/components/AmountSummary";
-import DeepCleaningServices from "@/components/DeepCleaningServices";
+import YouMayLikeServices from "@/components/YouMayLikeServices";
 import GradientButton2 from "@/components/ui/GradientButton2";
 import { SelectAddressModal } from "@/components/booking-flow/SelectAddressModal";
 import AddNewAddressModal from "@/components/AddNewAddressModal";
@@ -43,7 +44,7 @@ const totalMRP = cartItems.reduce(
 const totalDiscount = totalMRP - totalAmount;
   const getCustomerAddresses = async (token: string) => {
     const res = await axios.get(
-      "https://app.tasprocompany.in/api/customers/customer-addresses",
+      `${API_BASE_URL}/customers/customer-addresses`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -110,7 +111,7 @@ const totalDiscount = totalMRP - totalAmount;
       altDigits.length === 10 ? `+91 ${altDigits}` : payload.contact_number;
 
     const res = await axios.post(
-      "https://app.tasprocompany.in/api/customers/customer-addresses",
+      `${API_BASE_URL}/customers/customer-addresses`,
       payload,
       {
         headers: {
@@ -193,7 +194,7 @@ const totalDiscount = totalMRP - totalAmount;
           </div>
         </div>
 
-        <DeepCleaningServices title="You might be also interested in" />
+        <YouMayLikeServices />
         <div className="block md:hidden flex justify-center mt-6">
           <Link href="/" className="w-full">
             <GradientButton2

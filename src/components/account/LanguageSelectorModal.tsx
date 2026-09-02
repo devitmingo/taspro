@@ -72,20 +72,16 @@ const LanguageSelectorPage: React.FC<Props> = ({ setActiveView }) => {
 
   return (
     <div className="min-h-screen">
-      <div className="w-full flex justify-between items-center mb-6 md:hidden">
+      <div className="w-full flex justify-between items-center mb-6">
         {/* Back */}
         <button
           onClick={() => setActiveView("default")}
-          className="text-black dark:text-white font-medium flex items-center gap-2 hover:text-orange-500 transition"
+          className="text-black dark:text-white font-semibold flex items-center gap-2 hover:text-orange-500 transition cursor-pointer"
         >
           <ArrowLeft size={20} />
-          Change Language
+          <span>Change Language</span>
         </button>
       </div>
-
-      <h2 className="hidden md:block md:text-[18px] md:text-[#1B1B1B] dark:text-white md:font-semibold md:mb-6">
-        Change Language
-      </h2>
 
       {/* Dropdown */}
       <div className="relative md:w-[390px] max-w-md">

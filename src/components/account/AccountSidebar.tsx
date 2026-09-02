@@ -86,7 +86,6 @@ export default function AccountSidebar() {
 
   const menu: MenuItem[] = [
     { icon: "/icons/Home.png", label: "Home", href: "/" },
-    { icon: "/icons/to-do.png", label: "My Schedule", href: "/schedule" },
     { icon: "/icons/Calender.png", label: "Bookings", href: "/my-booking" },
     { icon: "/icons/profile.png", label: "Account", href: "/account" },
   ];
@@ -96,11 +95,10 @@ export default function AccountSidebar() {
       className="
     hidden md:flex flex-col gap-1 lg:gap-2 xl:gap-3
     bg-white dark:bg-gray-100 rounded-2xl border border-gray-200
-
-    md:w-[80px] lg:w-[250px]   // 👈 FIX
+    md:w-[80px] lg:w-[250px]
     md:px-3 lg:px-6
     md:py-2 lg:py-4
-    h-fit
+    h-fit sticky top-24 self-start flex-shrink-0 z-10
   "
     >
       {menu.map((item) => {

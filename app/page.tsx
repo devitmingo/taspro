@@ -2,333 +2,280 @@
 
 import ServiceSection from "@/components/ServiceSection";
 import FeatureSection from "@/components/FeatureSection";
-import AppliancesGrid from "@/components/AppliancesGrid";
 import ServicePromoSection from "@/components/ServicePromoSection";
-import DeepCleaningServices from "@/components/DeepCleaningServices";
-import CleaningPackage from "@/components/CleaningPackage";
-import HandymanServices from "@/components/HandymanServices";
 import MajorServices from "@/components/MajorServices";
-import AMCServicePlan from "@/components/AMCServicePlan";
 import WhyChooseUs from "@/components/WhyChooseUs";
 import DownloadApp from "@/components/DownloadApp";
 import HomeStartupModal from "@/components/HomeStartupModal";
+import DynamicCategorySection from "@/components/DynamicCategorySection";
 import ServicesSection from "@/components/ServicesSection";
+import NoServiceModal from "@/components/NoServiceModal";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import ServiceReels from "@/components/ServiceReels";
-import Header from "@/components/Header";
 
 export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
 
   const [isMounted, setIsMounted] = useState(false);
-  const [location, setLocation] = useState<any>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [servicesApiData, setServicesApiData] = useState<any[]>([]);
+  const [categoriesData, setCategoriesData] = useState<any[]>([]);
+  const [showNoServiceModal, setShowNoServiceModal] = useState(false);
+  const [unservedCity, setUnservedCity] = useState("Raipur");
+  const [availableCitiesList, setAvailableCitiesList] = useState<any[]>([
+    { name: "Raipur", state: "Chhattisgarh" },
+    { name: "Durg", state: "Chhattisgarh" },
+    { name: "Bhilai", state: "Chhattisgarh" },
+    { name: "New Raipur", state: "Chhattisgarh" },
+  ]);
 
   useEffect(() => {
     setIsMounted(true);
+
+    const fetchCities = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/cities`);
+        if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          const list = res.data.data.map((c: any) => ({
+            name: c.name,
+            state: c.state?.name || "Chhattisgarh",
+          }));
+          setAvailableCitiesList(list);
+        }
+      } catch (e) {}
+    };
+
+    fetchCities();
   }, []);
 
- useEffect(() => {
-   const savedLocation = localStorage.getItem("selected_location");
+  const loadAllData = useCallback(async (state: string, city: string, stateId?: number, cityId?: number) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+      };
+      if (token && token !== "null" && token !== "undefined") {
+        headers.Authorization = `Bearer ${token}`;
+      }
 
-   if (savedLocation) {
-     const location = JSON.parse(savedLocation);
+      const [dashRes, servRes, catRes] = await Promise.allSettled([
+        axios.get(`${API_BASE_URL}/customers/dashboard`, {
+          params: {
+            state,
+            city,
+            state_id: stateId,
+            city_id: cityId,
+            state_name: state,
+            city_name: city,
+          },
+          headers,
+        }),
+        axios.get(`${API_BASE_URL}/services`, {
+          params: {
+            state_name: state,
+            city_name: city,
+          },
+        }),
+        axios.get(`${API_BASE_URL}/service-categories`),
+      ]);
 
-     fetchDashboardData(location.state, location.city);
+      let categories: any[] = [];
 
-     fetchServicesApi(location.state, location.city);
-   } else {
-     fetchDashboardData("Chhattisgarh", "Raipur");
+      if (dashRes.status === "fulfilled" && dashRes.value.data?.data) {
+        setDashboardData(dashRes.value.data.data);
+      }
 
-     fetchServicesApi("Chhattisgarh", "Raipur");
-   }
- }, []);
+      if (catRes.status === "fulfilled" && catRes.value.data?.data && Array.isArray(catRes.value.data.data) && catRes.value.data.data.length > 0) {
+        categories = catRes.value.data.data;
+      } else if (dashRes.status === "fulfilled" && dashRes.value.data?.data?.categories && Array.isArray(dashRes.value.data.data.categories) && dashRes.value.data.data.categories.length > 0) {
+        categories = dashRes.value.data.data.categories;
+      }
 
- const fetchServicesApi = async (state: string, city: string) => {
-   try {
-     const res = await axios.get("https://app.tasprocompany.in/api/services", {
-       params: {
-         state_name: state,
-         city_name: city,
-       },
-     });
+      setCategoriesData(categories);
 
-     setServicesApiData(res.data?.data || []);
-   } catch (error) {
-     console.log(error);
-   }
- };
+      let servicesList: any[] = [];
+      let hasCitySpecificServices = false;
 
- useEffect(() => {
-   const handleLocationChange = (e: any) => {
-     const location = e.detail;
+      if (servRes.status === "fulfilled" && servRes.value.data?.data && Array.isArray(servRes.value.data.data) && servRes.value.data.data.length > 0) {
+        servicesList = servRes.value.data.data;
+        hasCitySpecificServices = true;
+      }
 
-     fetchDashboardData(location.state, location.city);
+      // Check if dashboard returned city-specific services
+      if (dashRes.status === "fulfilled" && dashRes.value.data?.data) {
+        const dData = dashRes.value.data.data;
+        const hasAppliance = Array.isArray(dData.appliance_repair_services?.data || dData.appliance_repair_services) && (dData.appliance_repair_services?.data || dData.appliance_repair_services).length > 0;
+        const hasDeep = Array.isArray(dData.deep_cleaning_services?.data || dData.deep_cleaning_services) && (dData.deep_cleaning_services?.data || dData.deep_cleaning_services).length > 0;
+        const hasCleaning = Array.isArray(dData.cleaning_packages?.data || dData.cleaning_packages) && (dData.cleaning_packages?.data || dData.cleaning_packages).length > 0;
+        const hasHandyman = Array.isArray(dData.handyman_services?.data || dData.handyman_services) && (dData.handyman_services?.data || dData.handyman_services).length > 0;
+        if (hasAppliance || hasDeep || hasCleaning || hasHandyman) {
+          hasCitySpecificServices = true;
+          if (servicesList.length === 0 && hasAppliance) {
+            servicesList = dData.appliance_repair_services?.data || dData.appliance_repair_services;
+          }
+        }
+      }
 
-     fetchServicesApi(location.state, location.city);
-   };
+      setServicesApiData(servicesList);
 
-   window.addEventListener("location-changed", handleLocationChange);
+      if (!hasCitySpecificServices) {
+        setUnservedCity(city || "your city");
+        setShowNoServiceModal(true);
+      } else {
+        setShowNoServiceModal(false);
+      }
+    } catch (error) {
+      console.error("Error loading home data:", error);
+    }
+  }, []);
 
-   return () => {
-     window.removeEventListener("location-changed", handleLocationChange);
-   };
- }, []);
+  // Initial Data Fetch
+  useEffect(() => {
+    const savedLocation = localStorage.getItem("selected_location");
+    if (savedLocation) {
+      try {
+        const loc = JSON.parse(savedLocation);
+        loadAllData(loc.state || "Chhattisgarh", loc.city || "Raipur", loc.state_id, loc.city_id);
+        return;
+      } catch (e) {}
+    }
+    loadAllData("Chhattisgarh", "Raipur");
+  }, [loadAllData]);
 
-useEffect(() => {
-  fetchDashboardData("Chhattisgarh", "Raipur");
-  fetchServicesApi("Chhattisgarh", "Raipur");
-}, []);
+  // Listen to Location Change Events
+  useEffect(() => {
+    const handleLocationChange = (e: any) => {
+      const loc = e.detail;
+      if (loc && loc.city) {
+        loadAllData(loc.state || "Chhattisgarh", loc.city, loc.state_id, loc.city_id);
+      }
+    };
 
-const fetchDashboardData = async (
-  state: string,
-  city: string,
-  stateId?: number,
-  cityId?: number,
-) => {
-  try {
-    const token = localStorage.getItem("token");
+    window.addEventListener("location-changed", handleLocationChange);
+    return () => {
+      window.removeEventListener("location-changed", handleLocationChange);
+    };
+  }, [loadAllData]);
 
-    const res = await axios.get(
-      "https://app.tasprocompany.in/api/customers/dashboard",
-      {
-        params: {
-          state,
-          city,
-          state_id: stateId,
-          city_id: cityId,
-          state_name: state,
-          city_name: city,
-        },
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      },
-    );
-
-    setDashboardData(res.data?.data);
-  } catch (error) {
-    console.log(error);
-  }
-};
-
-
+  // Profile completion redirect
   useEffect(() => {
     if (user && !user.profileCompleted) {
       router.push(`/complete-profile?phone=${user.phone}`);
     }
   }, [user, router]);
 
-  useEffect(() => {
-    if (!user) return;
+  const handleSelectAnotherCity = () => {
+    setShowNoServiceModal(false);
+    window.dispatchEvent(new Event("open-location-modal"));
+  };
 
-    const fetchUserLocation = () => {
-      if (!navigator.geolocation) {
-        console.log("Geolocation not supported");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const latitude = position.coords.latitude;
-          const longitude = position.coords.longitude;
-
-          console.log("LAT:", latitude);
-          console.log("LNG:", longitude);
-
-          try {
-            const apiKey = process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY;
-
-            const res = await fetch(
-              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`,
-            );
-
-            const data = await res.json();
-
-            const result = data?.results?.[0];
-        
-
-            let city = "";
-            let state = "";
-            // let city = "";
-            // let state = "";
-
-          
-            if (result?.address_components) {
-              result.address_components.forEach((component: any) => {
-                if (component.types.includes("locality")) {
-                  city = component.long_name;
-                }
-                if (component.types.includes("administrative_area_level_1")) {
-                  state = component.long_name;
-                }
-              });
-            }
-
-            const address = result?.formatted_address || "Address not found";
-        
-
-            const locationData = {
-              latitude,
-              longitude,
-              address,
-              city,
-              state,
-            };
-          
-
-            setLocation(locationData);
-
-            localStorage.setItem("user_location", JSON.stringify(locationData));
-            window.dispatchEvent(new Event("location-updated"));
-
-            await fetchDashboardData(state || "Chhattisgarh", city || "Raipur");
-            console.log("LOCATION DATA:", locationData);
-            console.log("FULL GOOGLE RESPONSE:", data);
-            // console.log("FINAL LOCATION DATA:", locationData);
-            console.log("FULL GOOGLE RESPONSE:", data);
-            // console.log("FINAL LOCATION DATA:", locationData);
-            // call your location-wise service API here
-            // await fetchServicesByLocation(latitude, longitude);
-          } catch (error) {
-            console.error("Geocoding error:", error);
-          }
-        },
-        (error) => {
-          console.error("Location permission denied:", error);
-          fetchDashboardData("Chhattisgarh", "Raipur");
-        },
-      );
+  const handleContinueDefaultCity = (targetCity = "Raipur") => {
+    setShowNoServiceModal(false);
+    const found = availableCitiesList.find((c) => c.name.toLowerCase() === targetCity.toLowerCase());
+    const locationData = {
+      city: targetCity,
+      state: found?.state || "Chhattisgarh",
+      isManual: true,
     };
-    
+    localStorage.setItem("selected_location", JSON.stringify(locationData));
+    window.dispatchEvent(
+      new CustomEvent("location-changed", { detail: locationData })
+    );
+  };
 
-    fetchUserLocation();
-  }, [user]);
-
-  
   if (isMounted && user && !user.profileCompleted) {
     return null;
   }
 
-  const fetchServicesByLocation = async (
-    latitude: number,
-    longitude: number,
-  ) => {
-    try {
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(
-        `https://app.tasprocompany.in/api/services?latitude=${latitude}&longitude=${longitude}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        },
-      );
-
-    const data = await res.json();
-    console.log("Location wise services:", data);
-  } catch (error) {
-    console.error("Service API error:", error);
-  }
-};
-console.log("dashboardData", dashboardData);
-
-useEffect(() => {
-  const loadDashboard = () => {
-    const savedLocation =
-      localStorage.getItem("selected_location");
-
-    if (savedLocation) {
-      const location = JSON.parse(savedLocation);
-
-    fetchDashboardData(
-      location.state,
-      location.city,
-      location.state_id,
-      location.city_id,
-    );
-    } else {
-      fetchDashboardData(
-        "Chhattisgarh",
-        "Raipur"
-      );
-    }
-  };
-
-  loadDashboard();
-
-  const handleLocationChange = (e: any) => {
-    const location = e.detail;
-
-    fetchDashboardData(
-      location.state,
-      location.city,
-      location.state_id,
-      location.city_id,
-    );
-
-    fetchServicesApi(location.state, location.city);
-  };
-
-  window.addEventListener(
-    "location-changed",
-    handleLocationChange
-  );
-
-  return () => {
-    window.removeEventListener(
-      "location-changed",
-      handleLocationChange
-    );
-  };
-}, []);
-
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-screen bg-white relative">
       <HomeStartupModal />
-      {/* <Header />                           */}
+
+      <NoServiceModal
+        isOpen={showNoServiceModal}
+        onClose={() => setShowNoServiceModal(false)}
+        cityName={unservedCity}
+        onSelectAnotherCity={handleSelectAnotherCity}
+        onContinueDefaultCity={handleContinueDefaultCity}
+        availableCities={availableCitiesList.map((c) => c.name)}
+      />
+
       <main>
         <ServiceSection
-          data={dashboardData?.categories || []}
+          data={categoriesData.length > 0 ? categoriesData : (dashboardData?.categories || [])}
           applianceData={servicesApiData}
+          sliders={dashboardData?.sliders || []}
         />
 
-        {/* <ServiceSection /> */}
         <FeatureSection />
-        {/* <AMCServicePlan /> */}
-        <AMCServicePlan data={dashboardData?.amc_services || []} />
 
-        <AppliancesGrid data={servicesApiData} />
-        {/* <AppliancesGrid data={dashboardData?.appliance_repair_services || []} /> */}
-        {/* <DeepCleaningServices /> */}
-        <DeepCleaningServices
-          data={dashboardData?.deep_cleaning_services || []}
-        />
-        {/* <CleaningPackage /> */}
-        <CleaningPackage data={dashboardData?.cleaning_packages || []} />
+        {/* Dynamic Category Sections based on View Type set in Admin Panel */}
+        {categoriesData && categoriesData.length > 0 ? (
+          categoriesData.map((cat: any) => {
+            const catName = (cat.name || "").toLowerCase();
+            let catItems: any[] = [];
 
-        {/* <HandymanServices /> */}
-        <HandymanServices data={dashboardData?.handyman_services || []} />
+            if (catName.includes("appliance")) {
+              catItems = dashboardData?.appliance_repair_services?.data || dashboardData?.appliance_repair_services || servicesApiData;
+            } else if (catName.includes("deep") || catName.includes("house cleaning")) {
+              catItems = dashboardData?.deep_cleaning_services?.data || dashboardData?.deep_cleaning_services || [];
+            } else if (catName.includes("package")) {
+              catItems = dashboardData?.cleaning_packages?.data || dashboardData?.cleaning_packages || [];
+            } else if (catName.includes("handyman")) {
+              catItems = dashboardData?.handyman_services?.data || dashboardData?.handyman_services || [];
+            } else {
+              catItems = servicesApiData;
+            }
 
-        {/* <MajorServices /> */}
+            return (
+              <DynamicCategorySection
+                key={cat.id || cat.name}
+                title={cat.name}
+                viewType={cat.view_type || 1}
+                data={catItems}
+              />
+            );
+          })
+        ) : (
+          <>
+            <DynamicCategorySection
+              title="Appliances Repair & Service"
+              viewType={1}
+              data={dashboardData?.appliance_repair_services || servicesApiData}
+            />
+            <DynamicCategorySection
+              title="Deep Cleaning Services"
+              viewType={2}
+              data={dashboardData?.deep_cleaning_services}
+            />
+            <DynamicCategorySection
+              title="TASpro Cleaning Packages"
+              viewType={3}
+              data={dashboardData?.cleaning_packages}
+            />
+            <DynamicCategorySection
+              title="Handyman Services"
+              viewType={1}
+              data={dashboardData?.handyman_services}
+            />
+          </>
+        )}
+
         <MajorServices data={dashboardData?.major_services || []} />
 
         <ServicePromoSection />
-        {/* <WhyChooseUs /> */}
+
         <WhyChooseUs data={dashboardData?.why_choose_us || []} />
         <DownloadApp />
         <ServiceReels data={dashboardData?.reels || []} />
         <div className="sm:block hidden">
-          <ServicesSection />
+          <ServicesSection data={servicesApiData} dashboardData={dashboardData} />
         </div>
       </main>
     </div>

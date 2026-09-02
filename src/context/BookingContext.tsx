@@ -51,7 +51,18 @@ useEffect(() => {
   const savedCart = localStorage.getItem("cartItems");
 
   if (savedCart) {
-    setCartItems(JSON.parse(savedCart));
+    try {
+      const parsed = JSON.parse(savedCart);
+      const sanitized = parsed.map((item: any) => ({
+        ...item,
+        price: Math.round(Number(item.price || item.discountedPrice || 0)),
+        discountedPrice: Math.round(Number(item.discountedPrice || item.price || 0)),
+        originalPrice: Math.round(Number(item.originalPrice || item.price || 0)),
+      }));
+      setCartItems(sanitized);
+    } catch (e) {
+      setCartItems([]);
+    }
   }
 
   setCartLoaded(true);
@@ -64,13 +75,19 @@ useEffect(() => {
 }, [cartItems, cartLoaded]);
 
  const addToCart = (service: any) => {
-   setCartItems((prev: any[]) => {
-     const existingItem = prev.find((item) => item.id === service.id);
+   const sanitizedService = {
+     ...service,
+     price: Math.round(Number(service.price || service.discountedPrice || 0)),
+     discountedPrice: Math.round(Number(service.discountedPrice || service.price || 0)),
+     originalPrice: Math.round(Number(service.originalPrice || service.price || 0)),
+   };
 
-     // IF ITEM ALREADY EXISTS -> increase quantity
+   setCartItems((prev: any[]) => {
+     const existingItem = prev.find((item) => item.id === sanitizedService.id);
+
      if (existingItem) {
        return prev.map((item) =>
-         item.id === service.id
+         item.id === sanitizedService.id
            ? {
                ...item,
                quantity: item.quantity + 1,
@@ -79,11 +96,10 @@ useEffect(() => {
        );
      }
 
-     // NEW ITEM
      return [
        ...prev,
        {
-         ...service,
+         ...sanitizedService,
          quantity: 1,
        },
      ];

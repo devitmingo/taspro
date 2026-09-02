@@ -141,13 +141,6 @@ const MyProfilePage = () => {
                   <span>Home</span>
                 </a>
                 <a
-                  href="/schedule"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <Calendar className="w-5 h-5" />
-                  <span>My Schedule</span>
-                </a>
-                <a
                   href="/my-booking"
                   className="flex items-center gap-3 px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
                 >

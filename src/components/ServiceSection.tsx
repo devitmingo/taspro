@@ -1,149 +1,98 @@
 "use client";
 
-import {
-  ChevronLeft,
-  ChevronRight,
-  Snowflake,
-  Sparkles,
-  Hammer,
-  Bug,
-  SprayCan,
-  ClipboardCheck,
-} from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import SafeImage from "@/components/SafeImage";
 import ApplianceModal from "./ApplianceModal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LayoutContainer from "./LayoutContainer";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const services = [
+import axios from "axios";
+
+import { API_BASE_URL, getImageUrl } from "@/config/api";
+
+const IMAGE_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const fallbackSliders = [
   {
-    title: "AC & Appliance Repair",
-    icon: Snowflake,
-    color: "purple",
-    link: "/service/ac-repair",
+    id: 1,
+    title: "Home Cleaning Offer",
+    description: "Get up to 30% discount on premium home cleaning services.",
+    image: `${IMAGE_BASE_URL}/storage/sliders/user-slider-1.jpg`,
   },
   {
-    title: "Deep Cleaning Services",
-    icon: Sparkles,
-    color: "blue",
-    link: "/service/deep-cleaning",
+    id: 2,
+    title: "Appliance Repair Services",
+    description: "Professional repair services for all home appliances at your doorstep.",
+    image: `${IMAGE_BASE_URL}/storage/sliders/user-slider-2.jpg`,
   },
   {
-    title: "Handyman Services",
-    icon: Hammer,
-    color: "yellow",
-    link: "/service/handyman",
-  },
-  {
-    title: "Pest Control & Waterproofing",
-    icon: Bug,
-    color: "orange",
-    link: "/service/pest-control",
-  },
-  {
-    title: "Cleaning Packages",
-    icon: SprayCan,
-    color: "green",
-    link: "/service/cleaning-packages",
-  },
-  {
-    title: "AMC Service Plan",
-    icon: ClipboardCheck,
-    color: "gray",
-    link: "/amc-services",
+    id: 3,
+    title: "Expert Handyman Services",
+    description: "Trusted electricians, plumbers, and carpenters available 24/7.",
+    image: `${IMAGE_BASE_URL}/storage/sliders/user-slider-3.jpg`,
   },
 ];
 
-const getColorClasses = (index: number) => {
-  const colors = [
-    {
-      card: "bg-[#E9D5FF]",
-      icon: "text-[#7E22CE]",
-    },
-    {
-      card: "bg-[#DBEAFE]",
-      icon: "text-[#0284C7]",
-    },
-    {
-      card: "bg-[#FEF3C7]",
-      icon: "text-[#F59E0B]",
-    },
-    {
-      card: "bg-[#FFE4E6]",
-      icon: "text-[#F97316]",
-    },
-    {
-      card: "bg-[#DCFCE7]",
-      icon: "text-[#16A34A]",
-    },
-    {
-      card: "bg-[#E0F2FE]",
-      icon: "text-[#0EA5E9]",
-    },
-    {
-      card: "bg-[#FCE7F3]",
-      icon: "text-[#DB2777]",
-    },
-    {
-      card: "bg-[#F3E8FF]",
-      icon: "text-[#9333EA]",
-    },
-    {
-      card: "bg-[#FEF9C3]",
-      icon: "text-[#CA8A04]",
-    },
-  ];
+const getCategoryImageUrl = (service: any) => {
+  const rawImage = service.icon_url || service.icon || service.image || service.icon_image;
+  if (rawImage && rawImage !== "null" && rawImage !== "") {
+    return getImageUrl(rawImage, "/tas.logo.png");
+  }
 
-  return colors[index % colors.length];
+  return "/tas.logo.png";
 };
 
 export default function ServiceSection({
   data = [],
   applianceData = [],
+  sliders = [],
 }: {
   data?: any[];
   applianceData?: any[];
+  sliders?: any[];
 }) {
   const router = useRouter();
   const [showApplianceModal, setShowApplianceModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [categoriesList, setCategoriesList] = useState<any[]>(data);
 
-  const fetchCategoryServices = async (service: any) => {
-    try {
-      console.log("CLICKED SERVICE:", service);
-
-      const url = `https://app.tasprocompany.in/api/services?state=Chhattisgarh&city=Raipur&state_id=1&service_category_id=${service.id}&service_category_name=${encodeURIComponent(service.name)}&state_name=Chhattisgarh&city_name=Raipur`;
-
-      console.log("API URL:", url);
-
-      const res = await fetch(url, {
-        headers: {
-          accept: "application/json",
-        },
-      });
-
-      console.log("STATUS:", res.status);
-
-      const data = await res.json();
-
-      console.log("SERVICES API RESPONSE:", data);
-
-      if (data?.status) {
-        console.log("SUB CATEGORIES:", data.data);
-      }
-
-      router.push(
-        `/service/${service.slug}?service_id=${service.service_id || service.id}`,
-      );
-    } catch (error) {
-      console.log("SERVICES API ERROR:", error);
+  useEffect(() => {
+    if (Array.isArray(data) && data.length > 0) {
+      setCategoriesList(data);
+    } else {
+      axios
+        .get(`${API_BASE_URL}/service-categories`)
+        .then((res) => {
+          if (res.data?.status && Array.isArray(res.data?.data) && res.data.data.length > 0) {
+            setCategoriesList(res.data.data);
+          }
+        })
+        .catch((err) => console.log("Failed to fetch service-categories:", err));
     }
+  }, [data]);
+
+  const sliderList = sliders.length > 0 ? sliders : fallbackSliders;
+
+  useEffect(() => {
+    if (sliderList.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % sliderList.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [sliderList.length]);
+
+  const handleCategoryClick = (service: any) => {
+    setSelectedCategory(service);
+    setShowApplianceModal(true);
   };
 
-  const finalServices = data.length > 0 ? data : services;
+  const finalServices = categoriesList;
 
   return (
-    <section className="w-full sm:pb-10  sm:px-5">
+    <section className="w-full sm:pb-10 sm:px-5">
       <LayoutContainer className="relative">
         <div className="flex flex-col lg:flex-row justify-between items-start">
           {/* Left Side - Service Cards */}
@@ -155,32 +104,31 @@ export default function ServiceSection({
             </h2>
 
             <div
-              className={`grid  grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-x-3 gap-y-5 xl:pb-0 sm:pb-10 ${
+              className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-x-3 gap-y-5 xl:pb-0 sm:pb-10 ${
                 finalServices.length > 6
                   ? "max-h-[320px] overflow-y-auto pr-2"
                   : ""
               }`}
             >
               {finalServices.map((service, index) => {
-                const { card, icon } = getColorClasses(index);
-                const Icon = services[index]?.icon || Snowflake;
+                const imageUrl = getCategoryImageUrl(service);
 
                 return (
                   <div
                     key={service.id || index}
                     className="flex flex-col items-center cursor-pointer group"
-                    onClick={() => {
-                      if (service.name === "Appliances Repair & Service") {
-                        setShowApplianceModal(true);
-                      } else {
-                        fetchCategoryServices(service);
-                      }
-                    }}
+                    onClick={() => handleCategoryClick(service)}
                   >
-                    <div
-                      className={`${card} w-full h-16 sm:h-24 rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-105 transition-all duration-300`}
-                    >
-                      <Icon className={`w-8 h-8 sm:w-12 sm:h-12 ${icon}`} />
+                    <div className="w-full h-20 sm:h-28 bg-gray-50 rounded-2xl flex items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-gray-100 relative">
+                      <SafeImage
+                        src={imageUrl}
+                        alt={service.name || service.title || "Category"}
+                        width={64}
+                        height={64}
+                        fallbackSrc="/tas.logo.png"
+                        className="w-12 h-12 sm:w-16 sm:h-16 object-contain group-hover:scale-105 transition-transform duration-300"
+                        style={{ objectFit: "contain" }}
+                      />
                     </div>
 
                     <p className="mt-2 text-[12px] sm:text-sm font-medium text-gray-800 dark:text-gray-300 text-center leading-tight">
@@ -192,20 +140,90 @@ export default function ServiceSection({
             </div>
           </div>
 
-          {/* Right Side - Hero Image Banner */}
-          <div className="w-full sm:block hidden lg:w-[60%] relative h-[300px] lg:h-[450px] rounded-3xl overflow-hidden shadow-xl group lg:ml-8">
-            <Image
-              src="/heroimage.jpg"
-              alt="Home Services"
-              fill
-              className="object-cover w-full h-full"
-              priority
-            />
+          {/* Right Side - Hero Image Slider Banner */}
+          <div className="w-full sm:block hidden lg:w-[60%] relative h-[300px] lg:h-[450px] rounded-3xl overflow-hidden shadow-xl group lg:ml-8 bg-gray-900">
+            {sliderList.map((slide: any, index: number) => (
+              <div
+                key={slide.id || index}
+                className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                  index === activeSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+                }`}
+              >
+                <SafeImage
+                  src={slide.image || slide.image_url || "/heroimage.jpg"}
+                  alt={slide.title || "Home Services"}
+                  fill
+                  fallbackSrc="/heroimage.jpg"
+                  className="object-cover w-full h-full rounded-3xl"
+                  priority={index === 0}
+                />
+                {/* Overlay gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent rounded-3xl" />
+                {slide.title && (
+                  <div className="absolute bottom-8 left-8 right-8 text-white z-20">
+                    <h3 className="text-xl sm:text-2xl font-bold drop-shadow-md">
+                      {slide.title}
+                    </h3>
+                    {slide.description && (
+                      <p className="text-xs sm:text-sm text-gray-200 mt-1 drop-shadow-sm max-w-lg">
+                        {slide.description}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Slide Dots */}
+            {sliderList.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+                {sliderList.map((_: any, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveSlide(idx)}
+                    className={`h-2.5 rounded-full transition-all duration-300 ${
+                      idx === activeSlide
+                        ? "w-7 bg-orange-500"
+                        : "w-2.5 bg-white/70 hover:bg-white"
+                    }`}
+                    aria-label={`Go to slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Left / Right Arrow Buttons */}
+            {sliderList.length > 1 && (
+              <>
+                <button
+                  onClick={() =>
+                    setActiveSlide(
+                      (prev) => (prev - 1 + sliderList.length) % sliderList.length
+                    )
+                  }
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 backdrop-blur-sm"
+                  aria-label="Previous Slide"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                <button
+                  onClick={() =>
+                    setActiveSlide((prev) => (prev + 1) % sliderList.length)
+                  }
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 backdrop-blur-sm"
+                  aria-label="Next Slide"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
           </div>
         </div>
         <ApplianceModal
           isOpen={showApplianceModal}
           onClose={() => setShowApplianceModal(false)}
+          category={selectedCategory}
           data={applianceData}
         />
       </LayoutContainer>

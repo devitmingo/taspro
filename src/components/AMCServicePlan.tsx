@@ -7,29 +7,54 @@ import { useRef, useEffect, useState } from "react";
 import LayoutContainer from "./LayoutContainer";
 import { useRouter } from "next/navigation";
 
-const amcPlans = [
+const defaultPlans = [
   {
-    title: "Looking for Fridge Repair?",
-    subtitle: "",
-    image:
-      "https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=800&q=80",
+    id: 3,
+    title: "Fridge Repair",
+    subtitle: "Complete cooling & gas refill protection",
+    slug: "refrigerator-repair",
+    image: "/tas.logo.png",
   },
   {
+    id: 1,
     title: "AC Servicing",
-    subtitle: "AC Service repair at your doorstep",
-    image:
-      "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&q=80",
+    subtitle: "Complete AC maintenance plan",
+    slug: "ac-repair-service",
+    image: "/tas.logo.png",
   },
   {
-    title: "Need for Electrician",
-    subtitle: "Electric Service at your doorstep",
-    image:
-      "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=800&q=80",
+    id: 11,
+    title: "Electrician Service",
+    subtitle: "Annual electrical safety & wiring repair",
+    slug: "electrician-service",
+    image: "/tas.logo.png",
+  },
+  {
+    id: 12,
+    title: "Plumber Service",
+    subtitle: "Comprehensive pipe & fixture maintenance",
+    slug: "plumber-service",
+    image: "/tas.logo.png",
+  },
+  {
+    id: 2,
+    title: "Washing Machine Care",
+    subtitle: "Motor, drum & leak protection plan",
+    slug: "washing-machine-repair",
+    image: "/tas.logo.png",
+  },
+  {
+    id: 7,
+    title: "Deep Cleaning Package",
+    subtitle: "Seasonal home deep cleaning service",
+    slug: "full-home-deep-cleaning",
+    image: "/tas.logo.png",
   },
 ];
 
-const AMCServicePlan = ({ data = [] }: { data?: any[] }) => {
-  const finalPlans = data.length > 0 ? data : amcPlans;
+const AMCServicePlan = ({ data }: { data?: any[] }) => {
+  if (!data || !Array.isArray(data) || data.length === 0) return null;
+  const finalPlans = data;
   const router = useRouter();
   const sliderRef = useRef<HTMLDivElement>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -105,27 +130,25 @@ const AMCServicePlan = ({ data = [] }: { data?: any[] }) => {
   };
 
   const scrollLeft = () => {
-    if (!sliderRef.current) return;
-    const slidesToShowCount = getSlidesToShow();
-    const slideWidthPercent = 100 / slidesToShowCount;
-    const newSlide = (currentSlide - 1 + amcPlans.length) % amcPlans.length;
-    setCurrentSlide(newSlide);
-    sliderRef.current.scrollTo({
-      left: (newSlide * sliderRef.current.offsetWidth) / slidesToShowCount,
-      behavior: "smooth",
-    });
+    if (sliderRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = sliderRef.current;
+      if (scrollLeft <= 10) {
+        sliderRef.current.scrollTo({ left: scrollWidth - clientWidth, behavior: "smooth" });
+      } else {
+        sliderRef.current.scrollBy({ left: -320, behavior: "smooth" });
+      }
+    }
   };
 
   const scrollRight = () => {
-    if (!sliderRef.current) return;
-    const slidesToShowCount = getSlidesToShow();
-    const slideWidthPercent = 100 / slidesToShowCount;
-    const newSlide = (currentSlide + 1) % amcPlans.length;
-    setCurrentSlide(newSlide);
-    sliderRef.current.scrollTo({
-      left: (newSlide * sliderRef.current.offsetWidth) / slidesToShowCount,
-      behavior: "smooth",
-    });
+    if (sliderRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = sliderRef.current;
+      if (scrollLeft + clientWidth >= scrollWidth - 10) {
+        sliderRef.current.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        sliderRef.current.scrollBy({ left: 320, behavior: "smooth" });
+      }
+    }
   };
 
   const startAutoScroll = () => {
@@ -149,19 +172,29 @@ const AMCServicePlan = ({ data = [] }: { data?: any[] }) => {
     return () => stopAutoScroll();
   }, [isPaused]);
 
-  useEffect(() => {
-    const handleResize = () => {
-      const slidesToShowCount = getSlidesToShow();
-      sliderRef.current?.scrollTo({
-        left:
-          (currentSlide * sliderRef.current.offsetWidth) / slidesToShowCount,
-        behavior: "smooth",
-      });
-    };
+  const handleBookNow = (plan: any) => {
+    let slug = plan.slug;
+    let serviceId = plan.service_id || plan.id;
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [currentSlide]);
+    if (!slug) {
+      const title = (plan.title || "").toLowerCase();
+      if (title.includes("fridge") || title.includes("refrigerator")) {
+        slug = "refrigerator-repair";
+        serviceId = 3;
+      } else if (title.includes("ac")) {
+        slug = "ac-repair-service";
+        serviceId = 1;
+      } else if (title.includes("electrician")) {
+        slug = "electrician-service";
+        serviceId = 11;
+      } else {
+        slug = "ac-repair-service";
+        serviceId = 1;
+      }
+    }
+
+    router.push(`/service/${slug}?service_id=${serviceId}&source=amc`);
+  };
 
   return (
     <section className="w-full bg-white dark:bg-gray-900 py-5">
@@ -171,7 +204,7 @@ const AMCServicePlan = ({ data = [] }: { data?: any[] }) => {
         </h2>
 
         {/* Navigation Arrows */}
-        {canScroll && !atStart && (
+        {canScroll && (
           <button
             onClick={scrollLeft}
             className="absolute left-[-1px] top-1/2 -translate-y-1/2 bg-white rounded-full w-10 h-10 hidden md:flex items-center justify-center border border-orange-600 text-orange-700 z-10"
@@ -180,7 +213,7 @@ const AMCServicePlan = ({ data = [] }: { data?: any[] }) => {
           </button>
         )}
 
-        {canScroll && !atEnd && (
+        {canScroll && (
           <button
             onClick={scrollRight}
             className="absolute right-[-1px] top-1/2 -translate-y-1/2 bg-white rounded-full w-10 h-10 hidden md:flex items-center justify-center border border-orange-600 text-orange-700 z-10"
@@ -192,17 +225,17 @@ const AMCServicePlan = ({ data = [] }: { data?: any[] }) => {
         <div
           ref={sliderRef}
           className="flex overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden [scrollbar-width:none] snap-x items-center"
-          style={{ gap: "20px" }}
+          style={{ gap: "16px" }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
-          {/* Duplicate slides for infinite loop effect */}
           {[...finalPlans, ...finalPlans].map((plan, index) => (
             <div
               key={index}
-              className=" sm:min-w-[50%] lg:min-w-[30%] flex-shrink-0 snap-center"
+              className="w-[85%] sm:w-[48%] md:w-[31.5%] lg:w-[23.5%] xl:w-[19%] flex-shrink-0 snap-center cursor-pointer"
+              onClick={() => handleBookNow(plan)}
             >
-              <div className="relative w-[382px] h-[228px] rounded-[12px] overflow-hidden  group">
+              <div className="relative w-full aspect-[16/10] h-[155px] sm:h-[165px] rounded-[12px] overflow-hidden group">
                 {/* Background Image */}
                 <SafeImage
                   src={plan.image}
@@ -212,30 +245,27 @@ const AMCServicePlan = ({ data = [] }: { data?: any[] }) => {
                 />
 
                 {/* Dark Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/20" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
 
                 {/* Content */}
-                <div className="absolute inset-0 p-6 flex flex-col justify-end items-start">
-                  <h3 className="text-2xl font-bold text-white mb-2 leading-tight">
+                <div className="absolute inset-0 p-3.5 sm:p-4 flex flex-col justify-end items-start">
+                  <h3 className="text-sm sm:text-base font-bold text-white mb-0.5 leading-tight">
                     {plan.title}
                   </h3>
                   {plan.subtitle && (
-                    <p className="text-gray-200 text-sm mb-4 font-medium">
+                    <p className="text-gray-200 text-[10px] sm:text-xs mb-2 font-medium line-clamp-1">
                       {plan.subtitle}
                     </p>
                   )}
 
                   <button
-                    onClick={() =>
-                      window.dispatchEvent(
-                        new CustomEvent("openApplianceModal", {
-                          detail: { source: "amc" },
-                        }),
-                      )
-                    }
-                    className="mt-2 px-5 py-2.5 border border-orange-500 text-orange-500 rounded-[8px] font-medium bg-transparent hover:bg-orange-500 hover:text-white transition-all duration-300 flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBookNow(plan);
+                    }}
+                    className="mt-0.5 px-3 py-1.5 border border-orange-500 text-orange-500 rounded-[6px] text-[11px] sm:text-xs font-medium bg-transparent hover:bg-orange-500 hover:text-white transition-all duration-300 flex items-center gap-1"
                   >
-                    Book Now <ArrowRight className="w-4 h-4" />
+                    Book Now <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
               </div>

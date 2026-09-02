@@ -6,6 +6,7 @@ import { ArrowLeft, Clock, Shield } from "lucide-react";
 import OTPVerification from "@/components/OTPVerification";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 import Swal from "sweetalert2";
 function OTPVerificationPageContent() {
   const router = useRouter();
@@ -21,7 +22,7 @@ function OTPVerificationPageContent() {
 
    try {
      const res = await axios.post(
-       "https://app.tasprocompany.in/api/customers/verify-otp",
+       `${API_BASE_URL}/customers/verify-otp`,
        {
          country_id: 1,
          mobile: phone,

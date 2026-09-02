@@ -9,15 +9,8 @@ export default function AccountLayout({
   return (
     <div className="min-h-screen dark:bg-gray-900">
       <div className="max-w-7xl mx-auto sm:px-2 md:px-4 lg:px-8 py-3">
-        <Breadcrumb
-          items={[{ label: "Home", href: "/" }, { label: "Profile" }]}
-        />
-
-        {/* Divider */}
-        {/* <div className="w-full h-[1px] bg-[#E1E1E1] mt-[50px]" /> */}
-
         {/* Layout */}
-        <div className="md:mt-10 flex flex-col lg:flex-row gap-8">
+        <div className="md:mt-4 flex flex-col lg:flex-row gap-8 items-start">
           {/* Sidebar */}
           <div className="hidden lg:block w-[220px] flex-shrink-0">
             <AccountSidebar />

@@ -17,28 +17,14 @@ export default function LayoutContent({
   return (
     <>
       {/* HEADER */}
-      {isHomePage ? (
-        <Suspense fallback={null}>
-          <Header />
-        </Suspense>
-      ) : (
-        <div className="hidden md:block">
-          <Suspense fallback={null}>
-            <Header />
-          </Suspense>
-        </div>
-      )}
+      <Suspense fallback={null}>
+        <Header />
+      </Suspense>
 
-      <div className="mx-auto px-4 md:px-8 lg:px-0 py-6">{children}</div>
+      <div className="mx-auto px-4 md:px-8 lg:px-0 pt-6 pb-0">{children}</div>
 
       {/* FOOTER */}
-      {isHomePage ? (
-        <Footer />
-      ) : (
-        <div className="hidden md:block">
-          <Footer />
-        </div>
-      )}
+      <Footer />
     </>
   );
 }

@@ -114,6 +114,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 const CancellationPage = () => {
   const [refundPolicy, setRefundPolicy] = useState("");
@@ -127,7 +128,7 @@ const CancellationPage = () => {
   const fetchPolicy = async () => {
     try {
  const res = await axios.get(
-   "https://app.tasprocompany.in/api/customer-policies",
+   `${API_BASE_URL}/customer-policies`,
    {
      headers: {
        Accept: "application/json",
