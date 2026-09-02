@@ -414,8 +414,26 @@ const ACRepairLayout = () => {
 
         if (data?.status) {
           setServiceDetails(data);
-          const firstTabId = data?.data?.subServices?.[0]?.sub_category_id;
-          if (firstTabId) setActiveTab(String(firstTabId));
+          const subCats = data?.data?.sub_categories || data?.data?.subServices || [];
+          const issues = data?.data?.issues || [];
+
+          // Find first tab with items, or first tab
+          const tabWithItems = subCats.find((sc: any) => {
+            const scId = sc.id ?? sc.sub_category_id;
+            return (
+              (sc.items && sc.items.length > 0) ||
+              issues.some((i: any) => Number(i.service_sub_category_id) === Number(scId))
+            );
+          });
+          const targetTabId =
+            tabWithItems?.id ??
+            tabWithItems?.sub_category_id ??
+            subCats[0]?.id ??
+            subCats[0]?.sub_category_id;
+
+          if (targetTabId) {
+            setActiveTab(String(targetTabId));
+          }
         }
       } catch (error) {
         console.log("SERVICE DETAILS API ERROR:", error);
@@ -448,69 +466,76 @@ const ACRepairLayout = () => {
       };
     }) || fallbackBrands.map((item) => ({ name: item.name, image: item.logo }));
 
-  const apiTabs =
-    apiService?.subServices?.map((cat: any) => ({
-      id: String(cat.sub_category_id),
-      name: cat.sub_category_name,
-      image: cat.image || cat.icon,
-      items: cat.items || [],
-    })) || [];
+  const subCategories = apiService?.sub_categories || apiService?.subServices || [];
+  const issues = apiService?.issues || [];
 
-  const tabs = apiTabs;
-  const currentType = tabs.find(
-    (tab: any) => String(tab.id) === String(activeTab),
-  ) || tabs[0];
+  const apiTabs =
+    subCategories.map((cat: any) => {
+      const catId = cat.id ?? cat.sub_category_id;
+      const catName = cat.name ?? cat.sub_category_name;
+      const catIcon = cat.icon_url ?? cat.icon ?? cat.image;
+      const items =
+        cat.items && cat.items.length > 0
+          ? cat.items
+          : issues.filter((issue: any) => Number(issue.service_sub_category_id) === Number(catId));
+
+      return {
+        id: String(catId),
+        name: catName,
+        image: catIcon,
+        items: items || [],
+      };
+    }) || [];
+
+  // If no subcategories exist but issues exist, create a default tab
+  if (apiTabs.length === 0 && issues.length > 0) {
+    apiTabs.push({
+      id: "all",
+      name: apiService?.name || "Services",
+      image: apiService?.home_icon_image_url || apiService?.home_icon_image || apiService?.icon,
+      items: issues,
+    });
+  }
+
+  const tabs = apiTabs.length > 0 ? apiTabs : service?.types || [];
+  const currentType =
+    tabs.find((tab: any) => String(tab.id) === String(activeTab)) ||
+    tabs.find((tab: any) => tab.items && tab.items.length > 0) ||
+    tabs[0];
+
+  const mapItemToSubService = (item: any): SubService => ({
+    id: item.id,
+    name: item.name,
+    title: item.name,
+    image: safeImage(item.icon_url || item.image || item.icon),
+    rating: Number(item.rating || 5.0),
+    reviews: item.reviews || 0,
+    duration: `${item.duration_minutes || 30} min`,
+    discountedPrice: Math.round(
+      Number(
+        item.price && Number(item.price) > 0
+          ? item.price
+          : item.final_price || item.base_price || item.discount_price || 0,
+      ),
+    ),
+    originalPrice: Math.round(
+      Number(
+        item.strike_price || item.original_price || item.originalPrice || item.base_price || 0,
+      ),
+    ),
+    warrantyDays: item.warranty_days,
+    warrantyDescription: item.warranty_description,
+    packageTag: item.package_tag,
+    issueDescriptions: item.issue_descriptions || item.descriptions || [],
+    issueMoreDetails: item.issue_more_details || item.details || [],
+  });
 
   const displayServices: SubService[] =
-    currentType?.items?.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      title: item.name,
-      image: safeImage(item.image || item.icon),
-      rating: Number(item.rating || 0),
-      reviews: item.reviews || 0,
-      duration: `${item.duration_minutes || 30} min`,
-      discountedPrice: Math.round(
-        Number(
-          (item.price && Number(item.price) > 0) ? item.price : (item.final_price || item.base_price || item.discount_price || 0)
-        )
-      ),
-      originalPrice: Math.round(
-        Number(item.strike_price || item.original_price || item.originalPrice || item.base_price || 0)
-      ),
-      warrantyDays: item.warranty_days,
-      warrantyDescription: item.warranty_description,
-      packageTag: item.package_tag,
-      issueDescriptions: item.issue_descriptions || item.descriptions || [],
-      issueMoreDetails: item.issue_more_details || item.details || [],
-    })) ||
-    currentType?.subServices ||
-    [];
+    currentType?.items?.map(mapItemToSubService) || currentType?.subServices || [];
 
   const getServicesForTab = (tab: any): SubService[] => {
     if (tab.items && tab.items.length > 0) {
-      return tab.items.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        title: item.name,
-        image: safeImage(item.image || item.icon),
-        rating: Number(item.rating || 0),
-        reviews: item.reviews || 0,
-        duration: `${item.duration_minutes || 30} min`,
-        discountedPrice: Math.round(
-          Number(
-            (item.price && Number(item.price) > 0) ? item.price : (item.final_price || item.base_price || item.discount_price || 0)
-          )
-        ),
-        originalPrice: Math.round(
-          Number(item.strike_price || item.original_price || item.originalPrice || item.base_price || 0)
-        ),
-        warrantyDays: item.warranty_days,
-        warrantyDescription: item.warranty_description,
-        packageTag: item.package_tag,
-        issueDescriptions: item.issue_descriptions || item.descriptions || [],
-        issueMoreDetails: item.issue_more_details || item.details || [],
-      }));
+      return tab.items.map(mapItemToSubService);
     }
     return tab.subServices || [];
   };

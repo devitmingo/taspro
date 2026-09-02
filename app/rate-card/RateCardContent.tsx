@@ -23,7 +23,10 @@ const RateCardContent = () => {
         );
 
         const data = await res.json();
-        setRateData(data?.data?.subServices || []);
+        const subCats = data?.data?.sub_categories || data?.data?.subServices || [];
+        const issues = data?.data?.issues || [];
+        const combined = subCats.length > 0 ? subCats : (issues.length > 0 ? [{ items: issues }] : []);
+        setRateData(combined);
       } catch (error) {
         console.log("RATE CARD ERROR:", error);
       }
@@ -32,8 +35,8 @@ const RateCardContent = () => {
     if (serviceId) fetchRateCard();
   }, [serviceId]);
 
-  const rateCart = rateData.flatMap((item) => item.rate_cart || []);
-  const spareParts = rateData.flatMap((item) => item.spare_parts || []);
+  const rateCart = rateData.flatMap((item) => item.rate_cart || item.items || []);
+  const spareParts = rateData.flatMap((item) => item.spare_parts || item.spare_categories || []);
 
   return (
     <div className="min-h-screen">

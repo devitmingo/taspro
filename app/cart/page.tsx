@@ -124,20 +124,26 @@ export default function CartPage() {
           `${API_BASE_URL}/service?service_id=${serviceId}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
         );
 
-        if (res.data?.status && res.data?.data?.subServices) {
-          res.data.data.subServices.forEach((subCat: any) => {
-            (subCat.items || []).forEach((item: any) => {
-              const itemPrice = Math.round(
-                Number((item.price && Number(item.price) > 0) ? item.price : (item.final_price || item.base_price || item.discount_price || 0))
-              );
-              const itemStrike = Math.round(
-                Number(item.strike_price || item.original_price || item.originalPrice || item.base_price || 0)
-              );
-              priceMap[String(item.id)] = {
-                price: itemPrice,
-                originalPrice: itemStrike > itemPrice ? itemStrike : Math.round(itemPrice * 1.25),
-              };
-            });
+        const subCats = res.data?.data?.sub_categories || res.data?.data?.subServices || [];
+        const issues = res.data?.data?.issues || [];
+        const allItems: any[] = [
+          ...issues,
+          ...subCats.flatMap((sc: any) => sc.items || []),
+        ];
+
+        if (res.data?.status && allItems.length > 0) {
+          allItems.forEach((item: any) => {
+            if (!item || !item.id) return;
+            const itemPrice = Math.round(
+              Number((item.price && Number(item.price) > 0) ? item.price : (item.final_price || item.base_price || item.discount_price || 0))
+            );
+            const itemStrike = Math.round(
+              Number(item.strike_price || item.original_price || item.originalPrice || item.base_price || 0)
+            );
+            priceMap[String(item.id)] = {
+              price: itemPrice,
+              originalPrice: itemStrike > itemPrice ? itemStrike : Math.round(itemPrice * 1.25),
+            };
           });
           setLocationPrices(priceMap);
         }
