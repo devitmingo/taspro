@@ -1006,11 +1006,7 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                           const status = booking.status?.toLowerCase();
 
                           if (activeTab === "pending")
-                            return (
-                              status === "pending" ||
-                              status === "rescheduled" ||
-                              status === "accepted"
-                            );
+                            return status !== "completed" && status !== "rejected" && status !== "cancelled";
                           if (activeTab === "completed")
                             return status === "completed";
                           if (activeTab === "rejected")
@@ -1023,18 +1019,11 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                               const status = booking.status?.toLowerCase();
 
                               if (activeTab === "pending")
-                                return (
-                                  status === "pending" ||
-                                  status === "rescheduled" ||
-                                  status === "accepted"
-                                );
+                                return status !== "completed" && status !== "rejected" && status !== "cancelled";
                               if (activeTab === "completed")
                                 return status === "completed";
                               if (activeTab === "rejected")
-                                return (
-                                  status === "rejected" ||
-                                  status === "cancelled"
-                                );
+                                return status === "rejected" || status === "cancelled";
 
                               return true;
                             })

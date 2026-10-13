@@ -98,6 +98,8 @@ export default function PaymentPage() {
         razorpay_payment_id: razorpayPaymentId,
         state_name: "Chhattisgarh",
         city_name: "Raipur",
+        enquiry_source: "web",
+        platform_type: "web",
       };
 
       const res = await axios.post(

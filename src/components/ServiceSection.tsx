@@ -104,11 +104,10 @@ export default function ServiceSection({
             </h2>
 
             <div
-              className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-x-3 gap-y-5 xl:pb-0 sm:pb-10 ${
-                finalServices.length > 6
+              className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-x-3 gap-y-5 xl:pb-0 sm:pb-10 ${finalServices.length > 6
                   ? "max-h-[320px] overflow-y-auto pr-2"
                   : ""
-              }`}
+                }`}
             >
               {finalServices.map((service, index) => {
                 const imageUrl = getCategoryImageUrl(service);
@@ -145,9 +144,8 @@ export default function ServiceSection({
             {sliderList.map((slide: any, index: number) => (
               <div
                 key={slide.id || index}
-                className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                  index === activeSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
-                }`}
+                className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${index === activeSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+                  }`}
               >
                 <SafeImage
                   src={slide.image || slide.image_url || "/heroimage.jpg"}
@@ -181,11 +179,10 @@ export default function ServiceSection({
                   <button
                     key={idx}
                     onClick={() => setActiveSlide(idx)}
-                    className={`h-2.5 rounded-full transition-all duration-300 ${
-                      idx === activeSlide
+                    className={`h-2.5 rounded-full transition-all duration-300 ${idx === activeSlide
                         ? "w-7 bg-orange-500"
                         : "w-2.5 bg-white/70 hover:bg-white"
-                    }`}
+                      }`}
                     aria-label={`Go to slide ${idx + 1}`}
                   />
                 ))}

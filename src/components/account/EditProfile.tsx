@@ -6,7 +6,7 @@ import { useState } from "react";
 import axios from "axios";
 import GradientButton2 from "@/components/ui/GradientButton2";
 import { useAuth } from "@/context/AuthContext";
-import { API_BASE_URL } from "@/config/api";
+import { API_BASE_URL, API_HOST_URL } from "@/config/api";
 import Swal from "sweetalert2";
 
 export default function EditProfile({
@@ -25,7 +25,7 @@ export default function EditProfile({
       return img;
     }
 
-    return `https://app.tasprocompany.in/${img}`;
+    return `${API_HOST_URL}/${img}`;
   };
   const [gender, setGender] = useState(profile?.gender || "Male");
   const { login } = useAuth();

@@ -29,6 +29,7 @@ import SafeImage from "@/components/SafeImage";
 type SubService = {
   id: number | string;
   name: string;
+  title?: string;
   description?: string;
   image: string;
   rating: number;

@@ -24,7 +24,7 @@ import {
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { API_BASE_URL } from "@/config/api";
+import { API_BASE_URL, API_HOST_URL, getImageUrl } from "@/config/api";
 import { SERVICES_DATA } from "@/data/services";
 import AuthModal from "./AuthModal";
 import { useBooking } from "@/context/BookingContext";
@@ -144,14 +144,20 @@ const Header = () => {
     if (!force && savedLocation) {
       try {
         const parsed = JSON.parse(savedLocation);
-        if (parsed.isManual) return; // User explicitly selected this city manually
+        if (parsed.isManual || parsed.city) return;
       } catch (e) {}
     }
 
     setIsDetectingLocation(true);
 
+    // Safety timeout: ensure loading spinner is dismissed after 5s
+    const safetyTimer = setTimeout(() => {
+      setIsDetectingLocation(false);
+    }, 5000);
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        clearTimeout(safetyTimer);
         const { latitude, longitude } = position.coords;
         try {
           const res = await fetch(
@@ -175,12 +181,35 @@ const Header = () => {
               }
             }
 
-            const finalCity = detectedCity || "Raipur";
-            const finalState = detectedState || "Chhattisgarh";
+            const matchedCity = dynamicCities.find(
+              (c) =>
+                c.name.toLowerCase() === detectedCity.toLowerCase() ||
+                detectedCity.toLowerCase().includes(c.name.toLowerCase()) ||
+                c.name.toLowerCase().includes(detectedCity.toLowerCase())
+            );
+
+            if (!matchedCity && detectedCity) {
+              await Swal.fire({
+                icon: "info",
+                title: "Service Unavailable",
+                text: `Sorry, TAS Pro is not available in ${detectedCity} yet.`,
+                confirmButtonColor: "#f97316",
+                confirmButtonText: "Choose Available City",
+              });
+              setIsLocationOpen(true);
+              return;
+            }
+
+            const finalCity = matchedCity ? matchedCity.name : (detectedCity || "Raipur");
+            const finalState = matchedCity ? matchedCity.state : (detectedState || "Chhattisgarh");
+            const finalCityId = matchedCity?.id;
+            const finalStateId = matchedCity?.state_id;
 
             const locationData = {
               city: finalCity,
               state: finalState,
+              city_id: finalCityId,
+              state_id: finalStateId,
               lat: latitude,
               lng: longitude,
               isAutoDetected: true,
@@ -206,13 +235,14 @@ const Header = () => {
         }
       },
       (error) => {
+        clearTimeout(safetyTimer);
         console.warn("Geolocation position unavailable or denied:", error);
         setIsDetectingLocation(false);
         if (!localStorage.getItem("selected_location")) {
           handleCitySelect({ name: "Raipur", state: "Chhattisgarh" }, false);
         }
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 5000, enableHighAccuracy: false, maximumAge: 60000 }
     );
   };
 
@@ -223,15 +253,16 @@ const Header = () => {
         const location = JSON.parse(savedLocation);
         if (location.city) setCurrentCity(location.city);
         if (location.state) setCurrentState(location.state);
-        if (!location.isManual) {
-          // If previously auto-detected, we can refresh current location
-          detectCurrentLocation(true);
-        }
-      } catch (e) {
-        detectCurrentLocation(false);
-      }
+      } catch (e) {}
     } else {
-      detectCurrentLocation(true);
+      const defaultLoc = {
+        city: "Raipur",
+        state: "Chhattisgarh",
+        isManual: true,
+      };
+      localStorage.setItem("selected_location", JSON.stringify(defaultLoc));
+      setCurrentCity("Raipur");
+      setCurrentState("Chhattisgarh");
     }
   }, []);
 
@@ -484,16 +515,14 @@ const Header = () => {
   };
 
   const getProfileImage = (img?: string | null) => {
-    if (!img) return "/profile.png";
-    let formatted = img;
-    if (formatted.includes("127.0.0.1:8000") || formatted.includes("localhost:8000")) {
-      formatted = formatted.replace(/^http:\/\/(127\.0\.0\.1|localhost):8000/, "https://app.tasprocompany.in");
+    if (!img || img === "null" || img === "undefined" || img === "") return "/profile.png";
+    const formatted = img.trim();
+    if (formatted.startsWith("http://") || formatted.startsWith("https://") || formatted.startsWith("data:") || formatted.startsWith("blob:")) {
+      return formatted;
     }
-    if (formatted.startsWith("http://app.tasprocompany.in") || formatted.startsWith("http://taskpro.itmingo.com")) {
-      formatted = formatted.replace(/^http:\/\//, "https://");
-    }
-    if (formatted.startsWith("http") || formatted.startsWith("/")) return formatted;
-    return `https://app.tasprocompany.in/storage/customers/${formatted}`;
+    if (formatted.startsWith("/")) return formatted;
+    if (formatted.startsWith("storage/")) return `${API_HOST_URL}/${formatted}`;
+    return `${API_HOST_URL}/storage/customers/${formatted}`;
   };
 
   useEffect(() => {
@@ -635,21 +664,12 @@ const Header = () => {
 
                     {/* GPS Detect Current Location button */}
                     <button
-                      onClick={() => detectCurrentLocation(true)}
-                      disabled={isDetectingLocation}
-                      className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs"
-                    >
-                      <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin" : ""}`} />
-                      <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location (GPS)"}</span>
-                    </button>
-
-                    {/* GPS Detect Current Location button */}
-                    <button
+                      type="button"
                       onClick={() => detectCurrentLocation(true)}
                       disabled={isDetectingLocation}
                       className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs cursor-pointer"
                     >
-                      <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin" : ""}`} />
+                      <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin text-orange-500" : ""}`} />
                       <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location (GPS)"}</span>
                     </button>
 
@@ -1019,10 +1039,14 @@ const Header = () => {
             {/* Login */}
             {!isClient ? null : user ? (
             <div className="relative group flex items-center gap-2 cursor-pointer">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 bg-gray-200">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 bg-gray-200 border border-gray-200/50 flex items-center justify-center">
                 <img
-                  src={getProfileImage(user?.profileImage)}
-                  alt="Profile"
+                  src={getProfileImage(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile)}
+                  alt={user?.firstName || "Profile"}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/profile.png";
+                  }}
                   className="w-full h-full object-cover rounded-full"
                 />
               </div>

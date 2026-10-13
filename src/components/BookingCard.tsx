@@ -84,6 +84,8 @@ const BookingCard: React.FC<BookingCardProps> = ({
                 ? "bg-green-100 text-green-700"
                 : status?.toLowerCase() === "rejected" || status?.toLowerCase() === "cancelled"
                 ? "bg-red-100 text-red-700"
+                : status?.toLowerCase() === "assigned" || status?.toLowerCase() === "in progress" || status?.toLowerCase() === "visit only"
+                ? "bg-blue-100 text-blue-700"
                 : "bg-orange-100 text-orange-600"
             }`}
           >

@@ -16,6 +16,9 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 // }
 
 
+import axios from 'axios';
+import { API_BASE_URL } from '@/config/api';
+
 interface User {
   id?: number;
   phone: string;
@@ -56,6 +59,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           console.error('Error parsing user data from localStorage', error);
         }
+      }
+
+      // Sync fresh profile data from backend if token exists
+      const token = localStorage.getItem('token');
+      if (token && token !== 'null' && token !== 'undefined') {
+        axios
+          .get(`${API_BASE_URL}/customers/profile`, {
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          })
+          .then((res) => {
+            if (res.data?.status && res.data?.data) {
+              const u = res.data.data;
+              const freshUser: User = {
+                id: u.id,
+                phone: u.mobile,
+                firstName: u.first_name,
+                lastName: u.last_name,
+                email: u.email,
+                mobile: u.mobile,
+                alt_mobile: u.alt_mobile,
+                alternateNumber: u.alt_mobile,
+                gender: u.gender,
+                profileImage: u.profile_url || u.profile || null,
+                profileCompleted: Boolean(u.first_name && u.first_name.trim() !== ''),
+                contactVerified: true,
+              };
+              setUser(freshUser);
+              localStorage.setItem('user', JSON.stringify(freshUser));
+            }
+          })
+          .catch(() => {});
       }
     }
   }, []);
