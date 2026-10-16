@@ -6,7 +6,7 @@ import SafeImage from "@/components/SafeImage";
 import ApplianceModal from "./ApplianceModal";
 import { useState, useEffect } from "react";
 import LayoutContainer from "./LayoutContainer";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import axios from "axios";
 
@@ -92,7 +92,10 @@ export default function ServiceSection({
     setShowApplianceModal(true);
   };
 
-  const finalServices = categoriesList;
+  const [showAllCategoriesModal, setShowAllCategoriesModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const displayedCategories = categoriesList.length >= 5 ? categoriesList.slice(0, 5) : categoriesList;
 
   return (
     <section className="w-full sm:pb-10 sm:px-5">
@@ -106,13 +109,9 @@ export default function ServiceSection({
               today?
             </h2>
 
-            <div
-              className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-x-3 gap-y-5 xl:pb-0 sm:pb-10 ${finalServices.length > 6
-                  ? "max-h-[320px] overflow-y-auto pr-2"
-                  : ""
-                }`}
-            >
-              {finalServices.map((service, index) => {
+            {/* Exactly 6 Buttons in 2x3 Grid - NO SCROLL */}
+            <div className="grid grid-cols-3 gap-x-3 gap-y-4 xl:pb-0 sm:pb-10">
+              {displayedCategories.map((service, index) => {
                 const imageUrl = getCategoryImageUrl(service);
 
                 return (
@@ -133,12 +132,30 @@ export default function ServiceSection({
                       />
                     </div>
 
-                    <p className="mt-2 text-[12px] sm:text-sm font-medium text-gray-800 dark:text-gray-300 text-center leading-tight">
+                    <p className="mt-2 text-[12px] sm:text-sm font-medium text-gray-800 dark:text-gray-300 text-center leading-tight line-clamp-2">
                       {service.name || service.title}
                     </p>
                   </div>
                 );
               })}
+
+              {/* 6th Button: >> (All Categories Button) */}
+              <div
+                className="flex flex-col items-center cursor-pointer group"
+                onClick={() => setShowAllCategoriesModal(true)}
+              >
+                <div className="w-full h-20 sm:h-28 bg-gradient-to-br from-orange-50 via-white to-orange-50/60 rounded-2xl flex flex-col items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-orange-200/80 group-hover:border-primary/60 relative">
+                  <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-white shadow-xs border border-orange-100 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                    <span className="text-xl sm:text-2xl font-black tracking-tighter leading-none select-none">
+                      &gt;&gt;
+                    </span>
+                  </div>
+                </div>
+
+                <p className="mt-2 text-[12px] sm:text-sm font-bold text-primary dark:text-orange-400 text-center leading-tight">
+                  All Categories
+                </p>
+              </div>
             </div>
           </div>
 
@@ -226,6 +243,113 @@ export default function ServiceSection({
           category={selectedCategory}
           data={applianceData}
         />
+
+        {/* All Categories Modal */}
+        {showAllCategoriesModal && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 transition-opacity duration-300"
+            onClick={() => setShowAllCategoriesModal(false)}
+          >
+            <div
+              className="bg-white rounded-t-[32px] sm:rounded-[28px] w-full sm:w-[680px] max-w-2xl p-6 sm:p-7 relative shadow-2xl border border-gray-100 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+                    All Categories
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Select any category to view available services
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAllCategoriesModal(false)}
+                  aria-label="Close"
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all active:scale-95"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Search if > 6 categories */}
+              {categoriesList.length > 6 && (
+                <div className="relative mb-4">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search category by name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-white transition-all text-gray-800 placeholder-gray-400"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-semibold"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Grid of Categories */}
+              <div className="overflow-y-auto pr-1 flex-1 max-h-[60vh] hide-scrollbar">
+                {(() => {
+                  const filtered = searchQuery.trim()
+                    ? categoriesList.filter((cat) =>
+                        (cat.name || cat.title || "")
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase())
+                      )
+                    : categoriesList;
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-12 text-center text-gray-500">
+                        <p className="text-sm font-medium">No categories found matching &quot;{searchQuery}&quot;</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4 py-1">
+                      {filtered.map((cat, idx) => {
+                        const catImage = getCategoryImageUrl(cat);
+                        return (
+                          <div
+                            key={cat.id || idx}
+                            onClick={() => {
+                              setShowAllCategoriesModal(false);
+                              handleCategoryClick(cat);
+                            }}
+                            className="group flex flex-col items-center text-center cursor-pointer p-2 rounded-2xl hover:bg-orange-50/60 transition-all duration-200"
+                          >
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gray-50 group-hover:bg-white p-3 flex items-center justify-center transition-all duration-200 shadow-xs border border-gray-100 group-hover:border-orange-200 group-hover:shadow-md group-hover:scale-105">
+                              <SafeImage
+                                src={catImage}
+                                alt={cat.name || cat.title || "Category"}
+                                width={64}
+                                height={64}
+                                fallbackSrc="/tas.logo.png"
+                                className="w-10 h-10 sm:w-14 sm:h-14 object-contain transition-transform"
+                              />
+                            </div>
+                            <span className="text-[11px] sm:text-xs font-semibold text-gray-800 dark:text-gray-200 group-hover:text-primary transition-colors mt-2 text-center leading-tight line-clamp-2 max-w-[110px]">
+                              {cat.name || cat.title}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </LayoutContainer>
     </section>
   );
