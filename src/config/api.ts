@@ -33,7 +33,13 @@ export const getImageUrl = (src?: string | null, fallback = "/tas.logo.png"): st
     return src;
   }
 
-  // Full HTTP/HTTPS URLs
+  // Extract storage paths from any domain (e.g. https://app.tasprocompany.in/storage/..., http://localhost/storage/...)
+  const storageIndex = src.indexOf("/storage/");
+  if (storageIndex !== -1) {
+    return src.substring(storageIndex);
+  }
+
+  // Full HTTP/HTTPS URLs (external images like unsplash)
   if (src.startsWith("http://") || src.startsWith("https://")) {
     return src;
   }
@@ -41,10 +47,10 @@ export const getImageUrl = (src?: string | null, fallback = "/tas.logo.png"): st
   // Relative storage paths or bare filenames
   const cleanPath = src.startsWith("/") ? src : `/${src}`;
   if (cleanPath.startsWith("/storage/")) {
-    return `${API_HOST_URL}${cleanPath}`;
+    return cleanPath;
   }
 
-  return `${API_HOST_URL}/storage${cleanPath}`;
+  return `/storage${cleanPath}`;
 };
 
 export default API_BASE_URL;

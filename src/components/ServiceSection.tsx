@@ -19,25 +19,28 @@ const fallbackSliders = [
     id: 1,
     title: "Home Cleaning Offer",
     description: "Get up to 30% discount on premium home cleaning services.",
-    image: `${IMAGE_BASE_URL}/storage/sliders/user-slider-1.jpg`,
+    image: "/storage/sliders/user-slider-1.jpg",
   },
   {
     id: 2,
     title: "Appliance Repair Services",
     description: "Professional repair services for all home appliances at your doorstep.",
-    image: `${IMAGE_BASE_URL}/storage/sliders/user-slider-2.jpg`,
+    image: "/storage/sliders/user-slider-2.jpg",
   },
   {
     id: 3,
     title: "Expert Handyman Services",
     description: "Trusted electricians, plumbers, and carpenters available 24/7.",
-    image: `${IMAGE_BASE_URL}/storage/sliders/user-slider-3.jpg`,
+    image: "/storage/sliders/user-slider-3.jpg",
   },
 ];
 
 const getCategoryImageUrl = (service: any) => {
   const rawImage = service.icon_url || service.icon || service.image || service.icon_image;
   if (rawImage && rawImage !== "null" && rawImage !== "") {
+    if (!rawImage.includes("/") && (rawImage.endsWith(".png") || rawImage.endsWith(".jpg") || rawImage.endsWith(".webp"))) {
+      return getImageUrl(`/storage/service-categories/${rawImage}`, "/tas.logo.png");
+    }
     return getImageUrl(rawImage, "/tas.logo.png");
   }
 
