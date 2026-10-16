@@ -219,18 +219,50 @@ export default function Home() {
         {categoriesData && categoriesData.length > 0 ? (
           categoriesData.map((cat: any) => {
             const catName = (cat.name || "").toLowerCase();
-            let catItems: any[] = [];
+            const catId = Number(cat.id);
+            let catItems: any[] = Array.isArray(cat.services) && cat.services.length > 0
+              ? cat.services
+              : [];
 
-            if (catName.includes("appliance")) {
-              catItems = dashboardData?.appliance_repair_services?.data || dashboardData?.appliance_repair_services || servicesApiData;
-            } else if (catName.includes("deep") || catName.includes("house cleaning")) {
-              catItems = dashboardData?.deep_cleaning_services?.data || dashboardData?.deep_cleaning_services || [];
-            } else if (catName.includes("package")) {
-              catItems = dashboardData?.cleaning_packages?.data || dashboardData?.cleaning_packages || [];
-            } else if (catName.includes("handyman")) {
-              catItems = dashboardData?.handyman_services?.data || dashboardData?.handyman_services || [];
-            } else {
-              catItems = servicesApiData;
+            if (catItems.length === 0) {
+              if (
+                dashboardData?.appliance_repair_services?.category_id === catId ||
+                catName.includes("appliance")
+              ) {
+                catItems =
+                  dashboardData?.appliance_repair_services?.data ||
+                  dashboardData?.appliance_repair_services ||
+                  [];
+              } else if (
+                dashboardData?.deep_cleaning_services?.category_id === catId ||
+                catName.includes("deep") ||
+                catName.includes("house cleaning")
+              ) {
+                catItems =
+                  dashboardData?.deep_cleaning_services?.data ||
+                  dashboardData?.deep_cleaning_services ||
+                  [];
+              } else if (
+                dashboardData?.cleaning_packages?.category_id === catId ||
+                catName.includes("package")
+              ) {
+                catItems =
+                  dashboardData?.cleaning_packages?.data ||
+                  dashboardData?.cleaning_packages ||
+                  [];
+              } else if (
+                dashboardData?.handyman_services?.category_id === catId ||
+                catName.includes("handyman")
+              ) {
+                catItems =
+                  dashboardData?.handyman_services?.data ||
+                  dashboardData?.handyman_services ||
+                  [];
+              } else {
+                catItems = servicesApiData.filter(
+                  (s: any) => Number(s.service_category_id || s.category_id) === catId
+                );
+              }
             }
 
             return (
