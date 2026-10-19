@@ -101,7 +101,8 @@ export default function ServiceSection({
   const [showAllCategoriesModal, setShowAllCategoriesModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const displayedCategories = categoriesList.length >= 5 ? categoriesList.slice(0, 5) : categoriesList;
+  const hasMore = categoriesList.length > 6;
+  const displayedCategories = hasMore ? categoriesList.slice(0, 5) : categoriesList.slice(0, 6);
 
   return (
     <section className="w-full sm:pb-10 sm:px-5">
@@ -115,7 +116,7 @@ export default function ServiceSection({
               today?
             </h2>
 
-            {/* Exactly 6 Buttons in 2x3 Grid - NO SCROLL */}
+            {/* Grid of Categories (max 6 items including >> button if hasMore) */}
             <div className="grid grid-cols-3 gap-x-3 gap-y-4 xl:pb-0 sm:pb-10">
               {displayedCategories.map((service, index) => {
                 const imageUrl = getCategoryImageUrl(service);
@@ -145,21 +146,23 @@ export default function ServiceSection({
                 );
               })}
 
-              {/* 6th Button: >> (All Categories Button) */}
-              <div
-                className="flex flex-col items-center cursor-pointer group"
-                onClick={() => setShowAllCategoriesModal(true)}
-              >
-                <div className="w-full h-20 sm:h-28 bg-gray-50 rounded-2xl flex items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-gray-100 relative">
-                  <span className="text-xl sm:text-2xl font-black text-primary select-none group-hover:scale-110 transition-transform duration-300">
-                    &gt;&gt;
-                  </span>
-                </div>
+              {/* 6th Slot: >> (All Categories Button) only if more categories exist than 6 */}
+              {hasMore && (
+                <div
+                  className="flex flex-col items-center cursor-pointer group"
+                  onClick={() => setShowAllCategoriesModal(true)}
+                >
+                  <div className="w-full h-20 sm:h-28 bg-gray-50 rounded-2xl flex items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-gray-100 relative">
+                    <span className="text-xl sm:text-2xl font-black text-primary select-none group-hover:scale-110 transition-transform duration-300">
+                      &gt;&gt;
+                    </span>
+                  </div>
 
-                <p className="mt-2 text-[12px] sm:text-sm font-bold text-primary dark:text-orange-400 text-center leading-tight">
-                  All Categories
-                </p>
-              </div>
+                  <p className="mt-2 text-[12px] sm:text-sm font-bold text-primary dark:text-orange-400 text-center leading-tight">
+                    All Categories
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

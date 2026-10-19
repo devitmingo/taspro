@@ -116,9 +116,14 @@ const ACRepairLayout = () => {
           const data = servRes.value;
           const allServices = Array.isArray(data) ? data : data?.data || [];
           const currentCatId = apiService?.service_category_id || (service as any)?.category_id;
-          const filtered = allServices.filter(
-            (s: any) => Number(s.service_category_id) === Number(currentCatId)
-          );
+          const currentServId = apiService?.id || serviceId || (service as any)?.id;
+          const filtered = allServices.filter((s: any) => {
+            const matchCat = Number(s.service_category_id) === Number(currentCatId);
+            const isCurrent =
+              (currentServId && Number(s.id) === Number(currentServId)) ||
+              (slug && s.slug === slug);
+            return matchCat && !isCurrent;
+          });
 
           const categoryTitles: Record<number, string> = {
             1: "Appliances Repair & Service",
@@ -133,9 +138,7 @@ const ACRepairLayout = () => {
             setCategorySectionTitle(`${apiService.category_name} Services`);
           }
 
-          if (filtered.length > 0) {
-            setCategoryServices(filtered);
-          }
+          setCategoryServices(filtered);
         }
 
         if (faqRes.status === "fulfilled" && faqRes.value?.status && Array.isArray(faqRes.value.data)) {
@@ -147,7 +150,7 @@ const ACRepairLayout = () => {
     };
 
     fetchPageSecondaryData();
-  }, [apiService, service]);
+  }, [apiService, service, serviceId, slug]);
 
   const offers = apiService?.offers || [];
   const serviceFaqs = Array.isArray(apiService?.faqs) ? apiService.faqs : [];
@@ -1487,7 +1490,10 @@ const ACRepairLayout = () => {
           />
         )}
 
-        <YouMayLikeServices />
+        <YouMayLikeServices
+          serviceId={apiService?.id || serviceId || (service as any)?.id}
+          currentSlug={slug}
+        />
       </div>
 
       {categoryServices && categoryServices.length > 0 && (

@@ -4,9 +4,9 @@ import LayoutContainer from "./LayoutContainer";
 
 const DownloadApp = () => {
   return (
-    <section className="sm:pb-10 px-0 sm:px-4">
+    <section className="pb-3 sm:pb-5">
       <LayoutContainer className="relative">
-        <div className="w-full rounded-[20px] overflow-hidden bg-gradient-to-r from-black to-[#1a1a1a]">
+        <div className="w-full rounded-3xl overflow-hidden bg-gradient-to-r from-black to-[#1a1a1a]">
           <div className="grid grid-cols-1 lg:grid-cols-2 items-center">
             {/* Left Content */}
             <div className="p-5 sm:p-10">

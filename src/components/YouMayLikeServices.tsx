@@ -36,12 +36,14 @@ interface Props {
   title?: string;
   categoryId?: number | string;
   serviceId?: number | string;
+  currentSlug?: string;
 }
 
 export default function YouMayLikeServices({
   title = "You may like our other services",
   categoryId,
   serviceId,
+  currentSlug,
 }: Props) {
   const [items, setItems] = useState<ServiceIssueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,30 @@ export default function YouMayLikeServices({
           } catch (e) {}
         }
 
+        // Helper to check if item is the current service being viewed
+        const isSelf = (item: any) => {
+          if (serviceId) {
+            const sIdStr = String(serviceId).trim();
+            if (
+              String(item.id || "").trim() === sIdStr ||
+              String(item.service_id || "").trim() === sIdStr ||
+              String(item.service?.id || "").trim() === sIdStr
+            ) {
+              return true;
+            }
+          }
+          if (currentSlug) {
+            const slugStr = currentSlug.toLowerCase().trim();
+            if (
+              (item.slug || "").toLowerCase().trim() === slugStr ||
+              (item.service?.slug || "").toLowerCase().trim() === slugStr
+            ) {
+              return true;
+            }
+          }
+          return false;
+        };
+
         // Fetch services table data directly
         const res = await fetch(
           `${API_BASE_URL}/services?state_name=${encodeURIComponent(stateName)}&city_name=${encodeURIComponent(cityName)}`
@@ -68,13 +94,15 @@ export default function YouMayLikeServices({
         let data: ServiceIssueItem[] = json?.data || json || [];
 
         if (Array.isArray(data) && data.length > 0) {
-          // If categoryId or serviceId is provided, prioritize services matching current category
-          let filtered = data;
+          let filtered = data.filter((item) => !isSelf(item));
+
           if (categoryId) {
-            filtered = data.filter(
+            const sameCat = filtered.filter(
               (s) => String(s.service_category_id || "") === String(categoryId)
             );
-            if (filtered.length === 0) filtered = data;
+            if (sameCat.length > 0) {
+              filtered = sameCat;
+            }
           }
 
           setItems(filtered.slice(0, 6));
@@ -83,7 +111,8 @@ export default function YouMayLikeServices({
           const issuesRes = await fetch(`${API_BASE_URL}/service-issues`);
           const issuesJson = await issuesRes.json();
           const issuesData = issuesJson?.data || issuesJson || [];
-          setItems(issuesData.slice(0, 6));
+          let filtered = Array.isArray(issuesData) ? issuesData.filter((item) => !isSelf(item)) : [];
+          setItems(filtered.slice(0, 6));
         }
       } catch (err) {
         console.error("Error fetching services for Frequently Added Together:", err);
@@ -93,7 +122,7 @@ export default function YouMayLikeServices({
     };
 
     fetchCurrentCategoryServices();
-  }, [categoryId, serviceId]);
+  }, [categoryId, serviceId, currentSlug]);
 
   if (loading) {
     return (

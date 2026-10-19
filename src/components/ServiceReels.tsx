@@ -23,7 +23,7 @@ export default function ServiceReels({ data }: { data?: any[] }) {
   const reelList = data;
 
   return (
-    <section className="mx-auto sm:px-0 py-8 sm:py-12 mb-6 sm:mb-10">
+    <section className="mx-auto sm:px-0 pt-0 sm:pt-2 pb-8 sm:pb-10 mb-6 sm:mb-10">
       <LayoutContainer className="relative">
         <h2 className="text-2xl font-bold text-gray-900">Service Reels</h2>
         <p className="text-gray-500 mb-5">Watch our experts in action</p>
