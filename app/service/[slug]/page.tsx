@@ -166,9 +166,16 @@ const ACRepairLayout = () => {
       : dbFaqs;
   const reviews = apiService?.reviews || [];
 
-  const galleryImages = Array.isArray(apiService?.gallery_images)
-    ? apiService.gallery_images
-    : [];
+  const galleryImages = (Array.isArray(apiService?.gallery_images) ? apiService.gallery_images : [])
+    .map((g: any) => (typeof g === "string" ? g : g?.image || g?.image_url || g?.url || ""))
+    .filter((img: string) => typeof img === "string" && img.trim() !== "")
+    .map((img: string) => {
+      if (!img.startsWith("http") && !img.startsWith("/")) {
+        return `/storage/services/${img}`;
+      }
+      return img;
+    })
+    .map((img: string) => getImageUrl(img, "/tas.logo.png"));
 
   const handleAddService = (subService: any) => {
     const activeTabObj = (tabs || []).find((t: any) => String(t.id) === String(activeTab));
@@ -306,35 +313,57 @@ const ACRepairLayout = () => {
       : (service?.image as any)?.src ||
       "/tas.logo.png";
 
-  const headerImage1 = apiService?.images?.header_image1;
-  const headerImage2 = apiService?.images?.header_image2;
-  const headerImage3 = apiService?.images?.header_image3;
+  const headerImage1 = apiService?.header_image1_url || apiService?.header_image1 || apiService?.images?.header_image1;
+  const headerImage2 = apiService?.header_image2_url || apiService?.header_image2 || apiService?.images?.header_image2;
+  const headerImage3 = apiService?.header_image3_url || apiService?.header_image3 || apiService?.images?.header_image3;
 
-  const validHeaderImages = [headerImage1, headerImage2, headerImage3].filter(
-    (img) =>
-      typeof img === "string" &&
-      img.trim() !== "" &&
-      img !== "/tas.logo.png" &&
-      !img.toLowerCase().endsWith(".svg")
-  );
+  const validHeaderImages = [headerImage1, headerImage2, headerImage3]
+    .filter(
+      (img) =>
+        typeof img === "string" &&
+        img.trim() !== "" &&
+        img !== "/tas.logo.png" &&
+        !img.toLowerCase().endsWith(".svg")
+    )
+    .map((img) => {
+      if (!img.startsWith("http") && !img.startsWith("/")) {
+        return `/storage/services/${img}`;
+      }
+      return img;
+    });
 
   const rawBanners =
     Array.isArray(apiService?.banners) && apiService.banners.length > 0
-      ? apiService.banners.filter(
-        (b: any) =>
-          typeof b === "string" &&
-          b.trim() !== "" &&
-          b !== "/tas.logo.png" &&
-          !b.toLowerCase().endsWith(".svg"),
-      )
+      ? apiService.banners
+          .map((b: any) => {
+            if (typeof b === "string") return b;
+            return b?.image || b?.image_url || b?.url || "";
+          })
+          .filter(
+            (b: string) =>
+              typeof b === "string" &&
+              b.trim() !== "" &&
+              b !== "/tas.logo.png" &&
+              !b.toLowerCase().endsWith(".svg")
+          )
+          .map((b: string) => {
+            if (!b.startsWith("http") && !b.startsWith("/")) {
+              return `/storage/services/${b}`;
+            }
+            return b;
+          })
       : [];
 
   const banners =
-    validHeaderImages.length > 0
-      ? validHeaderImages
-      : rawBanners.length > 0
-        ? rawBanners
-        : [fallbackBanner];
+    rawBanners.length > 0
+      ? rawBanners
+      : validHeaderImages.length > 0
+        ? validHeaderImages
+        : [
+            apiService?.home_icon_image_url ||
+              (apiService?.home_icon_image ? `/storage/services/${apiService.home_icon_image}` : null) ||
+              fallbackBanner
+          ].filter(Boolean);
 
   const [currentBanner, setCurrentBanner] = useState(0);
 
@@ -785,10 +814,12 @@ const ACRepairLayout = () => {
                       : getImageUrl(fallbackBanner, "/tas.logo.png")
                   }
                   alt={service?.name || "Service Banner"}
-                  className="w-full h-full object-fill transition-all duration-500 rounded-[24px]"
+                  className="w-full h-full object-cover transition-all duration-500 rounded-[24px]"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = "/tas.logo.png";
+                    if (target.src !== "/tas.logo.png" && !target.src.endsWith("/tas.logo.png")) {
+                      target.src = "/tas.logo.png";
+                    }
                   }}
                 />
 

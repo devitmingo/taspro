@@ -44,6 +44,12 @@ const getCategoryImageUrl = (service: any) => {
     return getImageUrl(rawImage, "/tas.logo.png");
   }
 
+  const name = (service.name || service.title || "").toLowerCase();
+  if (name.includes("appliance")) return getImageUrl("/storage/service-categories/1792148921_4095.webp");
+  if (name.includes("deep") || name.includes("house")) return getImageUrl("/storage/service-categories/1792149010_4155.webp");
+  if (name.includes("handyman") || name.includes("repair")) return getImageUrl("/storage/service-categories/1792149153_2243.webp");
+  if (name.includes("package")) return getImageUrl("/storage/service-categories/1792149143_7008.webp");
+
   return "/tas.logo.png";
 };
 
@@ -144,12 +150,10 @@ export default function ServiceSection({
                 className="flex flex-col items-center cursor-pointer group"
                 onClick={() => setShowAllCategoriesModal(true)}
               >
-                <div className="w-full h-20 sm:h-28 bg-gradient-to-br from-orange-50 via-white to-orange-50/60 rounded-2xl flex flex-col items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-orange-200/80 group-hover:border-primary/60 relative">
-                  <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-white shadow-xs border border-orange-100 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                    <span className="text-xl sm:text-2xl font-black tracking-tighter leading-none select-none">
-                      &gt;&gt;
-                    </span>
-                  </div>
+                <div className="w-full h-20 sm:h-28 bg-gray-50 rounded-2xl flex items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-gray-100 relative">
+                  <span className="text-xl sm:text-2xl font-black text-primary select-none group-hover:scale-110 transition-transform duration-300">
+                    &gt;&gt;
+                  </span>
                 </div>
 
                 <p className="mt-2 text-[12px] sm:text-sm font-bold text-primary dark:text-orange-400 text-center leading-tight">
