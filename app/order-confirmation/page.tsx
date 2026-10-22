@@ -154,22 +154,6 @@ const totalDiscount = totalMRP - totalAmount;
               address={displayAddress}
               onChangeAddress={() => setShowAddressModal(true)}
             />
-
-            <div className="w-full flex items-start gap-4 bg-white border border-[#E1E1E1] rounded-xl p-4">
-              <div className="w-10 h-10 flex items-center justify-center shrink-0">
-                <img src="/fi.png" className="w-6 h-6 lg:w-8 lg:h-8" />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <p className="text-sm lg:text-lg font-semibold text-[#666666]">
-                  Service providers require OTPs for avail Service
-                </p>
-                <p className="text-xs lg:text-base text-[#898989]">
-                  Neque porro quisquam est, qui dolorem ipsum quia dolor sit
-                  amet...
-                </p>
-              </div>
-            </div>
           </div>
 
           <div className="w-full max-w-[400px] flex flex-col gap-5">

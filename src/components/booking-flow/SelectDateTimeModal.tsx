@@ -88,13 +88,14 @@ export const SelectDateTimeModal: React.FC<SelectDateTimeModalProps> = ({
         });
 
         const fetched = res.data?.data;
-        if (Array.isArray(fetched) && fetched.length > 0) {
+        if (Array.isArray(fetched)) {
           setTimeSlots(fetched);
         } else {
-          setTimeSlots(DEFAULT_SLOTS);
+          setTimeSlots([]);
         }
       } catch (error: any) {
-        setTimeSlots(DEFAULT_SLOTS);
+        console.error("Error fetching slots:", error);
+        setTimeSlots([]);
       } finally {
         setSlotLoading(false);
       }
@@ -190,7 +191,7 @@ export const SelectDateTimeModal: React.FC<SelectDateTimeModalProps> = ({
             <div className="text-center py-4 text-xs font-semibold text-gray-500 animate-pulse">
               Loading available slots...
             </div>
-          ) : (
+          ) : timeSlots.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {timeSlots.map((slot: any) => {
                 const isSelected = selectedTime === slot.slot_time;
@@ -213,6 +214,11 @@ export const SelectDateTimeModal: React.FC<SelectDateTimeModalProps> = ({
                   </button>
                 );
               })}
+            </div>
+          ) : (
+            <div className="text-center py-6 px-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              <p className="text-xs font-semibold text-gray-600">No slots available for this date.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Please select another date above.</p>
             </div>
           )}
         </div>

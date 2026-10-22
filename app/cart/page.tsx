@@ -513,8 +513,8 @@ const handleDateTimeContinue = (
             </h1>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-10">
-            <div className="lg:col-span-2 space-y-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-10 items-start">
+            <div className="lg:col-span-2 space-y-6 self-start">
               <div className="hidden md:block rounded-xl border border-gray-200 p-5">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Customer Details
@@ -725,8 +725,8 @@ const handleDateTimeContinue = (
                     )}
 
                     {/* Coupons List */}
-                    <div className="space-y-2.5 pt-2">
-                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <div className="space-y-2.5 pt-2 max-h-64 overflow-y-auto pr-1">
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wider sticky top-0 bg-orange-50/90 backdrop-blur-xs py-1 z-10">
                         Available Coupons
                       </p>
                       {AVAILABLE_COUPONS.map((c) => (
