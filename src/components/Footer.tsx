@@ -39,6 +39,9 @@ const Footer = () => {
                 <Link href="/cancellation-refund" className="hover:text-white transition-colors text-gray-300">Cancellation & Refund Policy</Link>
               </li>
               <li>
+                <Link href="/rework-policy" className="hover:text-white transition-colors text-gray-300">Rework Policy</Link>
+              </li>
+              <li>
                 <Link href="/terms-of-use" className="hover:text-white transition-colors text-gray-300">Terms of Use</Link>
               </li>
               <li>

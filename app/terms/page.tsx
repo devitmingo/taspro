@@ -10,7 +10,7 @@ const TermsPage = () => {
 
       <main className="py-8 md:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl">
+          <div className="w-full">
             {/* Heading */}
             <div className="mb-8">
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-900 dark:text-white leading-tight">

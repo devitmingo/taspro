@@ -42,7 +42,7 @@ const PrivacyPage = () => {
             Privacy Policy
           </h1>
 
-          <div className="max-w-5xl">
+          <div className="w-full">
             {loading ? (
               <p className="text-gray-500">Loading...</p>
             ) : (

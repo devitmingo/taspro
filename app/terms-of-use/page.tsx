@@ -11,7 +11,7 @@
 //     <div className="min-h-screen py-8 md:py-12">
 //       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 //         {/* Header */}
-//         <div className="max-w-4xl mb-10">
+//         <div className="w-full mb-10">
 //           <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-900 dark:text-white mb-4 leading-tight">
 //             Terms of Use
 //           </h1>
@@ -234,13 +234,13 @@ const TermsPage = () => {
   return (
     <div className="min-h-screen py-8 md:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mb-10">
+        <div className="w-full mb-10">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold">
             Terms of Use
           </h1>
         </div>
 
-        <div className="max-w-4xl">
+        <div className="w-full">
           {loading ? (
             <p>Loading...</p>
           ) : (
