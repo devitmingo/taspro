@@ -188,20 +188,9 @@ const Header = () => {
                 c.name.toLowerCase().includes(detectedCity.toLowerCase())
             );
 
-            if (!matchedCity && detectedCity) {
-              await Swal.fire({
-                icon: "info",
-                title: "Service Unavailable",
-                text: `Sorry, TAS Pro is not available in ${detectedCity} yet.`,
-                confirmButtonColor: "#f97316",
-                confirmButtonText: "Choose Available City",
-              });
-              setIsLocationOpen(true);
-              return;
-            }
-
-            const finalCity = matchedCity ? matchedCity.name : (detectedCity || "Raipur");
-            const finalState = matchedCity ? matchedCity.state : (detectedState || "Chhattisgarh");
+            // Default current location city comes directly from Google API (not only added city)
+            const finalCity = detectedCity || (matchedCity ? matchedCity.name : "Raipur");
+            const finalState = detectedState || (matchedCity ? matchedCity.state : "Chhattisgarh");
             const finalCityId = matchedCity?.id;
             const finalStateId = matchedCity?.state_id;
 
@@ -253,17 +242,11 @@ const Header = () => {
         const location = JSON.parse(savedLocation);
         if (location.city) setCurrentCity(location.city);
         if (location.state) setCurrentState(location.state);
+        return;
       } catch (e) {}
-    } else {
-      const defaultLoc = {
-        city: "Raipur",
-        state: "Chhattisgarh",
-        isManual: true,
-      };
-      localStorage.setItem("selected_location", JSON.stringify(defaultLoc));
-      setCurrentCity("Raipur");
-      setCurrentState("Chhattisgarh");
     }
+    // Default current location city should come from google API
+    detectCurrentLocation(true);
   }, []);
 
   useEffect(() => {
@@ -662,7 +645,7 @@ const Header = () => {
                       </div>
                     )}
 
-                    {/* GPS Detect Current Location button */}
+                    {/* Current Location button */}
                     <button
                       type="button"
                       onClick={() => detectCurrentLocation(true)}
@@ -670,7 +653,7 @@ const Header = () => {
                       className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs cursor-pointer"
                     >
                       <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin text-orange-500" : ""}`} />
-                      <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location (GPS)"}</span>
+                      <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location"}</span>
                     </button>
 
                     {/* Search box */}
@@ -809,23 +792,9 @@ const Header = () => {
               </Link>
 
               <Link
-                href="/my-booking?tab=amc"
+                href="/my-booking"
                 className={`flex flex-col items-center justify-center ${
-                  pathname?.startsWith("/my-booking") && activeTab === "amc"
-                    ? "text-orange-500"
-                    : "text-gray-500"
-                }`}
-              >
-                <Wrench className="w-5 h-5" />
-                <span className="text-[11px] mt-1 font-medium">
-                  AMC Services
-                </span>
-              </Link>
-
-              <Link
-                href="/my-booking?tab=home"
-                className={`flex flex-col items-center justify-center ${
-                  pathname?.startsWith("/my-booking") && activeTab !== "amc"
+                  pathname?.startsWith("/my-booking")
                     ? "text-orange-500"
                     : "text-gray-500"
                 }`}
@@ -852,7 +821,7 @@ const Header = () => {
           {/* Logo */}
           <div className="flex items-center gap-2 w-40 sm:w-44 relative shrink-0">
             <Link href="/" className="block">
-              <img src="/tas.logo.png" alt="TAS Company" className="w-full h-auto object-contain" />
+              <img src="/tas.logo.png" alt="TASpro Company" className="w-full h-auto object-contain" />
             </Link>
           </div>
 
@@ -882,6 +851,17 @@ const Header = () => {
                       {currentCity}
                     </span>
                   </div>
+
+                  {/* Use Current Location button */}
+                  <button
+                    type="button"
+                    onClick={() => detectCurrentLocation(true)}
+                    disabled={isDetectingLocation}
+                    className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs cursor-pointer"
+                  >
+                    <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin text-orange-500" : ""}`} />
+                    <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location"}</span>
+                  </button>
 
                   {/* Master State Filters */}
                   {stateTabs.length > 1 && (

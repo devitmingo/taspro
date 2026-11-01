@@ -43,7 +43,7 @@ export default function AboutSection() {
 
       {/* Why best */}
       <h3 className="text-lg sm:text-xl font-semibold dark:text-white mt-8 mb-3">
-        What makes TASPro Company the best?
+        What makes TASpro Company the best?
       </h3>
 
       <p className="text-sm sm:text-base md:text-lg text-[#414141] dark:text-gray-400 leading-7 mb-6">

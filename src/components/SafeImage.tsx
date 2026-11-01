@@ -48,6 +48,17 @@ export default function SafeImage({
     }
   };
 
+  const resolveObjectFit = (): React.CSSProperties["objectFit"] => {
+    if (hasError) return "contain";
+    if (style?.objectFit) return style.objectFit;
+    if (className?.includes("object-fill")) return "fill";
+    if (className?.includes("object-contain")) return "contain";
+    if (className?.includes("object-none")) return "none";
+    if (className?.includes("object-scale-down")) return "scale-down";
+    if (className?.includes("object-cover")) return "cover";
+    return "cover";
+  };
+
   const objectFitStyle: React.CSSProperties = hasError
     ? { objectFit: "contain", padding: "6px", backgroundColor: "#f9fafb" }
     : {};
@@ -56,7 +67,7 @@ export default function SafeImage({
     return (
       <img
         src={imgSrc}
-        alt={alt || "TAS Pro Service"}
+        alt={alt || "TASpro Service"}
         loading="lazy"
         decoding="async"
         onError={handleError}
@@ -66,7 +77,7 @@ export default function SafeImage({
           inset: 0,
           width: "100%",
           height: "100%",
-          objectFit: hasError ? "contain" : (style?.objectFit || "cover"),
+          objectFit: resolveObjectFit(),
           ...objectFitStyle,
           ...style,
         }}
@@ -77,7 +88,7 @@ export default function SafeImage({
   return (
     <img
       src={imgSrc}
-      alt={alt || "TAS Pro Service"}
+      alt={alt || "TASpro Service"}
       width={width || 80}
       height={height || 80}
       loading="lazy"
@@ -85,7 +96,7 @@ export default function SafeImage({
       onError={handleError}
       className={className}
       style={{
-        objectFit: hasError ? "contain" : (style?.objectFit || "cover"),
+        objectFit: resolveObjectFit(),
         ...objectFitStyle,
         ...style,
       }}

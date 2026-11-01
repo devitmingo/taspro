@@ -11,6 +11,7 @@ import {
   X,
   Heart,
   AlertTriangle,
+  MapPin,
 } from "lucide-react";
 import { API_BASE_URL, getImageUrl } from "@/config/api";
 import Link from "next/link";
@@ -19,9 +20,9 @@ import { useBooking } from "@/context/BookingContext";
 import DynamicCategorySection from "@/components/DynamicCategorySection";
 import ServicesSection from "@/components/ServicesSection";
 import ServiceDetailsModal from "@/components/ServiceDetailsModal";
-import YouMayLikeServices from "@/components/YouMayLikeServices";
 import { SelectCapacityModal } from "@/components/booking-flow/SelectCapacityModal";
 import { AMCDurationModal } from "@/components/AMCDurationModal";
+import NoServiceModal from "@/components/NoServiceModal";
 import Image from "next/image";
 import SafeImage from "@/components/SafeImage";
 
@@ -310,11 +311,13 @@ const ACRepairLayout = () => {
     };
   }, []);
 
-  const fallbackBanner =
-    typeof service?.image === "string"
+  const isMatchingStaticService =
+    service && (!serviceId || String(service.id) === String(serviceId));
+  const fallbackBanner = isMatchingStaticService
+    ? typeof service?.image === "string"
       ? service.image
-      : (service?.image as any)?.src ||
-      "/tas.logo.png";
+      : (service?.image as any)?.src || "/tas.logo.png"
+    : "/tas.logo.png";
 
   const headerImage1 = apiService?.header_image1_url || apiService?.header_image1 || apiService?.images?.header_image1;
   const headerImage2 = apiService?.header_image2_url || apiService?.header_image2 || apiService?.images?.header_image2;
@@ -338,23 +341,23 @@ const ACRepairLayout = () => {
   const rawBanners =
     Array.isArray(apiService?.banners) && apiService.banners.length > 0
       ? apiService.banners
-          .map((b: any) => {
-            if (typeof b === "string") return b;
-            return b?.image || b?.image_url || b?.url || "";
-          })
-          .filter(
-            (b: string) =>
-              typeof b === "string" &&
-              b.trim() !== "" &&
-              b !== "/tas.logo.png" &&
-              !b.toLowerCase().endsWith(".svg")
-          )
-          .map((b: string) => {
-            if (!b.startsWith("http") && !b.startsWith("/")) {
-              return `/storage/services/${b}`;
-            }
-            return b;
-          })
+        .map((b: any) => {
+          if (typeof b === "string") return b;
+          return b?.image || b?.image_url || b?.url || "";
+        })
+        .filter(
+          (b: string) =>
+            typeof b === "string" &&
+            b.trim() !== "" &&
+            b !== "/tas.logo.png" &&
+            !b.toLowerCase().endsWith(".svg")
+        )
+        .map((b: string) => {
+          if (!b.startsWith("http") && !b.startsWith("/")) {
+            return `/storage/services/${b}`;
+          }
+          return b;
+        })
       : [];
 
   const banners =
@@ -363,10 +366,10 @@ const ACRepairLayout = () => {
       : validHeaderImages.length > 0
         ? validHeaderImages
         : [
-            apiService?.home_icon_image_url ||
-              (apiService?.home_icon_image ? `/storage/services/${apiService.home_icon_image}` : null) ||
-              fallbackBanner
-          ].filter(Boolean);
+          apiService?.home_icon_image_url ||
+          (apiService?.home_icon_image ? `/storage/services/${apiService.home_icon_image}` : null) ||
+          fallbackBanner
+        ].filter(Boolean);
 
   const [currentBanner, setCurrentBanner] = useState(0);
 
@@ -389,6 +392,14 @@ const ACRepairLayout = () => {
   }, [banners]);
 
   const [selectedLoc, setSelectedLoc] = useState(() => {
+    const paramCity = searchParams?.get("city_name") || searchParams?.get("city");
+    const paramState = searchParams?.get("state_name") || searchParams?.get("state");
+    if (paramCity) {
+      return {
+        state: paramState || "Chhattisgarh",
+        city: paramCity,
+      };
+    }
     if (typeof window !== "undefined") {
       try {
         const savedLoc = localStorage.getItem("selected_location");
@@ -396,20 +407,61 @@ const ACRepairLayout = () => {
           const parsed = JSON.parse(savedLoc);
           return {
             state: parsed.state || "Chhattisgarh",
-            city: parsed.city || "Durg",
+            city: parsed.city || "Raipur",
           };
         }
-      } catch (e) {}
+      } catch (e) { }
     }
-    return { state: "Chhattisgarh", city: "Durg" };
+    return { state: "Chhattisgarh", city: "Raipur" };
   });
+
+  const [showNoServiceModal, setShowNoServiceModal] = useState(false);
+  const [availableCitiesList, setAvailableCitiesList] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/cities`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.data && Array.isArray(res.data)) {
+          setAvailableCitiesList(res.data);
+        }
+      })
+      .catch(() => { });
+  }, []);
+
+  const handleSelectAnotherCity = () => {
+    setShowNoServiceModal(false);
+    window.dispatchEvent(new Event("open-location-modal"));
+  };
+
+  const handleContinueDefaultCity = (targetCity = "Raipur") => {
+    setShowNoServiceModal(false);
+    const found = availableCitiesList.find(
+      (c: any) => (c.name || c).toLowerCase() === targetCity.toLowerCase()
+    );
+    const locationData = {
+      city: targetCity,
+      state: found?.state?.name || found?.state || "Chhattisgarh",
+      state_id: found?.state_id,
+      city_id: found?.id,
+      isManual: true,
+    };
+    localStorage.setItem("selected_location", JSON.stringify(locationData));
+    setSelectedLoc({
+      city: targetCity,
+      state: locationData.state,
+    });
+    window.dispatchEvent(
+      new CustomEvent("location-changed", { detail: locationData })
+    );
+  };
 
   useEffect(() => {
     const handleLocChange = (e: any) => {
       if (e.detail) {
         setSelectedLoc({
           state: e.detail.state || "Chhattisgarh",
-          city: e.detail.city || "Durg",
+          city: e.detail.city || "Raipur",
         });
       }
     };
@@ -427,28 +479,18 @@ const ACRepairLayout = () => {
             ? `${API_BASE_URL}/service?slug=${slug}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
             : `${API_BASE_URL}/service?id=${subCategoryId}`;
 
-        let res = await fetch(primaryUrl, {
+        const res = await fetch(primaryUrl, {
           headers: { accept: "application/json" },
         });
 
-        let data = await res.json();
+        const data = await res.json();
+        const issues = data?.data?.issues || [];
+        const hasActiveIssues = Array.isArray(issues) && issues.length > 0;
 
-        if (!data?.status) {
-          const fallbackUrl = serviceId
-            ? `${API_BASE_URL}/service?service_id=${serviceId}`
-            : slug
-              ? `${API_BASE_URL}/service?slug=${slug}`
-              : `${API_BASE_URL}/service?id=${subCategoryId}`;
-          res = await fetch(fallbackUrl, {
-            headers: { accept: "application/json" },
-          });
-          data = await res.json();
-        }
-
-        if (data?.status) {
+        if (data?.status && hasActiveIssues) {
+          setShowNoServiceModal(false);
           setServiceDetails(data);
           const subCats = data?.data?.sub_categories || data?.data?.subServices || [];
-          const issues = data?.data?.issues || [];
 
           // Find first tab with items, or first tab
           const tabWithItems = subCats.find((sc: any) => {
@@ -467,6 +509,10 @@ const ACRepairLayout = () => {
           if (targetTabId) {
             setActiveTab(String(targetTabId));
           }
+        } else {
+          // If service not found or no service issues added for this city
+          setServiceDetails(data?.status ? data : null);
+          setShowNoServiceModal(true);
         }
       } catch (error) {
         console.log("SERVICE DETAILS API ERROR:", error);
@@ -530,7 +576,7 @@ const ACRepairLayout = () => {
     });
   }
 
-  const tabs = apiTabs.length > 0 ? apiTabs : service?.types || [];
+  const tabs = issues.length > 0 ? apiTabs : [];
   const currentType =
     tabs.find((tab: any) => String(tab.id) === String(activeTab)) ||
     tabs.find((tab: any) => tab.items && tab.items.length > 0) ||
@@ -734,7 +780,7 @@ const ACRepairLayout = () => {
                 const formattedName = name ? (hasService ? name : `${name} Service`) : "Service";
                 return (
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-snug">
-                    Best {formattedName} in {service?.city || "Raipur"}
+                    Best {formattedName} in {selectedLoc.city || service?.city || "Raipur"}
                   </h1>
                 );
               })()}
@@ -757,7 +803,7 @@ const ACRepairLayout = () => {
                     {service?.bookings || 0}
                   </span>
                   <span>
-                    (Bookings in {service?.city || "Raipur"})
+                    (Bookings in {selectedLoc.city || service?.city || "Raipur"})
                   </span>
                 </div>
               </div>
@@ -769,36 +815,36 @@ const ACRepairLayout = () => {
                       ✓
                     </div>
                     <span className="text-sm font-medium text-gray-800">
-                      TAS<span className="text-orange-500">Pro</span> Cover
+                      TAS<span className="text-orange-500">pro</span> Cover
                     </span>
                   </div>
 
                   <div className="mt-5 space-y-3">
                     <div
                       onClick={() => setShowWarrantyModal(true)}
-                      className="flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer hover:border-orange-500"
+                      className="flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer hover:border-orange-500 group transition-all"
                     >
                       <div className="flex gap-2 items-center">
                         <span>🏅</span>
-                        <span className="text-sm text-gray-500 hover:text-orange-600">
+                        <span className="text-sm text-gray-500 group-hover:text-orange-600 transition-colors">
                           {displayServices?.[0]?.warrantyDays || apiService?.warranty_days || 0} Days Warranty
                         </span>
                       </div>
-                      <span>›</span>
+                      <span className="text-gray-400 group-hover:text-orange-500 transition-colors">›</span>
                     </div>
 
-                    <div className="flex justify-between items-center border rounded-xl px-4 py-3 hover:border-orange-500">
+                    <Link
+                      href={`/rate-card?service_id=${serviceId || apiService?.id || (service as any)?.id || 1}`}
+                      className="flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer hover:border-orange-500 group transition-all block"
+                    >
                       <div className="flex gap-2 items-center">
                         <span>💳</span>
-                        <Link
-                          href={`/rate-card?service_id=${serviceId}`}
-                          className="text-sm text-gray-500 hover:text-orange-600"
-                        >
+                        <span className="text-sm text-gray-500 group-hover:text-orange-600 transition-colors">
                           Standard rate card no hidden charges
-                        </Link>
+                        </span>
                       </div>
-                      <span>›</span>
-                    </div>
+                      <span className="text-gray-400 group-hover:text-orange-500 transition-colors">›</span>
+                    </Link>
                   </div>
                 </div>
               )}
@@ -817,11 +863,19 @@ const ACRepairLayout = () => {
                       : getImageUrl(fallbackBanner, "/tas.logo.png")
                   }
                   alt={service?.name || "Service Banner"}
-                  className="w-full h-full object-cover transition-all duration-500 rounded-[24px]"
+                  className="w-full h-full object-fill transition-all duration-500 rounded-[24px]"
+                  style={{
+                    objectFit:
+                      (banners[currentBanner] || fallbackBanner) &&
+                        !getImageUrl(banners[currentBanner] || fallbackBanner, "/tas.logo.png").endsWith("/tas.logo.png")
+                        ? "fill"
+                        : "contain",
+                  }}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     if (target.src !== "/tas.logo.png" && !target.src.endsWith("/tas.logo.png")) {
                       target.src = "/tas.logo.png";
+                      target.style.objectFit = "contain";
                     }
                   }}
                 />
@@ -889,285 +943,315 @@ const ACRepairLayout = () => {
               </div>
             )}
 
-            <div
-              style={{ position: "sticky", top: "80px", zIndex: 40 }}
-              className="bg-white dark:bg-gray-900 py-3 w-full flex items-center mb-5 shadow-sm"
-            >
-              {activeScroll === "tabs" && canScroll && !atStart && (
-                <button
-                  onClick={() => scroll(tabsRef, "left")}
-                  className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white shadow-lg rounded-full items-center justify-center border border-[#FF6A00] z-20"
-                >
-                  <ChevronLeft className="w-6 h-6 text-[#FF6A00]" />
-                </button>
-              )}
-
-              <div className="overflow-hidden w-full">
-                <div
-                  ref={tabsRef}
-                  className="flex gap-4 overflow-x-auto hide-scrollbar w-full py-2"
-                >
-                  {tabs.map((tab: any) => (
-                    <div key={tab.id} className="flex-shrink-0">
-                      <div
-                        onClick={() => {
-                          setActiveTab(String(tab.id));
-                          const el = document.getElementById(`category-section-${tab.id}`);
-                          if (el) {
-                            const yOffset = -210;
-                            const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
-                            window.scrollTo({ top: y, behavior: "smooth" });
-                          }
-                        }}
-                        className={`w-28 h-14 sm:w-32 sm:h-16 p-1 sm:p-1.5 rounded-xl border flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${activeTab === String(tab.id)
-                          ? "border-[#FF6A00] bg-orange-50/20 shadow-[0_4px_12px_rgba(255,106,0,0.15)] font-bold"
-                          : "border-gray-200 bg-white hover:border-gray-300 font-semibold"
-                          }`}
-                      >
-                        {/* IMAGE / ICON */}
-                        {tab.icon && tab.icon.length < 5 ? (
-                          <span className="text-lg mb-0.5">{tab.icon}</span>
-                        ) : (
-                          <img
-                            src={safeImage(tab.image)}
-                            alt={tab.name}
-                            className="w-7 h-7 sm:w-8 sm:h-8 aspect-square object-contain mb-0.5 rounded-md flex-shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "/tas.logo.png";
-                            }}
-                          />
-                        )}
-
-                        {/* TEXT */}
-                        <p
-                          title={tab.name?.replace(/repair/gi, "").trim()}
-                          className={`text-[10px] sm:text-[11px] text-center font-medium truncate w-full block text-ellipsis whitespace-nowrap px-1 ${activeTab === String(tab.id)
-                            ? "text-[#FF6A00]"
-                            : "text-gray-700"
-                            }`}
-                        >
-                          {tab.name?.replace(/repair/gi, "").trim()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+            {issues.length === 0 ? (
+              <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-3xl p-8 sm:p-12 text-center my-6 shadow-sm">
+                <div className="w-16 h-16 bg-orange-100 dark:bg-orange-950/50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-orange-500 shadow-inner">
+                  <MapPin className="w-8 h-8 animate-bounce" />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 leading-tight">
+                  We are currently not serving in <span className="text-orange-500">{selectedLoc.city || "your city"}</span>
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed mb-6">
+                  Service issues have not been added for {selectedLoc.city || "this city"} yet. In the meantime, you can pick a served city from the navbar or continue with our operational hub.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto">
+                  <button
+                    onClick={handleSelectAnotherCity}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-95"
+                  >
+                    Select City from Nav
+                  </button>
+                  <button
+                    onClick={() => handleContinueDefaultCity("Raipur")}
+                    className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-xl text-xs sm:text-sm hover:border-orange-500 transition-colors"
+                  >
+                    Continue in Raipur
+                  </button>
                 </div>
               </div>
-              {activeScroll === "tabs" && canScroll && !atEnd && (
-                <button
-                  onClick={() => scroll(tabsRef, "right")}
-                  className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white shadow-lg rounded-full items-center justify-center border border-[#FF6A00] z-20"
+            ) : (
+              <>
+                <div
+                  style={{ position: "sticky", top: "80px", zIndex: 40 }}
+                  className="bg-white dark:bg-gray-900 py-3 w-full flex items-center mb-5 shadow-sm"
                 >
-                  <ChevronRight className="w-6 h-6 text-[#FF6A00]" />
-                </button>
-              )}
-            </div>
+                  {activeScroll === "tabs" && canScroll && !atStart && (
+                    <button
+                      onClick={() => scroll(tabsRef, "left")}
+                      className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white shadow-lg rounded-full items-center justify-center border border-[#FF6A00] z-20"
+                    >
+                      <ChevronLeft className="w-6 h-6 text-[#FF6A00]" />
+                    </button>
+                  )}
 
-            <div className="mt-8 space-y-10">
-              {(tabs.length > 0
-                ? tabs
-                : [{ id: "default", name: "Service", subServices: displayServices }]
-              ).map((tab: any) => {
-                const tabServices = getServicesForTab(tab);
-                if (!tabServices || tabServices.length === 0) return null;
-
-                return (
-                  <div
-                    key={tab.id}
-                    id={`category-section-${tab.id}`}
-                    className="scroll-mt-[210px]"
-                  >
-                    <h3 className="text-lg sm:text-2xl font-semibold text-gray-800 dark:text-white mb-4 pb-2 border-b border-gray-200">
-                      {tab.name}
-                    </h3>
-                    <div className="space-y-4">
-                      {tabServices.map((subService) => {
-                        const cartItem = cartItems.find(
-                          (item: any) => String(item.id) === String(subService.id),
-                        );
-
-                        return (
+                  <div className="overflow-hidden w-full">
+                    <div
+                      ref={tabsRef}
+                      className="flex gap-4 overflow-x-auto hide-scrollbar w-full py-2"
+                    >
+                      {tabs.map((tab: any) => (
+                        <div key={tab.id} className="flex-shrink-0">
                           <div
-                            key={subService.id}
-                            className="w-full max-w-2xl"
+                            onClick={() => {
+                              setActiveTab(String(tab.id));
+                              const el = document.getElementById(`category-section-${tab.id}`);
+                              if (el) {
+                                const yOffset = -210;
+                                const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                                window.scrollTo({ top: y, behavior: "smooth" });
+                              }
+                            }}
+                            className={`w-28 h-14 sm:w-32 sm:h-16 p-1 sm:p-1.5 rounded-xl border flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${activeTab === String(tab.id)
+                              ? "border-[#FF6A00] bg-orange-50/20 shadow-[0_4px_12px_rgba(255,106,0,0.15)] font-bold"
+                              : "border-gray-200 bg-white hover:border-gray-300 font-semibold"
+                              }`}
                           >
-                            <div className="sm:shadow-none shadow-lg border sm:border-0 border-gray-100 dark:border-gray-800 rounded-xl py-4 px-4 w-full bg-white dark:bg-gray-800">
-                              <div className="flex gap-4">
-                                <div className="flex flex-col items-center">
-                                  <div className="relative w-28 h-28 rounded-lg overflow-hidden bg-gray-100">
-                                    <img
-                                      src={safeImage(subService.image)}
-                                      alt={subService.name || "Service"}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = "/tas.logo.png";
-                                      }}
-                                    />
-                                  </div>
-
-                                  {cartItem ? (
-                                    <div className="-mt-4 z-10 bg-white border border-orange-500 text-orange-500 rounded-lg flex items-center shadow-sm px-2 py-0.5 text-sm font-semibold gap-2">
-                                      <button
-                                        onClick={() => removeFromCart(cartItem.id)}
-                                        className="px-1 text-orange-500 hover:text-orange-600 font-bold"
-                                      >
-                                        -
-                                      </button>
-                                      <span className="text-gray-900 font-medium min-w-[14px] text-center text-xs">
-                                        {cartItem.quantity}
-                                      </span>
-                                      <button
-                                        onClick={() => {
-                                          if (source === "amc") {
-                                            setSelectedService(subService);
-                                            setShowCapacityModal(true);
-                                          } else {
-                                            handleAddService(subService);
-                                          }
-                                        }}
-                                        className="px-1 text-orange-500 hover:text-orange-600 font-bold"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => {
-                                        if (source === "amc") {
-                                          setSelectedService(subService);
-                                          setShowCapacityModal(true);
-                                        } else {
-                                          handleAddService(subService);
-                                        }
-                                      }}
-                                      className="-mt-4 border z-10 border-orange-500 text-orange-500 px-4 py-1 rounded-lg text-sm font-medium bg-white shadow-sm hover:bg-orange-50 transition"
-                                    >
-                                      Add
-                                    </button>
-                                  )}
-                                </div>
-
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span
-                                      onClick={() => {
-                                        setSelectedWarrantyDays(
-                                          subService.warrantyDays || 30,
-                                        );
-                                        setShowWarrantyModal(true);
-                                      }}
-                                      className="cursor-pointer text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-md"
-                                    >
-                                      {subService.warrantyDays || 0} Days Warranty
-                                    </span>
-
-                                    <div className="flex items-center gap-2">
-                                      {subService.packageTag && (
-                                        <span className="text-[11px] bg-green-100 text-green-700 font-semibold px-2.5 py-0.5 rounded-full border border-green-200">
-                                          {subService.packageTag}
-                                        </span>
-                                      )}
-                                      <button
-                                        onClick={() => handleWishlist(subService.id)}
-                                        className="flex-shrink-0"
-                                      >
-                                        <Heart
-                                          className={`w-6 h-6 transition-all duration-300 ${wishlistItems.includes(Number(subService.id))
-                                            ? "text-red-500 fill-red-500"
-                                            : "text-gray-400"
-                                            }`}
-                                        />
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <div className=" flex justify-between items-start sm:flex-row flex-col">
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900 dark:text-white mt-1">
-                                        {subService.name}
-                                      </h4>
-
-                                      <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
-                                        <Star className="w-3 h-3 fill-orange-500 text-orange-500" />
-                                        <span>
-                                          {typeof subService.rating === "number"
-                                            ? subService.rating.toFixed(1)
-                                            : "0.0"}
-                                        </span>
-                                        <span>({subService.reviews} reviews)</span>
-                                      </div>
-
-                                      <div className="flex gap-2 py-2">
-                                        <Clock className="w-4 h-4" />
-                                        <p className="text-xs text-gray-700">
-                                          {subService.duration} approx
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    <div className="flex flex-col mt-2 items-end">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-gray-900 dark:text-white text-lg">
-                                          ₹{subService.discountedPrice}
-                                        </span>
-
-                                        {subService.originalPrice ? (
-                                          <span className="text-xs text-gray-400 line-through">
-                                            ₹{subService.originalPrice}
-                                          </span>
-                                        ) : null}
-                                      </div>
-
-                                      {(() => {
-                                        const orig = subService.originalPrice;
-                                        const disc = subService.discountedPrice;
-                                        const calcOff =
-                                          orig && disc && orig > disc
-                                            ? Math.round(((orig - disc) / orig) * 100)
-                                            : null;
-                                        const offText =
-                                          (subService as any).offer ||
-                                          (calcOff ? `${calcOff}% OFF` : null);
-
-                                        return offText ? (
-                                          <span className="text-green-600 text-xs font-semibold mt-1">
-                                            {offText}
-                                          </span>
-                                        ) : null;
-                                      })()}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <ul className="text-xs text-gray-500 mt-2 space-y-1">
-                                <li>
-                                  • Get 2X deeper dust removal with Foam + PowerJet
-                                  technology
-                                </li>
-                                <li>
-                                  • Intense cleaning of both indoor & outdoor units
-                                </li>
-                              </ul>
-
-                              <p
-                                onClick={() => {
-                                  setSelectedService(subService);
-                                  setShowModal(true);
+                            {/* IMAGE / ICON */}
+                            {tab.icon && tab.icon.length < 5 ? (
+                              <span className="text-lg mb-0.5">{tab.icon}</span>
+                            ) : (
+                              <img
+                                src={safeImage(tab.image)}
+                                alt={tab.name}
+                                className="w-7 h-7 sm:w-8 sm:h-8 aspect-square object-contain mb-0.5 rounded-md flex-shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "/tas.logo.png";
                                 }}
-                                className="text-blue-600 text-xs mt-2 cursor-pointer"
-                              >
-                                More Details {">>"}
-                              </p>
-                            </div>
+                              />
+                            )}
+
+                            {/* TEXT */}
+                            <p
+                              title={tab.name?.replace(/repair/gi, "").trim()}
+                              className={`text-[10px] sm:text-[11px] text-center font-medium truncate w-full block text-ellipsis whitespace-nowrap px-1 ${activeTab === String(tab.id)
+                                ? "text-[#FF6A00]"
+                                : "text-gray-700"
+                                }`}
+                            >
+                              {tab.name?.replace(/repair/gi, "").trim()}
+                            </p>
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                  {activeScroll === "tabs" && canScroll && !atEnd && (
+                    <button
+                      onClick={() => scroll(tabsRef, "right")}
+                      className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white shadow-lg rounded-full items-center justify-center border border-[#FF6A00] z-20"
+                    >
+                      <ChevronRight className="w-6 h-6 text-[#FF6A00]" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-8 space-y-10">
+                  {(tabs.length > 0
+                    ? tabs
+                    : [{ id: "default", name: "Service", subServices: displayServices }]
+                  ).map((tab: any) => {
+                    const tabServices = getServicesForTab(tab);
+                    if (!tabServices || tabServices.length === 0) return null;
+
+                    return (
+                      <div
+                        key={tab.id}
+                        id={`category-section-${tab.id}`}
+                        className="scroll-mt-[210px]"
+                      >
+                        <h3 className="text-lg sm:text-2xl font-semibold text-gray-800 dark:text-white mb-4 pb-2 border-b border-gray-200">
+                          {tab.name}
+                        </h3>
+                        <div className="space-y-4">
+                          {tabServices.map((subService) => {
+                            const cartItem = cartItems.find(
+                              (item: any) => String(item.id) === String(subService.id),
+                            );
+
+                            return (
+                              <div
+                                key={subService.id}
+                                className="w-full max-w-2xl"
+                              >
+                                <div className="sm:shadow-none shadow-lg border sm:border-0 border-gray-100 dark:border-gray-800 rounded-xl py-4 px-4 w-full bg-white dark:bg-gray-800">
+                                  <div className="flex gap-4">
+                                    <div className="flex flex-col items-center">
+                                      <div className="relative w-28 h-28 rounded-lg overflow-hidden bg-gray-100">
+                                        <img
+                                          src={safeImage(subService.image)}
+                                          alt={subService.name || "Service"}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.src = "/tas.logo.png";
+                                          }}
+                                        />
+                                      </div>
+
+                                      {cartItem ? (
+                                        <div className="-mt-4 z-10 bg-white border border-orange-500 text-orange-500 rounded-lg flex items-center shadow-sm px-2 py-0.5 text-sm font-semibold gap-2">
+                                          <button
+                                            onClick={() => removeFromCart(cartItem.id)}
+                                            className="px-1 text-orange-500 hover:text-orange-600 font-bold"
+                                          >
+                                            -
+                                          </button>
+                                          <span className="text-gray-900 font-medium min-w-[14px] text-center text-xs">
+                                            {cartItem.quantity}
+                                          </span>
+                                          <button
+                                            onClick={() => {
+                                              if (source === "amc") {
+                                                setSelectedService(subService);
+                                                setShowCapacityModal(true);
+                                              } else {
+                                                handleAddService(subService);
+                                              }
+                                            }}
+                                            className="px-1 text-orange-500 hover:text-orange-600 font-bold"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => {
+                                            if (source === "amc") {
+                                              setSelectedService(subService);
+                                              setShowCapacityModal(true);
+                                            } else {
+                                              handleAddService(subService);
+                                            }
+                                          }}
+                                          className="-mt-4 border z-10 border-orange-500 text-orange-500 px-4 py-1 rounded-lg text-sm font-medium bg-white shadow-sm hover:bg-orange-50 transition"
+                                        >
+                                          Add
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span
+                                          onClick={() => {
+                                            setSelectedWarrantyDays(
+                                              subService.warrantyDays || 30,
+                                            );
+                                            setShowWarrantyModal(true);
+                                          }}
+                                          className="cursor-pointer text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-md"
+                                        >
+                                          {subService.warrantyDays || 0} Days Warranty
+                                        </span>
+
+                                        <div className="flex items-center gap-2">
+                                          {subService.packageTag && (
+                                            <span className="text-[11px] bg-green-100 text-green-700 font-semibold px-2.5 py-0.5 rounded-full border border-green-200">
+                                              {subService.packageTag}
+                                            </span>
+                                          )}
+                                          <button
+                                            onClick={() => handleWishlist(subService.id)}
+                                            className="flex-shrink-0"
+                                          >
+                                            <Heart
+                                              className={`w-6 h-6 transition-all duration-300 ${wishlistItems.includes(Number(subService.id))
+                                                ? "text-red-500 fill-red-500"
+                                                : "text-gray-400"
+                                                }`}
+                                            />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div className=" flex justify-between items-start sm:flex-row flex-col">
+                                        <div>
+                                          <h4 className="font-semibold text-gray-900 dark:text-white mt-1">
+                                            {subService.name}
+                                          </h4>
+
+                                          <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                                            <Star className="w-3 h-3 fill-orange-500 text-orange-500" />
+                                            <span>
+                                              {typeof subService.rating === "number"
+                                                ? subService.rating.toFixed(1)
+                                                : "0.0"}
+                                            </span>
+                                            <span>({subService.reviews} reviews)</span>
+                                          </div>
+
+                                          <div className="flex gap-2 py-2">
+                                            <Clock className="w-4 h-4" />
+                                            <p className="text-xs text-gray-700">
+                                              {subService.duration} approx
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex flex-col mt-2 items-end">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-gray-900 dark:text-white text-lg">
+                                              ₹{subService.discountedPrice}
+                                            </span>
+
+                                            {subService.originalPrice ? (
+                                              <span className="text-xs text-gray-400 line-through">
+                                                ₹{subService.originalPrice}
+                                              </span>
+                                            ) : null}
+                                          </div>
+
+                                          {(() => {
+                                            const orig = subService.originalPrice;
+                                            const disc = subService.discountedPrice;
+                                            const calcOff =
+                                              orig && disc && orig > disc
+                                                ? Math.round(((orig - disc) / orig) * 100)
+                                                : null;
+                                            const offText =
+                                              (subService as any).offer ||
+                                              (calcOff ? `${calcOff}% OFF` : null);
+
+                                            return offText ? (
+                                              <span className="text-green-600 text-xs font-semibold mt-1">
+                                                {offText}
+                                              </span>
+                                            ) : null;
+                                          })()}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <ul className="text-xs text-gray-500 mt-2 space-y-1">
+                                    <li>
+                                      • Get 2X deeper dust removal with Foam + PowerJet
+                                      technology
+                                    </li>
+                                    <li>
+                                      • Intense cleaning of both indoor & outdoor units
+                                    </li>
+                                  </ul>
+
+                                  <p
+                                    onClick={() => {
+                                      setSelectedService(subService);
+                                      setShowModal(true);
+                                    }}
+                                    className="text-blue-600 text-xs mt-2 cursor-pointer"
+                                  >
+                                    More Details {">>"}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
           {showDifferentServiceModal && (
             <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -1357,7 +1441,7 @@ const ACRepairLayout = () => {
                 />
 
                 <Link
-                  href={`/rate-card?service_id=${serviceId}`}
+                  href={`/rate-card?service_id=${serviceId || apiService?.id || (service as any)?.id || 1}`}
                   className="w-full border border-orange-500 text-orange-500 rounded-2xl px-5 py-2 flex items-center justify-between font-semibold text-sm mb-8"
                 >
                   Standard Rate Card
@@ -1370,7 +1454,7 @@ const ACRepairLayout = () => {
   "
               >
                 <h4 className="font-semibold text-sm text-gray-900 dark:text-white mb-3">
-                  Why TASPro Company
+                  Why TASpro Company
                 </h4>
 
                 {[
@@ -1489,11 +1573,6 @@ const ACRepairLayout = () => {
             toggleFAQ={toggleFAQ}
           />
         )}
-
-        <YouMayLikeServices
-          serviceId={apiService?.id || serviceId || (service as any)?.id}
-          currentSlug={slug}
-        />
       </div>
 
       {categoryServices && categoryServices.length > 0 && (
@@ -1594,6 +1673,15 @@ const ACRepairLayout = () => {
             handleAddService(selectedService);
           }
         }}
+      />
+
+      <NoServiceModal
+        isOpen={showNoServiceModal}
+        onClose={() => setShowNoServiceModal(false)}
+        cityName={selectedLoc.city}
+        onSelectAnotherCity={handleSelectAnotherCity}
+        onContinueDefaultCity={handleContinueDefaultCity}
+        availableCities={availableCitiesList.map((c: any) => c.name || c)}
       />
     </>
   );

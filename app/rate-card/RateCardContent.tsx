@@ -1,5 +1,4 @@
 "use client";
-export const dynamic = "force-dynamic";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
@@ -87,8 +86,8 @@ const RateCardContent = () => {
   }, [rateData]);
 
   return (
-    <div className="min-h-screen py-6 px-3 sm:px-6">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen py-6 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-center relative mb-6">
           <button
@@ -138,8 +137,8 @@ const RateCardContent = () => {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 border-b border-gray-200">
                       <tr>
-                        <th className="text-left px-4 py-3.5 font-semibold text-gray-700">Description</th>
-                        <th className="text-right px-4 py-3.5 font-semibold text-gray-700 w-36 sm:w-44">
+                        <th className="text-left px-5 sm:px-6 py-4 font-semibold text-gray-700">Description</th>
+                        <th className="text-right px-5 sm:px-6 py-4 font-semibold text-gray-700 w-40 sm:w-56">
                           Service Charge
                         </th>
                       </tr>
@@ -148,7 +147,7 @@ const RateCardContent = () => {
                     <tbody className="divide-y divide-gray-100">
                       {electricalParts.length === 0 ? (
                         <tr>
-                          <td colSpan={2} className="px-4 py-6 text-center text-gray-500">
+                          <td colSpan={2} className="px-5 sm:px-6 py-6 text-center text-gray-500">
                             No electrical parts or service charges available.
                           </td>
                         </tr>
@@ -160,7 +159,7 @@ const RateCardContent = () => {
 
                           return (
                             <tr key={item.id ?? index} className="hover:bg-gray-50/70 transition-colors">
-                              <td className="px-4 py-3.5">
+                              <td className="px-5 sm:px-6 py-4">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="font-medium text-gray-900">{item.description}</span>
                                   {subName && (
@@ -176,7 +175,7 @@ const RateCardContent = () => {
                                 </div>
                               </td>
 
-                              <td className="px-4 py-3.5 text-right">
+                              <td className="px-5 sm:px-6 py-4 text-right">
                                 {actual && actual !== finalPrice && (
                                   <p className="text-gray-400 line-through text-xs">{actual}</p>
                                 )}
@@ -214,16 +213,16 @@ const RateCardContent = () => {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-100 border-b border-gray-200">
                       <tr>
-                        <th className="text-left px-4 py-3.5 font-semibold text-gray-700">Part Name</th>
-                        <th className="text-center px-4 py-3.5 font-semibold text-gray-700 w-32 sm:w-36">Price</th>
-                        <th className="text-right px-4 py-3.5 font-semibold text-gray-700 w-32 sm:w-40">Warranty</th>
+                        <th className="text-left px-5 sm:px-6 py-4 font-semibold text-gray-700">Part Name</th>
+                        <th className="text-center px-5 sm:px-6 py-4 font-semibold text-gray-700 w-36 sm:w-44">Price</th>
+                        <th className="text-right px-5 sm:px-6 py-4 font-semibold text-gray-700 w-36 sm:w-48">Warranty</th>
                       </tr>
                     </thead>
 
                     <tbody className="divide-y divide-gray-100">
                       {spareParts.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-gray-500">
+                          <td colSpan={3} className="px-5 sm:px-6 py-6 text-center text-gray-500">
                             No spare parts available.
                           </td>
                         </tr>
@@ -237,16 +236,16 @@ const RateCardContent = () => {
 
                           return (
                             <tr key={item.id ?? index} className="hover:bg-gray-50/70 transition-colors">
-                              <td className="px-4 py-3.5 font-medium text-gray-900">{item.description}</td>
+                              <td className="px-5 sm:px-6 py-4 font-medium text-gray-900">{item.description}</td>
 
-                              <td className="px-4 py-3.5 text-center">
+                              <td className="px-5 sm:px-6 py-4 text-center">
                                 {actual && actual !== finalPrice && (
                                   <p className="text-gray-400 line-through text-xs">{actual}</p>
                                 )}
                                 <p className="font-bold text-gray-900 text-sm sm:text-base">{finalPrice}</p>
                               </td>
 
-                              <td className="px-4 py-3.5 text-right">
+                              <td className="px-5 sm:px-6 py-4 text-right">
                                 <span className="inline-block text-xs sm:text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
                                   {warranty}
                                 </span>

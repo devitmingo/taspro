@@ -179,7 +179,14 @@ export default function ServiceSection({
                   alt={slide.title || "Home Services"}
                   fill
                   fallbackSrc="/heroimage.jpg"
-                  className="object-cover w-full h-full rounded-3xl"
+                  className="object-fill w-full h-full rounded-3xl"
+                  style={{
+                    objectFit:
+                      (slide.image || slide.image_url) &&
+                      !String(slide.image || slide.image_url).endsWith("/tas.logo.png")
+                        ? "fill"
+                        : "contain",
+                  }}
                   priority={index === 0}
                 />
                 {/* Overlay gradient */}

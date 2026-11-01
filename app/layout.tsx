@@ -12,7 +12,7 @@ import LayoutContent from "@/components/LayoutContent";
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "TAS PRO - Professional Home Services",
+  title: "TASpro - Professional Home Services",
   description:
     "Professional home services with certified technicians and guaranteed quality work",
   icons: {

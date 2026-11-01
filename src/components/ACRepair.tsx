@@ -111,7 +111,7 @@ const ServiceListItem = ({ service, onAdd, onViewDetails }: { service: Service; 
 
 const WhyTasproCard = () => (
   <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-    <h3 className="font-bold text-lg mb-4">Why TASPro?</h3>
+    <h3 className="font-bold text-lg mb-4">Why TASpro?</h3>
     <ul className="space-y-3">
       {whyTasproItems.map((item, index) => (
         <li key={index} className="flex items-center gap-3 text-sm text-gray-700">
@@ -412,7 +412,7 @@ const handleRemoveItem = (id: string) => {
               AC Repair Service in Raipur
             </h2>
             <p className="text-gray-600 leading-7">
-              TasPro offers top-notch AC repair and maintenance services in
+              TASpro offers top-notch AC repair and maintenance services in
               Raipur. Our team of certified professionals ensures your air
               conditioner runs efficiently, providing quick cooling and lower
               power consumption. From gas refilling to circuit repair, we handle
@@ -433,7 +433,7 @@ const handleRemoveItem = (id: string) => {
                 costs. A good service provider will inspect your AC thoroughly
                 before suggesting repairs. Ensure that they use genuine spare
                 parts and have a good track record of customer satisfaction. At
-                TasPro, we ensure all these standards are met to give you a
+                TASpro, we ensure all these standards are met to give you a
                 hassle-free experience.
               </p>
             </div>

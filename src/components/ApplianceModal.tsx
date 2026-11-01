@@ -93,20 +93,11 @@ const ApplianceModal = ({
           city_name: city,
         },
       })
-      .then(async (res) => {
+      .then((res) => {
         if (res.data?.status && Array.isArray(res.data?.data) && res.data.data.length > 0) {
           setCategoryServices(res.data.data);
         } else {
-          const fallbackRes = await axios.get(`${API_BASE_URL}/services`, {
-            params: {
-              service_category_id: categoryId,
-            },
-          });
-          if (fallbackRes.data?.status && Array.isArray(fallbackRes.data?.data)) {
-            setCategoryServices(fallbackRes.data.data);
-          } else {
-            setCategoryServices([]);
-          }
+          setCategoryServices([]);
         }
       })
       .catch((err) => {
@@ -116,6 +107,14 @@ const ApplianceModal = ({
       .finally(() => setLoading(false));
   }, [isOpen, category]);
 
+  const getSlug = (item: any) => {
+    if (item.slug && item.slug !== "ac-repair-service") return item.slug;
+    const name = (item.name || item.label || "").toLowerCase();
+    if (name.includes("ac")) return "ac-repair";
+    if (name.includes("cleaning") || name.includes("house")) return "deep-cleaning";
+    return name ? name.replace(/[^a-z0-9]+/g, "-") : "service";
+  };
+
   // Determine final list of items to show
   let itemsToShow: any[] = [];
 
@@ -124,7 +123,7 @@ const ApplianceModal = ({
       id: item.id,
       image: getApplianceImage(item.name, item.image || item.icon),
       label: item.name,
-      slug: item.slug || "ac-repair-service",
+      slug: getSlug(item),
     }));
   } else if (data.length > 0 && category?.id) {
     const categoryId = Number(category.id);
@@ -135,7 +134,7 @@ const ApplianceModal = ({
       id: item.id,
       image: getApplianceImage(item.name, item.image || item.icon),
       label: item.name,
-      slug: item.slug || "ac-repair-service",
+      slug: getSlug(item),
     }));
   }
 

@@ -24,6 +24,9 @@ export default function HomeStartupModal() {
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined" && window.location.search.includes("nomodal=1")) {
+      return;
+    }
     try {
       const shown = localStorage.getItem("homeStartupModalShown");
       if (!shown) {

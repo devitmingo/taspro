@@ -10,7 +10,6 @@ import SuccessCard from "@/components/SuccessCard";
 import CustomerDetails from "@/components/CustomerDetails";
 import CouponCard from "@/components/CouponCard";
 import AmountSummary from "@/components/AmountSummary";
-import YouMayLikeServices from "@/components/YouMayLikeServices";
 import GradientButton2 from "@/components/ui/GradientButton2";
 import { SelectAddressModal } from "@/components/booking-flow/SelectAddressModal";
 import AddNewAddressModal from "@/components/AddNewAddressModal";
@@ -178,7 +177,6 @@ const totalDiscount = totalMRP - totalAmount;
           </div>
         </div>
 
-        <YouMayLikeServices />
         <div className="block md:hidden flex justify-center mt-6">
           <Link href="/" className="w-full">
             <GradientButton2

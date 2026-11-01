@@ -39,10 +39,10 @@ export default function ACRepairHero() {
             </div>
           </div>
 
-          {/* TASPro Cover Badge */}
+          {/* TASpro Cover Badge */}
           <div className="flex items-center space-x-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 inline-flex">
             <Shield className="w-5 h-5 text-green-600" />
-            <span className="text-green-800 font-medium">TASPro Cover</span>
+            <span className="text-green-800 font-medium">TASpro Cover</span>
           </div>
 
           {/* AC Type Dropdown */}

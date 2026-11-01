@@ -139,7 +139,7 @@ export default function PaymentPage() {
                 key: razorKey,
                 amount: orderInfo.amount,
                 currency: orderInfo.currency || "INR",
-                name: "TASPro Company",
+                name: "TASpro Company",
                 description: "Home Service Booking Payment",
                 image: "https://files.catbox.moe/l742u1.png",
                 handler: async function (response: any) {

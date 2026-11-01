@@ -2094,7 +2094,7 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
         </div>
       </div>
       <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-md z-50 md:hidden">
-        <div className="grid grid-cols-4 h-16">
+        <div className="grid grid-cols-3 h-16">
           <Link
             href="/"
             className={`flex flex-col items-center justify-center ${
@@ -2106,21 +2106,9 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
           </Link>
 
           <Link
-            href="/my-booking?tab=amc"
+            href="/my-booking"
             className={`flex flex-col items-center justify-center ${
-              pathname?.startsWith("/my-booking") && bookingType === "amc"
-                ? "text-orange-500"
-                : "text-gray-500"
-            }`}
-          >
-            <Wrench className="w-5 h-5" />
-            <span className="text-[11px] mt-1 font-medium">AMC Services</span>
-          </Link>
-
-          <Link
-            href="/my-booking?tab=home"
-            className={`flex flex-col items-center justify-center ${
-              pathname?.startsWith("/my-booking") && bookingType !== "amc"
+              pathname?.startsWith("/my-booking")
                 ? "text-orange-500"
                 : "text-gray-500"
             }`}

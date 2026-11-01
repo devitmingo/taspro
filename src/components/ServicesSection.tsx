@@ -82,12 +82,6 @@ const DEFAULT_CONSTRUCTION_SERVICES: ServiceItem[] = [
   { id: 26, name: "Water Proofing & Pest Control", slug: "pest-control" },
 ];
 
-const DEFAULT_AMC_SERVICES: ServiceItem[] = [
-  { id: 27, name: "Air Conditioner (AC) AMC", slug: "amc-services" },
-  { id: 28, name: "Water Purifier (RO) AMC", slug: "amc-services" },
-  { id: 29, name: "Kitchen Chimney AMC", slug: "amc-services" },
-];
-
 const DEFAULT_PACKAGES: ServiceItem[] = [
   { id: 30, name: "Bathroom Cleaning Package", slug: "cleaning-packages" },
   { id: 31, name: "Water Tank Cleaning Package", slug: "cleaning-packages" },
@@ -99,6 +93,7 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
   const [servicesList, setServicesList] = useState<ServiceItem[]>([]);
   const [cityName, setCityName] = useState("Raipur");
   const [stateName, setStateName] = useState("Chhattisgarh");
+  const [servingCities, setServingCities] = useState<any[]>([]);
 
   useEffect(() => {
     try {
@@ -109,7 +104,47 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
         if (parsed.state) setStateName(parsed.state);
       }
     } catch (e) {}
+
+    const handleLocationChange = (e: any) => {
+      if (e.detail) {
+        if (e.detail.city) setCityName(e.detail.city);
+        if (e.detail.state) setStateName(e.detail.state);
+      }
+    };
+    window.addEventListener("location-changed", handleLocationChange);
+
+    const fetchCities = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/cities`);
+        if (res.data?.status && Array.isArray(res.data?.data) && res.data.data.length > 0) {
+          setServingCities(res.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch serving cities", err);
+      }
+    };
+    fetchCities();
+
+    return () => window.removeEventListener("location-changed", handleLocationChange);
   }, []);
+
+  const handleCitySelect = (cityItem: any) => {
+    const targetCity = typeof cityItem === "string" ? cityItem : cityItem.name;
+    const targetState = typeof cityItem === "string" ? "Chhattisgarh" : (cityItem.state?.name || cityItem.state || "Chhattisgarh");
+    const locationData = {
+      city: targetCity,
+      state: targetState,
+      city_id: typeof cityItem === "object" ? cityItem.id : undefined,
+      state_id: typeof cityItem === "object" ? cityItem.state_id : undefined,
+      isManual: true,
+    };
+    localStorage.setItem("selected_location", JSON.stringify(locationData));
+    setCityName(targetCity);
+    setStateName(targetState);
+    window.dispatchEvent(
+      new CustomEvent("location-changed", { detail: locationData })
+    );
+  };
 
   useEffect(() => {
     if (Array.isArray(data) && data.length > 0) {
@@ -173,17 +208,25 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
 
   const cleaningFinal = deepCleaning;
 
+  const formatServiceNameWithCity = (name: string) => {
+    if (!cityName) return name;
+    const cleanCity = cityName.trim();
+    const regex = new RegExp(`\\s+in\\s+${cleanCity}$`, "i");
+    if (regex.test(name)) return name;
+    return `${name} in ${cleanCity}`;
+  };
+
   const renderServiceLinks = (items: ServiceItem[]) => {
     return items.map((item, index) => {
       const slug = getRouteSlug(item.slug || item.name, item.service_category_id);
-      const url = slug === "amc-services" ? "/amc-services" : `/service/${slug}?service_id=${item.id}`;
+      const url = `/service/${slug}?service_id=${item.id}`;
       return (
         <span key={item.id || index} className="inline-flex items-center">
           <Link
             href={url}
             className="hover:text-orange-600 hover:underline transition-colors cursor-pointer font-normal text-gray-600 text-xs sm:text-sm"
           >
-            {item.name}
+            {formatServiceNameWithCity(item.name)}
           </Link>
           {index < items.length - 1 && <span className="mx-1.5 text-gray-400 font-light">|</span>}
         </span>
@@ -196,7 +239,7 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
       <section className="py-10 sm:py-12 bg-[#EBEBEB] border-t border-gray-200 mt-6 sm:mt-10">
         <LayoutContainer>
           <div className="space-y-6">
-            {/* SECTION 1: On-demand Services */}
+            {/* On-demand Services */}
             <div>
               <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3">
                 On-demand Services we offer in {cityName} {stateName}
@@ -231,23 +274,6 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
                   {renderServiceLinks(DEFAULT_CONSTRUCTION_SERVICES)}
                 </div>
               </div>
-            </div>
-
-            {/* SECTION 2: AMC Services */}
-            <div>
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3">
-                AMC Services we offer in {cityName} {stateName}
-              </h3>
-
-              {/* Annual Maintenance Contract (AMC) */}
-              <div className="mb-4">
-                <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-                  Annual Maintenance Contract (AMC)
-                </h4>
-                <div className="text-xs sm:text-sm leading-relaxed flex flex-wrap items-center gap-y-1">
-                  {renderServiceLinks(DEFAULT_AMC_SERVICES)}
-                </div>
-              </div>
 
               {/* Cleaning Packages */}
               <div className="mb-2">
@@ -267,12 +293,25 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
         <LayoutContainer>
           <div className="flex flex-wrap items-center text-xs sm:text-sm text-gray-600 gap-1.5">
             <span className="font-semibold text-gray-900">Serving Cities :</span>
-            {["Raipur", "New Raipur", "Durg", "Bhilai", "Korba", "Raigarh", "Kanker"].map((city, idx, arr) => (
-              <span key={city} className="inline-flex items-center">
-                <span className="hover:text-orange-600 transition-colors cursor-pointer text-gray-700">{city}</span>
-                {idx < arr.length - 1 && <span className="ml-1.5 text-gray-400">|</span>}
-              </span>
-            ))}
+            {(servingCities.length > 0 ? servingCities : [{ id: 1, name: "Raipur" }, { id: 2, name: "Durg" }]).map((cityItem: any, idx: number, arr: any[]) => {
+              const name = typeof cityItem === "string" ? cityItem : cityItem.name;
+              const isCurrent = name.toLowerCase() === cityName.toLowerCase();
+              return (
+                <span key={cityItem.id || name} className="inline-flex items-center">
+                  <span
+                    onClick={() => handleCitySelect(cityItem)}
+                    className={`transition-colors cursor-pointer ${
+                      isCurrent
+                        ? "text-orange-600 font-bold"
+                        : "text-gray-700 hover:text-orange-600"
+                    }`}
+                  >
+                    {name}
+                  </span>
+                  {idx < arr.length - 1 && <span className="ml-1.5 text-gray-400">|</span>}
+                </span>
+              );
+            })}
           </div>
         </LayoutContainer>
       </section>

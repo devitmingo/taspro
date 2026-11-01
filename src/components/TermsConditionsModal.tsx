@@ -199,7 +199,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
                 6. Limitation of Liability
               </h3>
               <p>
-                TASPro Company shall not be liable for any indirect, incidental,
+                TASpro Company shall not be liable for any indirect, incidental,
                 or consequential damages arising out of or in connection with
                 your use of our services.
               </p>

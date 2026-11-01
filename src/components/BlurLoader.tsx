@@ -33,7 +33,7 @@ export default function BlurLoader({
           <div className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white shadow-inner p-1">
             <Image
               src="/tas.logo.png"
-              alt="TAS PRO Logo"
+              alt="TASpro Logo"
               width={32}
               height={32}
               className="object-contain animate-pulse"

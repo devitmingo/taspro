@@ -118,9 +118,9 @@ const CartPanel = ({ cartItems, onRemoveItem, onCheckout }) => {
         )}
       </div>
 
-      {/* Why TASPro Company Card */}
+      {/* Why TASpro Company Card */}
       <div className="bg-[#EBF5FF] p-8 rounded-2xl border border-blue-100">
-        <h3 className="text-lg font-bold mb-6 text-gray-900">Why TASPro Company?</h3>
+        <h3 className="text-lg font-bold mb-6 text-gray-900">Why TASpro Company?</h3>
         <ul className="space-y-3">
           {whyTasproFeatures.map((feature, index) => (
             <li key={index} className="flex items-center gap-3 text-gray-700 font-medium">

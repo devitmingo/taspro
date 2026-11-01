@@ -78,7 +78,7 @@ export const CartSummaryCard: React.FC = () => {
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-        <h4 className="font-bold text-gray-900 mb-2">Why TASPro Company?</h4>
+        <h4 className="font-bold text-gray-900 mb-2">Why TASpro Company?</h4>
         <ul className="text-sm text-gray-700 space-y-1">
           <li>✓ Verified & Professional Technicians</li>
           <li>✓ Same Day Booking Available</li>

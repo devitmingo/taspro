@@ -5,22 +5,19 @@
 
 const TermsPage = () => {
   return (
-    <div className="min-h-screen w-full">
-      {/* <Header /> */}
+    <div className="min-h-screen w-full bg-gray-50/70 py-6 md:py-10">
+      <div className="w-full 2xl:w-[85%] mx-auto px-4 sm:px-5">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-xs sm:shadow-sm p-6 sm:p-10 lg:p-12">
+          {/* Heading */}
+          <div className="mb-8 pb-6 border-b border-gray-100">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white leading-tight">
+              Terms and Conditions
+            </h1>
 
-      <main className="py-8 md:py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="w-full">
-            {/* Heading */}
-            <div className="mb-8">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-900 dark:text-white leading-tight">
-                Terms and Conditions
-              </h1>
-
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
-                Last updated: January 29, 2026
-              </p>
-            </div>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Last updated: January 29, 2026
+            </p>
+          </div>
 
             {/* Section */}
             <section className="mb-8">
@@ -29,14 +26,14 @@ const TermsPage = () => {
               </h2>
 
               <p className="text-sm sm:text-base md:text-lg text-gray-700 dark:text-gray-400 leading-7 mb-4">
-                Welcome to TAS PRO! These terms and conditions outline the rules
-                and regulations for the use of TAS PRO's Website and Services.
+                Welcome to TASpro! These terms and conditions outline the rules
+                and regulations for the use of TASpro's Website and Services.
               </p>
 
               <p className="text-sm sm:text-base md:text-lg text-gray-700 dark:text-gray-400 leading-7">
                 By accessing this website and booking our services, we assume
                 you accept these terms and conditions. Do not continue to use
-                TAS PRO if you do not agree to take all of the terms and
+                TASpro if you do not agree to take all of the terms and
                 conditions stated on this page.
               </p>
             </section>
@@ -64,7 +61,7 @@ const TermsPage = () => {
 
               <ul className="list-disc pl-5 space-y-2 text-sm sm:text-base md:text-lg text-gray-700 dark:text-gray-400 leading-7">
                 <li>
-                  <strong>Company:</strong> Refers to TAS PRO, the service
+                  <strong>Company:</strong> Refers to TASpro, the service
                   provider.
                 </li>
 
@@ -75,11 +72,11 @@ const TermsPage = () => {
 
                 <li>
                   <strong>Service:</strong> Refers to the home services provided
-                  by TAS PRO.
+                  by TASpro.
                 </li>
 
                 <li>
-                  <strong>Website:</strong> Refers to the TAS PRO website
+                  <strong>Website:</strong> Refers to the TASpro website
                   accessible at www.taspro.com
                 </li>
 
@@ -230,7 +227,7 @@ const TermsPage = () => {
               </h2>
 
               <p className="text-sm sm:text-base md:text-lg text-gray-700 dark:text-gray-400 leading-7">
-                TAS PRO shall not be liable for any indirect, incidental,
+                TASpro shall not be liable for any indirect, incidental,
                 special, or consequential damages arising out of or in
                 connection with the use of our services. Our liability is
                 limited to the amount paid for the specific service in question.
@@ -278,10 +275,7 @@ const TermsPage = () => {
             </section>
           </div>
         </div>
-      </main>
-
-      {/* <Footer /> */}
-    </div>
+      </div>
   );
 };
 
