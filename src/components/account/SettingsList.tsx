@@ -5,9 +5,7 @@ import {
   MapPin,
   Wallet,
   CreditCard,
-  Globe,
   Bell,
-  Moon,
   Star,
   Ticket,
   Gift,
@@ -32,7 +30,6 @@ type Props = {
 };
 
 export default function SettingsList({ setActiveView }: Props) {
-  const [dark, setDark] = useState(false);
   const [notify, setNotify] = useState(true);
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -119,19 +116,9 @@ export default function SettingsList({ setActiveView }: Props) {
   };
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") setDark(true);
+    document.documentElement.classList.remove("dark");
+    localStorage.removeItem("theme");
   }, []);
-
-  useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  }, [dark]);
 
   return (
     <div className="w-full max-w-[390px] mx-auto lg:ml-12 px-4 lg:px-0">
@@ -180,16 +167,6 @@ export default function SettingsList({ setActiveView }: Props) {
 
         <div className="border-t border-[#E1E4E8]" />
 
-        <Item
-          icon={
-            <Globe className="w-4 md:w-5 h-4 md:h-5 text-gray-600 dark:text-gray-300 group-hover:text-orange-500 transition" />
-          }
-          text="Change Language"
-          onClick={() => setActiveView("language")}
-        />
-
-        <div className="border-t border-[#E1E4E8]" />
-
         <Toggle
           icon={
             <Bell className="w-4 md:w-5 h-4 md:h-5 text-gray-600 dark:text-gray-300 group-hover:text-orange-500 transition" />
@@ -197,17 +174,6 @@ export default function SettingsList({ setActiveView }: Props) {
           text="Notification Setting"
           state={notify}
           setState={setNotify}
-        />
-
-        <div className="border-t border-[#E1E4E8]" />
-
-        <Toggle
-          icon={
-            <Moon className="w-4 md:w-5 h-4 md:h-5 text-gray-600 dark:text-gray-300 group-hover:text-orange-500 transition" />
-          }
-          text="Dark Mode"
-          state={dark}
-          setState={setDark}
         />
       </div>
 

@@ -171,12 +171,6 @@ export const AccountLayout: React.FC<{ initial?: string }> = ({
                     >
                       My Wallet
                     </button>
-                    <button
-                      onClick={() => setStep("language")}
-                      className="w-full text-left px-4 py-3 rounded-[12px] border border-gray-100 hover:shadow"
-                    >
-                      Change Language
-                    </button>
                     <div className="flex items-center justify-between px-4 py-3 rounded-[12px] border border-gray-100">
                       <span>Notification Setting (Toggle)</span>
                       <label className="inline-flex items-center cursor-pointer">
@@ -188,20 +182,6 @@ export const AccountLayout: React.FC<{ initial?: string }> = ({
                         />
                         <span
                           className={`w-11 h-6 flex items-center bg-gray-200 rounded-full p-1 ${notification ? "bg-orange-400" : ""}`}
-                        ></span>
-                      </label>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-3 rounded-[12px] border border-gray-100">
-                      <span>Dark Mode (Toggle)</span>
-                      <label className="inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={dark}
-                          onChange={() => setDark((v) => !v)}
-                          className="sr-only"
-                        />
-                        <span
-                          className={`w-11 h-6 flex items-center bg-gray-200 rounded-full p-1 ${dark ? "bg-orange-400" : ""}`}
                         ></span>
                       </label>
                     </div>

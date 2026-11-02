@@ -144,26 +144,12 @@ export const AccountPage = () => {
       onClick: () => setSection("wallet")
     },
     {
-      id: "change-language",
-      icon: <Globe className="w-5 h-5" />,
-      title: "Change Language",
-      onClick: () => setShowLanguageModal(true)
-    },
-    {
       id: "notifications",
       icon: <Bell className="w-5 h-5" />,
       title: "Notification Setting",
       hasToggle: true,
       toggleState: notifications,
       onToggle: () => setNotifications(!notifications)
-    },
-    {
-      id: "dark-mode",
-      icon: <Moon className="w-5 h-5" />,
-      title: "Dark Mode",
-      hasToggle: true,
-      toggleState: darkMode,
-      onToggle: () => setDarkMode(!darkMode)
     },
     {
       id: "my-activity",

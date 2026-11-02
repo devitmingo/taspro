@@ -14,7 +14,6 @@ import ProfileCard from "@/components/account/ProfileCard";
 import GradientButton from "@/components/ui/GradientButton";
 import EditProfile from "@/components/account/EditProfile";
 import ReferEarn from "@/components/account/ReferEarn";
-import LanguageSelectorPage from "@/components/account/LanguageSelectorModal";
 import MyWallet from "@/components/account/MyWallet";
 import MyReviews from "@/components/account/MyReviews";
 import MyCoupon from "@/components/account/MyCoupon";
@@ -72,7 +71,6 @@ export default function AccountContent() {
       editProfile: "Edit Profile",
       wallet: "My Wallet",
       payment: "Saved Payment Methods",
-      language: "Change Language",
       reviews: "My Rating & Reviews",
       coupon: "My Coupons",
       refer: "Refer & Earn",
@@ -97,8 +95,6 @@ export default function AccountContent() {
         );
       case "refer":
         return <ReferEarn setActiveView={setActiveView} profile={profile} />;
-      case "language":
-        return <LanguageSelectorPage setActiveView={setActiveView} />;
       case "wallet":
         return <MyWallet setActiveView={setActiveView} profile={profile} />;
       case "reviews":
