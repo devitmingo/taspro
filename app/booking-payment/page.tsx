@@ -364,7 +364,8 @@ export default function CompletePaymentPage() {
 
       const razorKey =
         process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
-        "rzp_test_Sg3z5bMD2SVDOG";
+        process.env.NEXT_PUBLIC_KEY_ID ||
+        "rzp_test_TvL5gF2aAKznOU";
 
       const options: any = {
         key: razorKey,
