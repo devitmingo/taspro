@@ -58,7 +58,7 @@ export const SelectAddressModal: React.FC<SelectAddressModalProps> = ({
   if (!isOpen) return null;
 
   const handleContinue = () => {
-    const selected = addressList.find((a) => String(a.id) === selectedId);
+    const selected = addressList.find((a) => String(a.id) === selectedId) || addressList[0];
     if (selected) onContinue(selected);
   };
 

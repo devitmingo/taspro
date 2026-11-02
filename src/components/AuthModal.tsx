@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Phone, ArrowRight, X, ShieldCheck, ArrowLeft, RotateCw } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
-import Swal from "sweetalert2";
 import { useAuth } from "@/context/AuthContext";
 
 interface AuthModalProps {
@@ -32,6 +31,8 @@ export default function AuthModal({
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [otpError, setOtpError] = useState<string | null>(null);
 
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -39,6 +40,8 @@ export default function AuthModal({
     setMode(initialMode);
     setStep("phone");
     setOtpDigits(["", "", "", ""]);
+    setPhoneError(null);
+    setOtpError(null);
   }, [initialMode, isOpen]);
 
   useEffect(() => {
@@ -74,14 +77,15 @@ export default function AuthModal({
 
   if (!isOpen) return null;
 
-  const handleSendOTP = async () => {
+  const handleSendOTP = async (isResend = false) => {
+    if (isResend) {
+      setOtpError(null);
+    } else {
+      setPhoneError(null);
+    }
+
     if (phone.length !== 10) {
-      Swal.fire({
-        icon: "warning",
-        title: "Invalid Phone Number",
-        text: "Please enter a valid 10-digit phone number.",
-        confirmButtonColor: "#FF6A00",
-      });
+      setPhoneError("Please enter a valid 10-digit phone number.");
       return;
     }
 
@@ -98,34 +102,29 @@ export default function AuthModal({
         setTimer(30);
         setCanResend(false);
         setOtpDigits(["", "", "", ""]);
+        setOtpError(null);
 
         setTimeout(() => {
           otpInputsRef.current[0]?.focus();
         }, 100);
-
-        Swal.fire({
-          icon: "success",
-          title: "OTP Sent",
-          text: `OTP has been sent to +${selectedCountry?.code || "91"} ${phone}`,
-          timer: 1500,
-          showConfirmButton: false,
-        });
       } else {
-        Swal.fire({
-          icon: "error",
-          title: "Failed",
-          text: res.data.message || "Unable to send OTP.",
-          confirmButtonColor: "#FF6A00",
-        });
+        const msg = res.data.message || "Unable to send OTP. Please try again.";
+        if (isResend || step === "otp") {
+          setOtpError(msg);
+        } else {
+          setPhoneError(msg);
+        }
       }
     } catch (error: any) {
       console.error(error?.response?.data || error);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error?.response?.data?.message || "Something went wrong. Please try again.",
-        confirmButtonColor: "#FF6A00",
-      });
+      const msg =
+        error?.response?.data?.message ||
+        "Something went wrong. Please check your number and try again.";
+      if (isResend || step === "otp") {
+        setOtpError(msg);
+      } else {
+        setPhoneError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -133,6 +132,7 @@ export default function AuthModal({
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
+    if (otpError) setOtpError(null);
 
     const newDigits = [...otpDigits];
     newDigits[index] = value.slice(-1);
@@ -156,6 +156,7 @@ export default function AuthModal({
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
+    if (otpError) setOtpError(null);
     const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
     if (pastedData) {
       const digits = pastedData.split("");
@@ -172,13 +173,10 @@ export default function AuthModal({
 
   const handleVerifyOTP = async (otpValue?: string) => {
     const finalOtp = otpValue || otpDigits.join("");
+    setOtpError(null);
+
     if (finalOtp.length !== 4) {
-      Swal.fire({
-        icon: "warning",
-        title: "Invalid OTP",
-        text: "Please enter a 4-digit code.",
-        confirmButtonColor: "#FF6A00",
-      });
+      setOtpError("Please enter a complete 4-digit code.");
       return;
     }
 
@@ -231,14 +229,6 @@ export default function AuthModal({
           window.dispatchEvent(new Event("wishlistUpdated"));
         }
 
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: `Logged in successfully!`,
-          timer: 1500,
-          showConfirmButton: false,
-        });
-
         if (!u.first_name || u.first_name.trim() === "") {
           const redir = redirectUrl ? `&redirect=${encodeURIComponent(redirectUrl)}` : "";
           router.push(`/complete-profile-step-1?phone=${u.mobile}${redir}`);
@@ -257,21 +247,13 @@ export default function AuthModal({
           }
         }
       } else {
-        Swal.fire({
-          icon: "error",
-          title: "Verification Failed",
-          text: res.data.message || "Invalid OTP code. Please try again.",
-          confirmButtonColor: "#FF6A00",
-        });
+        setOtpError(res.data.message || "Invalid OTP code. Please try again.");
       }
     } catch (error: any) {
       console.error("OTP Verification Error:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error?.response?.data?.message || "OTP verification failed.",
-        confirmButtonColor: "#FF6A00",
-      });
+      setOtpError(
+        error?.response?.data?.message || "Invalid OTP code. Please try again."
+      );
     } finally {
       setVerifyLoading(false);
     }
@@ -297,7 +279,11 @@ export default function AuthModal({
                 {/* Modal Tabs Header */}
                 <div className="flex border-b border-gray-200 mb-5">
                   <button
-                    onClick={() => setMode("login")}
+                    onClick={() => {
+                      setMode("login");
+                      setPhoneError(null);
+                      setOtpError(null);
+                    }}
                     className={`pb-2.5 px-3 text-sm font-bold transition-all relative ${
                       mode === "login"
                         ? "text-[#FF6A00] border-b-2 border-[#FF6A00]"
@@ -307,7 +293,11 @@ export default function AuthModal({
                     Sign In
                   </button>
                   <button
-                    onClick={() => setMode("signup")}
+                    onClick={() => {
+                      setMode("signup");
+                      setPhoneError(null);
+                      setOtpError(null);
+                    }}
                     className={`pb-2.5 px-3 text-sm font-bold transition-all relative ${
                       mode === "signup"
                         ? "text-[#FF6A00] border-b-2 border-[#FF6A00]"
@@ -333,7 +323,13 @@ export default function AuthModal({
                     <label className="block text-[11px] font-semibold text-gray-700 mb-1 uppercase tracking-wider">
                       Phone Number
                     </label>
-                    <div className="flex rounded-xl border border-gray-300 overflow-hidden focus-within:border-[#FF6A00] focus-within:ring-1 focus-within:ring-[#FF6A00]">
+                    <div
+                      className={`flex rounded-xl border overflow-hidden transition-colors ${
+                        phoneError
+                          ? "border-red-500 focus-within:border-red-500 focus-within:ring-1 focus-within:ring-red-400"
+                          : "border-gray-300 focus-within:border-[#FF6A00] focus-within:ring-1 focus-within:ring-[#FF6A00]"
+                      }`}
+                    >
                       <select
                         value={selectedCountry?.id || ""}
                         onChange={(e) => {
@@ -358,19 +354,25 @@ export default function AuthModal({
                         <input
                           type="tel"
                           value={phone}
-                          onChange={(e) =>
-                            setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
-                          }
+                          onChange={(e) => {
+                            setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
+                            if (phoneError) setPhoneError(null);
+                          }}
                           placeholder="Enter 10-digit number"
                           className="w-full pl-8 pr-3 py-2.5 text-xs text-gray-900 placeholder-gray-400 outline-none"
                         />
                       </div>
                     </div>
+                    {phoneError && (
+                      <p className="text-red-500 text-xs font-medium mt-1.5 flex items-center gap-1">
+                        <span>•</span> {phoneError}
+                      </p>
+                    )}
                   </div>
 
                   {/* Submit Button */}
                   <button
-                    onClick={handleSendOTP}
+                    onClick={() => handleSendOTP(false)}
                     disabled={loading}
                     className="w-full py-3 bg-gradient-to-r from-[#FF6A00] to-orange-600 text-white font-bold rounded-xl hover:from-orange-600 hover:to-orange-700 shadow-sm transition-all flex items-center justify-center gap-2 text-xs disabled:opacity-50"
                   >
@@ -389,7 +391,10 @@ export default function AuthModal({
               /* OTP Step Inside Modal */
               <>
                 <button
-                  onClick={() => setStep("phone")}
+                  onClick={() => {
+                    setStep("phone");
+                    setOtpError(null);
+                  }}
                   className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-orange-600 mb-3 transition-colors"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -411,7 +416,7 @@ export default function AuthModal({
                 </p>
 
                 {/* 4 Digit OTP Grid Inputs */}
-                <div className="grid grid-cols-4 gap-2.5 mb-5" onPaste={handlePaste}>
+                <div className="grid grid-cols-4 gap-2.5 mb-2" onPaste={handlePaste}>
                   {otpDigits.map((digit, idx) => (
                     <input
                       key={idx}
@@ -424,16 +429,27 @@ export default function AuthModal({
                       value={digit}
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(idx, e)}
-                      className="w-full h-12 text-center text-lg font-bold rounded-xl border border-gray-300 focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 outline-none transition-all bg-gray-50 text-gray-900"
+                      className={`w-full h-12 text-center text-lg font-bold rounded-xl border outline-none transition-all bg-gray-50 text-gray-900 ${
+                        otpError
+                          ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                          : "border-gray-300 focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100"
+                      }`}
                     />
                   ))}
                 </div>
+
+                {/* Inline OTP Error */}
+                {otpError && (
+                  <p className="text-red-500 text-xs font-medium mb-3 text-center flex items-center justify-center gap-1">
+                    <span>•</span> {otpError}
+                  </p>
+                )}
 
                 {/* Resend OTP */}
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-5">
                   {canResend ? (
                     <button
-                      onClick={handleSendOTP}
+                      onClick={() => handleSendOTP(true)}
                       className="text-[#FF6A00] font-bold hover:underline flex items-center gap-1"
                     >
                       <RotateCw className="w-3 h-3" /> Resend OTP

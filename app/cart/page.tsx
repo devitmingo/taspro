@@ -774,7 +774,7 @@ export default function CartPage() {
                   {isLogged ? (
                     <button
                       onClick={() => {
-                        setIsBookingFlow(false);
+                        setIsBookingFlow(true);
                         setShowAddressModal(true);
                       }}
                       className="border border-[#ff5500] text-[#ff5500] px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-orange-50 transition-colors"
@@ -1384,10 +1384,7 @@ export default function CartPage() {
             setSelectedAddress(address);
             localStorage.setItem("selectedAddress", JSON.stringify(address));
             setShowAddressModal(false);
-
-            if (isBookingFlow) {
-              setShowDateTimeModal(true);
-            }
+            setShowDateTimeModal(true);
           }}
           onAddNew={() => {
             setEditingAddress(null);
