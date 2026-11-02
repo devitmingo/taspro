@@ -1,7 +1,7 @@
 "use client";
 
 import { X, MapPin } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import MapPickerModal from "./MapPickerModal";
 
@@ -23,28 +23,66 @@ interface AddNewAddressModalProps {
     state_name?: string;
     city_name?: string;
   }) => void;
+  initialData?: any;
 }
 
 const AddNewAddressModal = ({
   isOpen,
   onClose,
   onSave,
+  initialData,
 }: AddNewAddressModalProps) => {
   const [formData, setFormData] = useState({
     fullName: "",
     contactNumber: "",
     alternateNumber: "",
     postalCode: "",
-    state: "",
-    city: "",
+    state: "Chhattisgarh",
+    city: "Raipur",
     houseNo: "",
     location: "",
     roadLandmark: "",
-    latitude: 0,
-    longitude: 0,
-    state_name: "",
-    city_name: "",
+    latitude: 21.2514,
+    longitude: 81.6296,
+    state_name: "Chhattisgarh",
+    city_name: "Raipur",
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        fullName: initialData.full_name || initialData.fullName || initialData.name || "",
+        contactNumber: (initialData.contact_number || initialData.phone || initialData.contactNumber || "").replace(/^\+91\s*/, ""),
+        alternateNumber: (initialData.alt_contact_number || initialData.alternateNumber || initialData.altPhone || "").replace(/^\+91\s*/, ""),
+        postalCode: initialData.postal_code || initialData.postalCode || initialData.pincode || "",
+        state: initialData.state?.name || initialData.state_name || initialData.state || "Chhattisgarh",
+        city: initialData.city?.name || initialData.city_name || initialData.city || "Raipur",
+        houseNo: initialData.house_number || initialData.houseNo || "",
+        location: initialData.street || initialData.location || "",
+        roadLandmark: initialData.street || initialData.roadLandmark || initialData.landmark || "",
+        latitude: initialData.latitude || 21.2514,
+        longitude: initialData.longitude || 81.6296,
+        state_name: initialData.state?.name || initialData.state_name || initialData.state || "Chhattisgarh",
+        city_name: initialData.city?.name || initialData.city_name || initialData.city || "Raipur",
+      });
+    } else {
+      setFormData({
+        fullName: "",
+        contactNumber: "",
+        alternateNumber: "",
+        postalCode: "",
+        state: "Chhattisgarh",
+        city: "Raipur",
+        houseNo: "",
+        location: "",
+        roadLandmark: "",
+        latitude: 21.2514,
+        longitude: 81.6296,
+        state_name: "Chhattisgarh",
+        city_name: "Raipur",
+      });
+    }
+  }, [initialData, isOpen]);
 
   const [showMapPicker, setShowMapPicker] = useState(false);
 
@@ -117,10 +155,12 @@ const AddNewAddressModal = ({
           }}
         >
           <h2 className="text-2xl font-extrabold text-center text-gray-900 mb-1">
-            Add New Address
+            {initialData ? "Edit Address" : "Add New Address"}
           </h2>
           <p className="text-xs text-gray-500 mb-6 text-center">
-            Please fill in all required details to add your address.
+            {initialData
+              ? "Update your address details."
+              : "Please fill in all required details to add your address."}
           </p>
 
           {/* 2-Column Grid Layout */}
@@ -295,7 +335,7 @@ const AddNewAddressModal = ({
               onClick={handleSave}
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold text-sm shadow-md transition-all active:scale-98"
             >
-              Continue
+              {initialData ? "Update Address" : "Save Address"}
             </button>
           </div>
         </div>

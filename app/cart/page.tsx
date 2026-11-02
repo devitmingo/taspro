@@ -376,6 +376,55 @@ export default function CartPage() {
     return res.data;
   };
 
+  const updateCustomerAddress = async (token: string, id: string | number, formData: any) => {
+    const cleanPhone = (value: string) => {
+      const digits = value
+        .replace(/\D/g, "")
+        .replace(/^91/, "")
+        .replace(/^0/, "");
+      return `+91 ${digits}`;
+    };
+
+    const altRaw = formData.alternateNumber || formData.altPhone || "";
+    const altDigits = altRaw
+      .replace(/\D/g, "")
+      .replace(/^91/, "")
+      .replace(/^0/, "");
+
+    const payload: any = {
+      full_name: formData.fullName || formData.name || "",
+      contact_number: cleanPhone(
+        formData.contactNumber || formData.phone || "",
+      ),
+      postal_code: formData.postalCode || "",
+      latitude: formData.latitude || 21.2514,
+      longitude: formData.longitude || 81.6296,
+      state_name: formData.state_name || formData.state || "Chhattisgarh",
+      city_name: formData.city_name || formData.city || "Raipur",
+      house_number: formData.houseNo || "",
+      street: formData.roadLandmark || formData.location || "",
+      type: formData.type || "Home",
+      is_active: 1,
+    };
+
+    payload.alt_contact_number =
+      altDigits.length === 10 ? `+91 ${altDigits}` : payload.contact_number;
+
+    const res = await axios.put(
+      `${API_BASE_URL}/customers/customer-addresses/${id}`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    return res.data;
+  };
+
 const createCustomerCart = async () => {
   const token = localStorage.getItem("token");
 
@@ -917,6 +966,19 @@ const handleDateTimeContinue = (
             setShowAddressModal(false);
             setShowAddNewAddressModal(true);
           }}
+          onEdit={(address) => {
+            setEditingAddress(address);
+            setShowAddressModal(false);
+            setShowAddNewAddressModal(true);
+          }}
+          onDelete={async (deletedId) => {
+            await fetchAddresses();
+            if (String(selectedAddress?.id) === String(deletedId)) {
+              setSelectedAddress(null);
+              localStorage.removeItem("selectedAddress");
+            }
+          }}
+          onRefresh={fetchAddresses}
         />
 
         <SelectDateTimeModal
@@ -930,16 +992,37 @@ const handleDateTimeContinue = (
 
         <AddNewAddressModal
           isOpen={showAddNewAddressModal}
+          initialData={editingAddress}
           onClose={() => {
             setShowAddNewAddressModal(false);
             setEditingAddress(null);
+            setShowAddressModal(true);
           }}
-          onSave={async (newAddress) => {
+          onSave={async (formData) => {
             const token = localStorage.getItem("token");
             if (!token) return;
 
             try {
-              await addCustomerAddress(token, newAddress);
+              if (editingAddress?.id) {
+                await updateCustomerAddress(token, editingAddress.id, formData);
+                await Swal.fire({
+                  icon: "success",
+                  title: "Address Updated!",
+                  text: "Your address has been updated successfully.",
+                  timer: 1500,
+                  showConfirmButton: false,
+                });
+              } else {
+                await addCustomerAddress(token, formData);
+                await Swal.fire({
+                  icon: "success",
+                  title: "Address Saved!",
+                  text: "Your address has been added successfully.",
+                  timer: 1500,
+                  showConfirmButton: false,
+                });
+              }
+
               await fetchAddresses();
 
               setShowAddNewAddressModal(false);
@@ -947,6 +1030,12 @@ const handleDateTimeContinue = (
               setShowAddressModal(true);
             } catch (error: any) {
               console.log("VALIDATION ERROR:", error.response?.data || error);
+              Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: error?.response?.data?.message || "Failed to save address.",
+                confirmButtonColor: "#f97316",
+              });
             }
           }}
         />
