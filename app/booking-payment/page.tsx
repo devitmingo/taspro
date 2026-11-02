@@ -199,12 +199,17 @@ export default function CompletePaymentPage() {
 
       if (res.data?.status) {
         // Booking successful
+        const bookingObj = res.data?.data?.booking || res.data?.data;
+        const bookingId = bookingObj?.id || res.data?.data?.booking_id || res.data?.data?.id;
+        const orderId =
+          bookingObj?.booking_no ||
+          res.data?.data?.order_id ||
+          res.data?.data?.booking_id ||
+          `TS${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}A${Math.floor(10000 + Math.random() * 90000)}`;
+
         const lastBooking = {
-          orderId:
-            res.data?.data?.order_id ||
-            res.data?.data?.booking_id ||
-            res.data?.data?.id ||
-            `TS${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}A${Math.floor(10000 + Math.random() * 90000)}`,
+          bookingId,
+          orderId,
           orderDate: new Date().toLocaleDateString("en-US", {
             weekday: "short",
             day: "numeric",
@@ -212,7 +217,7 @@ export default function CompletePaymentPage() {
             year: "numeric",
           }),
           items: cartItems.length > 0 ? [...cartItems] : [],
-          serviceName: cartItems[0]?.name || cartItems[0]?.serviceName || "AC Repair",
+          serviceName: cartItems[0]?.serviceName || cartItems[0]?.name || "AC Repair",
           totalMRP,
           totalDiscount,
           couponDiscount,
@@ -230,8 +235,8 @@ export default function CompletePaymentPage() {
         localStorage.removeItem("selectedAddress");
         localStorage.removeItem("cartItems");
 
-        // Immediately direct to order confirmation without any popup
-        router.push("/order-confirmation");
+        // Immediately direct to order confirmation with bookingId query param if available
+        router.push(bookingId ? `/order-confirmation?booking_id=${bookingId}` : "/order-confirmation");
       } else {
         Swal.fire({
           icon: "error",
