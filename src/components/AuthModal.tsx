@@ -102,6 +102,14 @@ export default function AuthModal({
         setTimeout(() => {
           otpInputsRef.current[0]?.focus();
         }, 100);
+
+        Swal.fire({
+          icon: "success",
+          title: "OTP Sent",
+          text: `OTP has been sent to +${selectedCountry?.code || "91"} ${phone}`,
+          timer: 1500,
+          showConfirmButton: false,
+        });
       } else {
         Swal.fire({
           icon: "error",
@@ -222,6 +230,14 @@ export default function AuthModal({
           window.dispatchEvent(new CustomEvent("user-logged-in", { detail: u }));
           window.dispatchEvent(new Event("wishlistUpdated"));
         }
+
+        await Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: `Logged in successfully!`,
+          timer: 1500,
+          showConfirmButton: false,
+        });
 
         if (!u.first_name || u.first_name.trim() === "") {
           const redir = redirectUrl ? `&redirect=${encodeURIComponent(redirectUrl)}` : "";

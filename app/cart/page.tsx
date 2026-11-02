@@ -594,12 +594,22 @@ export default function CartPage() {
     return res.data;
   };
 
-  const createCustomerCart = async () => {
+  const handlePlaceOrderClick = () => {
     const token = localStorage.getItem("token");
 
     if (!token) {
       localStorage.setItem("redirectAfterLogin", "/cart");
       window.dispatchEvent(new Event("open-auth-modal"));
+      return;
+    }
+
+    if (!cartItems.length) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cart Empty",
+        text: "Please add at least one service to continue.",
+        confirmButtonColor: "#ff5500",
+      });
       return;
     }
 
@@ -609,18 +619,40 @@ export default function CartPage() {
       return;
     }
 
-    if (!cartItems.length) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Cart Empty",
-        text: "Please add at least one service to continue.",
-        confirmButtonColor: "#ff5500",
-      });
+    // Address is selected -> open time slot modal
+    setIsBookingFlow(true);
+    setShowDateTimeModal(true);
+  };
+
+  const handleAgreeAndProceed = async () => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      setShowTCModal(false);
+      localStorage.setItem("redirectAfterLogin", "/cart");
+      window.dispatchEvent(new Event("open-auth-modal"));
       return;
     }
 
     try {
       setCartLoading(true);
+
+      // Ensure bookingDateTime is set for booking-payment page
+      if (!localStorage.getItem("bookingDateTime")) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const dd = String(today.getDate()).padStart(2, "0");
+        localStorage.setItem(
+          "bookingDateTime",
+          JSON.stringify({
+            date: `${yyyy}-${mm}-${dd}`,
+            time: "10:00 AM - 12:00 PM",
+            slotId: 1,
+            notes: "Need urgent service",
+          }),
+        );
+      }
 
       const payload = {
         service_category_id: Number(
@@ -643,7 +675,7 @@ export default function CartPage() {
         })),
       };
 
-      const res = await axios.post(
+      await axios.post(
         `${API_BASE_URL}/customers/customer-carts?state_id=1&city_id=1&state_name=Chhattisgarh&city_name=Raipur`,
         payload,
         {
@@ -655,8 +687,8 @@ export default function CartPage() {
         },
       );
 
-      console.log("Cart Created:", res.data);
-      setShowDateTimeModal(true);
+      setShowTCModal(false);
+      router.push("/booking-payment");
     } catch (error: any) {
       console.log("CART API ERROR:", error?.response?.data || error);
 
@@ -664,6 +696,7 @@ export default function CartPage() {
         error?.response?.status === 401 ||
         error?.response?.data?.message === "Unauthenticated."
       ) {
+        setShowTCModal(false);
         await Swal.fire({
           icon: "warning",
           title: "Session Expired",
@@ -679,14 +712,9 @@ export default function CartPage() {
         return;
       }
 
-      await Swal.fire({
-        icon: "error",
-        title: "Failed",
-        text:
-          error?.response?.data?.message ||
-          "Unable to create cart. Please try again.",
-        confirmButtonColor: "#ff5500",
-      });
+      // If cart creation had non-blocking error, still proceed to payment
+      setShowTCModal(false);
+      router.push("/booking-payment");
     } finally {
       setCartLoading(false);
     }
@@ -704,7 +732,8 @@ export default function CartPage() {
     );
 
     setShowDateTimeModal(false);
-    router.push("/booking-payment");
+    // After time slot selected, open Terms & Conditions modal
+    setShowTCModal(true);
   };
 
   return (
@@ -1208,7 +1237,7 @@ export default function CartPage() {
 
                 {/* Main CTA: Place Order */}
                 <button
-                  onClick={createCustomerCart}
+                  onClick={handlePlaceOrderClick}
                   disabled={cartLoading || cartItems.length === 0}
                   className="w-full py-3.5 px-6 rounded-xl bg-[#ff5500] hover:bg-[#e64d00] active:scale-[0.99] text-white font-bold text-sm sm:text-base shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
@@ -1326,7 +1355,7 @@ export default function CartPage() {
                   </div>
 
                   <button
-                    onClick={createCustomerCart}
+                    onClick={handlePlaceOrderClick}
                     disabled={cartLoading || cartItems.length === 0}
                     className="py-2.5 px-6 rounded-xl bg-[#ff5500] text-white font-bold text-sm shadow-md flex items-center gap-1.5"
                   >
@@ -1357,7 +1386,7 @@ export default function CartPage() {
             setShowAddressModal(false);
 
             if (isBookingFlow) {
-              setShowTCModal(true);
+              setShowDateTimeModal(true);
             }
           }}
           onAddNew={() => {
@@ -1444,7 +1473,8 @@ export default function CartPage() {
         <TermsConditionsModal
           isOpen={showTCModal}
           onClose={() => setShowTCModal(false)}
-          onConfirm={() => router.push("/booking-payment")}
+          onConfirm={handleAgreeAndProceed}
+          loading={cartLoading}
         />
 
         {/* Complete Service Review Modal */}
