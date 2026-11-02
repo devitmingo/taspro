@@ -46,8 +46,31 @@ function OrderConfirmationContent() {
   const [showAddNewAddressModal, setShowAddNewAddressModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any | null>(null);
   const [activeAddress, setActiveAddress] = useState<any>(null);
+  const [cityName, setCityName] = useState("Raipur");
+  const [stateName, setStateName] = useState("Chhattisgarh");
   const [recommendedServices, setRecommendedServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Sync selected city/location
+  useEffect(() => {
+    try {
+      const savedLoc = localStorage.getItem("selected_location");
+      if (savedLoc) {
+        const parsed = JSON.parse(savedLoc);
+        if (parsed.city) setCityName(parsed.city);
+        if (parsed.state) setStateName(parsed.state);
+      }
+    } catch (e) {}
+
+    const handleLocationChange = (e: any) => {
+      if (e.detail) {
+        if (e.detail.city) setCityName(e.detail.city);
+        if (e.detail.state) setStateName(e.detail.state);
+      }
+    };
+    window.addEventListener("location-changed", handleLocationChange);
+    return () => window.removeEventListener("location-changed", handleLocationChange);
+  }, []);
 
   const carouselRef = useRef<HTMLDivElement>(null);
 
@@ -330,56 +353,112 @@ function OrderConfirmationContent() {
         })
         .catch((e) => console.log(e));
     }
-
-    // 4. Fetch dynamic services for "You might be also interested in"
-    Promise.allSettled([
-      axios.get(`${API_BASE_URL}/services`),
-      axios.get(`${API_BASE_URL}/service-categories`),
-    ]).then(([servicesRes, categoriesRes]) => {
-      const dynamicList: any[] = [];
-
-      if (servicesRes.status === "fulfilled" && servicesRes.value.data?.data) {
-        servicesRes.value.data.data.forEach((s: any) => {
-          dynamicList.push({
-            id: `svc_${s.id}`,
-            name: s.name,
-            slug: s.slug,
-            image: getImageUrl(s.image || s.home_icon_image, "/bathroom.png"),
-            price: s.visiting_charge > 0 ? s.visiting_charge : 200,
-            strikePrice: Math.round(
-              (s.visiting_charge > 0 ? s.visiting_charge : 200) * 1.25,
-            ),
-            rating: s.rating ? parseFloat(s.rating) : 4.8,
-            reviews: s.reviews?.length ? `${s.reviews.length}k` : "1.2k",
-            duration: "45 mins",
-          });
-        });
-      }
-
-      if (
-        categoriesRes.status === "fulfilled" &&
-        categoriesRes.value.data?.data
-      ) {
-        categoriesRes.value.data.data.forEach((c: any) => {
-          dynamicList.push({
-            id: `cat_${c.id}`,
-            name: c.name,
-            slug: c.slug,
-            image: getImageUrl(c.icon_url, "/washing-machine.png"),
-            price: 550,
-            strikePrice: 650,
-            rating: 4.5,
-            reviews: "2.4k",
-            duration: "45 mins",
-          });
-        });
-      }
-
-      if (dynamicList.length > 0) {
-        setRecommendedServices(dynamicList);
-      }
-    });
   }, [token, bookingIdFromUrl]);
+
+  // Fetch services whose service issues are available in the selected city
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCityServices = async () => {
+      try {
+        const dynamicList: any[] = [];
+
+        // 1. Fetch service issues available in the selected city
+        const issuesUrl = `${API_BASE_URL}/service-issues?city_name=${encodeURIComponent(cityName)}`;
+        const servicesUrl = `${API_BASE_URL}/services?city_name=${encodeURIComponent(cityName)}&state_name=${encodeURIComponent(stateName)}`;
+
+        const [issuesRes, servicesRes] = await Promise.allSettled([
+          fetch(issuesUrl).then((r) => r.json()),
+          fetch(servicesUrl).then((r) => r.json()),
+        ]);
+
+        // Add service issues available in this city
+        if (issuesRes.status === "fulfilled" && issuesRes.value?.data) {
+          const issuesData = issuesRes.value.data;
+          if (Array.isArray(issuesData)) {
+            issuesData.forEach((issue: any) => {
+              const basePrice = Number(issue.base_price) || 0;
+              const strikePrice =
+                Number(issue.strike_price) || Math.round(basePrice * 1.18);
+              const serviceSlug =
+                issue.service?.slug || "ac-repair-appliances-repair-service";
+
+              dynamicList.push({
+                id: `issue_${issue.id}`,
+                name: issue.name,
+                categoryName:
+                  issue.serviceSubCategory?.name ||
+                  issue.serviceCategory?.name ||
+                  issue.service?.name ||
+                  "Verified Service",
+                slug: `${serviceSlug}?service_id=${issue.service_id || issue.service?.id || 1}`,
+                image: getImageUrl(
+                  issue.icon_url || issue.icon,
+                  "/bathroom.png",
+                ),
+                price: basePrice > 0 ? basePrice : 199,
+                strikePrice:
+                  strikePrice > basePrice
+                    ? strikePrice
+                    : Math.round(basePrice * 1.2),
+                rating: 5.0,
+                reviews: "1.2k",
+                duration: issue.duration_minutes
+                  ? `${issue.duration_minutes} mins`
+                  : "45 mins",
+                packageTag: issue.package_tag || null,
+              });
+            });
+          }
+        }
+
+        // Also add services that have active service issues in this city
+        if (servicesRes.status === "fulfilled" && servicesRes.value?.data) {
+          const servicesData = servicesRes.value.data;
+          if (Array.isArray(servicesData)) {
+            servicesData.forEach((s: any) => {
+              if (
+                !dynamicList.some(
+                  (item) =>
+                    item.name.toLowerCase() === (s.name || "").toLowerCase(),
+                )
+              ) {
+                const visitingCharge = Number(s.visiting_charge) || 200;
+                dynamicList.push({
+                  id: `svc_${s.id}`,
+                  name: s.name,
+                  categoryName: s.category?.name || "Home Service",
+                  slug:
+                    s.slug ||
+                    `ac-repair-appliances-repair-service?service_id=${s.id}`,
+                  image: getImageUrl(
+                    s.image || s.home_icon_image,
+                    "/washing-machine.png",
+                  ),
+                  price: visitingCharge,
+                  strikePrice: Math.round(visitingCharge * 1.2),
+                  rating: s.rating ? parseFloat(s.rating) : 4.8,
+                  reviews: s.reviews ? `${s.reviews}k` : "1.2k",
+                  duration: "45 mins",
+                  packageTag: null,
+                });
+              }
+            });
+          }
+        }
+
+        if (isMounted) {
+          setRecommendedServices(dynamicList);
+        }
+      } catch (e) {
+        console.error("Error fetching city-filtered services:", e);
+      }
+    };
+
+    fetchCityServices();
+    return () => {
+      isMounted = false;
+    };
+  }, [cityName, stateName]);
 
   const items = bookingData?.items || [];
   const displayAddress =
@@ -814,37 +893,7 @@ function OrderConfirmationContent() {
               </div>
             </div>
 
-            {/* CARD 2: Offer Earned */}
-            <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-xs space-y-2">
-              <div className="flex items-center gap-2 text-[#ff5500]">
-                <Gift className="w-4 h-4" />
-                <h4 className="text-xs sm:text-sm font-bold text-gray-900">
-                  Offer Earned
-                </h4>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mt-0.5">
-                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-900">
-                      You earned{" "}
-                      <span className="text-orange-600 font-extrabold">
-                        20 Reward Points
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      These points can be used on your next booking.
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-orange-500" />
-              </div>
-            </div>
-
-            {/* CARD 3: Important Information */}
+            {/* CARD 2: Important Information */}
             <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-xs space-y-3">
               <div className="flex items-center gap-2 text-[#ff5500]">
                 <Info className="w-4 h-4" />
@@ -949,137 +998,125 @@ function OrderConfirmationContent() {
         {/* ================= BOTTOM SECTION: You might be also interested in ================= */}
         <div className="mt-12 pt-8 border-t border-gray-200/80">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight">
-              You might be also interested in
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => scrollCarousel("left")}
-                className="w-8 h-8 rounded-full border border-gray-300 bg-white hover:bg-gray-100 flex items-center justify-center text-gray-700 transition-colors cursor-pointer shadow-2xs"
-                aria-label="Previous"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollCarousel("right")}
-                className="w-8 h-8 rounded-full border border-gray-300 bg-white hover:bg-gray-100 flex items-center justify-center text-gray-700 transition-colors cursor-pointer shadow-2xs"
-                aria-label="Next"
-              >
-                <ChevronRightIcon className="w-4 h-4" />
-              </button>
+            <div>
+              <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight">
+                You might be also interested in
+              </h2>
+              {cityName && (
+                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                  Available in <span className="text-[#ff5500] font-bold">{cityName}</span>
+                </p>
+              )}
             </div>
+            {recommendedServices.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => scrollCarousel("left")}
+                  className="w-8 h-8 rounded-full border border-gray-300 bg-white hover:bg-gray-100 flex items-center justify-center text-gray-700 transition-colors cursor-pointer shadow-2xs"
+                  aria-label="Previous"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollCarousel("right")}
+                  className="w-8 h-8 rounded-full border border-gray-300 bg-white hover:bg-gray-100 flex items-center justify-center text-gray-700 transition-colors cursor-pointer shadow-2xs"
+                  aria-label="Next"
+                >
+                  <ChevronRightIcon className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Dynamic Carousel / Grid */}
-          <div
-            ref={carouselRef}
-            className="flex gap-4 overflow-x-auto pb-4 pt-1 scroll-smooth no-scrollbar"
-            style={{ scrollSnapType: "x mandatory" }}
-          >
-            {(recommendedServices.length > 0
-              ? recommendedServices
-              : [
-                  {
-                    id: 1,
-                    name: "Appliances Repair & Service",
-                    price: 200,
-                    strikePrice: 236,
-                    rating: 5.0,
-                    reviews: "1.2k",
-                    duration: "45 mins",
-                    image: "/bathroom.png",
-                    slug: "ac-repair-appliances-repair-service",
-                  },
-                  {
-                    id: 2,
-                    name: "Deep Cleaning Services",
-                    price: 550,
-                    strikePrice: 650,
-                    rating: 4.5,
-                    reviews: "2.4k",
-                    duration: "45 mins",
-                    image: "/washing-machine.png",
-                    slug: "full-house-cleaning-deep-cleaning-services",
-                  },
-                  {
-                    id: 3,
-                    name: "Handyman Service",
-                    price: 299,
-                    strikePrice: 399,
-                    rating: 4.8,
-                    reviews: "950",
-                    duration: "60 mins",
-                    image: "/carpenter.png",
-                    slug: "handyman-service",
-                  },
-                  {
-                    id: 4,
-                    name: "TASpro Cleaning Packages",
-                    price: 799,
-                    strikePrice: 999,
-                    rating: 4.9,
-                    reviews: "3.1k",
-                    duration: "90 mins",
-                    image: "/heroimage.jpg",
-                    slug: "taspro-cleaning-packages",
-                  },
-                ]
-            ).map((service) => (
-              <div
-                key={service.id}
-                className="min-w-[260px] sm:min-w-[280px] max-w-[290px] bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between shrink-0"
-                style={{ scrollSnapAlign: "start" }}
-              >
-                <div className="h-40 w-full overflow-hidden bg-gray-100 relative">
-                  <img
-                    src={service.image}
-                    alt={service.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    onError={(e: any) => {
-                      e.target.src = "/tas.logo.png";
-                    }}
-                  />
-                </div>
-
-                <div className="p-4 space-y-2.5 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="font-bold text-sm text-gray-900 leading-snug line-clamp-1">
-                      {service.name}
-                    </h3>
-
-                    <div className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 mt-1">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span className="font-bold text-gray-800">
-                        {service.rating}
+          {recommendedServices.length > 0 ? (
+            <div
+              ref={carouselRef}
+              className="flex gap-4 overflow-x-auto pb-4 pt-1 scroll-smooth no-scrollbar"
+              style={{ scrollSnapType: "x mandatory" }}
+            >
+              {recommendedServices.map((service) => (
+                <div
+                  key={service.id}
+                  className="min-w-[260px] sm:min-w-[280px] max-w-[290px] bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between shrink-0 group"
+                  style={{ scrollSnapAlign: "start" }}
+                >
+                  <div className="h-40 w-full overflow-hidden bg-gray-100 relative">
+                    <img
+                      src={service.image}
+                      alt={service.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e: any) => {
+                        e.target.src = "/tas.logo.png";
+                      }}
+                    />
+                    {service.packageTag && (
+                      <span className="absolute top-2.5 left-2.5 px-2.5 py-0.5 text-[9px] font-extrabold uppercase bg-orange-600 text-white rounded-full shadow-2xs">
+                        {service.packageTag}
                       </span>
-                      <span>({service.reviews} Reviews)</span>
-                    </div>
-
-                    <div className="flex items-baseline gap-1.5 mt-2">
-                      <span className="text-base font-extrabold text-gray-900">
-                        ₹{service.price}
-                      </span>
-                      <span className="text-xs text-gray-400 line-through">
-                        ₹{service.strikePrice}
-                      </span>
-                      <span className="text-[11px] text-gray-500 ml-1">
-                        {service.duration}
-                      </span>
-                    </div>
+                    )}
                   </div>
 
-                  <Link
-                    href={`/service/${service.slug}`}
-                    className="w-full py-2 bg-[#ff5500] hover:bg-[#e64d00] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center cursor-pointer mt-2"
-                  >
-                    Book Now
-                  </Link>
+                  <div className="p-4 space-y-2.5 flex-1 flex flex-col justify-between">
+                    <div>
+                      {service.categoryName && (
+                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider truncate">
+                          {service.categoryName}
+                        </p>
+                      )}
+                      <h3 className="font-bold text-sm text-gray-900 leading-snug line-clamp-1 group-hover:text-orange-600 transition-colors">
+                        {service.name}
+                      </h3>
+
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 mt-1">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span className="font-bold text-gray-800">
+                          {service.rating}
+                        </span>
+                        <span>({service.reviews} Reviews)</span>
+                      </div>
+
+                      <div className="flex items-baseline gap-1.5 mt-2">
+                        <span className="text-base font-extrabold text-gray-900">
+                          ₹{service.price}
+                        </span>
+                        {service.strikePrice > service.price && (
+                          <span className="text-xs text-gray-400 line-through">
+                            ₹{service.strikePrice}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-gray-500 ml-1">
+                          {service.duration}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={
+                        service.slug.startsWith("/")
+                          ? service.slug
+                          : `/service/${service.slug}`
+                      }
+                      className="w-full py-2 bg-[#ff5500] hover:bg-[#e64d00] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center cursor-pointer mt-2"
+                    >
+                      Book Now
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-gray-50 border border-gray-200 rounded-2xl">
+              <p className="text-sm font-semibold text-gray-700">
+                No services currently available in {cityName}.
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                We are actively adding new services for your location!
+              </p>
+            </div>
+          )}
         </div>
       </main>
 
