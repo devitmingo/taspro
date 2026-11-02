@@ -18,7 +18,6 @@ import {
   User,
   Phone,
   Lock,
-  Gift,
   Star,
   ChevronRight,
   Info,
@@ -364,6 +363,7 @@ function OrderConfirmationContent() {
 
         // 1. Fetch service issues available in the selected city
         const issuesUrl = `${API_BASE_URL}/service-issues?city_name=${encodeURIComponent(cityName)}`;
+        // 2. Fetch services available in the selected city
         const servicesUrl = `${API_BASE_URL}/services?city_name=${encodeURIComponent(cityName)}&state_name=${encodeURIComponent(stateName)}`;
 
         const [issuesRes, servicesRes] = await Promise.allSettled([
@@ -376,7 +376,7 @@ function OrderConfirmationContent() {
           const issuesData = issuesRes.value.data;
           if (Array.isArray(issuesData)) {
             issuesData.forEach((issue: any) => {
-              const basePrice = Number(issue.base_price) || 0;
+              const basePrice = Number(issue.base_price) || 200;
               const strikePrice =
                 Number(issue.strike_price) || Math.round(basePrice * 1.18);
               const serviceSlug =
@@ -385,11 +385,6 @@ function OrderConfirmationContent() {
               dynamicList.push({
                 id: `issue_${issue.id}`,
                 name: issue.name,
-                categoryName:
-                  issue.serviceSubCategory?.name ||
-                  issue.serviceCategory?.name ||
-                  issue.service?.name ||
-                  "Verified Service",
                 slug: `${serviceSlug}?service_id=${issue.service_id || issue.service?.id || 1}`,
                 image: getImageUrl(
                   issue.icon_url || issue.icon,
@@ -405,7 +400,6 @@ function OrderConfirmationContent() {
                 duration: issue.duration_minutes
                   ? `${issue.duration_minutes} mins`
                   : "45 mins",
-                packageTag: issue.package_tag || null,
               });
             });
           }
@@ -426,7 +420,6 @@ function OrderConfirmationContent() {
                 dynamicList.push({
                   id: `svc_${s.id}`,
                   name: s.name,
-                  categoryName: s.category?.name || "Home Service",
                   slug:
                     s.slug ||
                     `ac-repair-appliances-repair-service?service_id=${s.id}`,
@@ -439,7 +432,6 @@ function OrderConfirmationContent() {
                   rating: s.rating ? parseFloat(s.rating) : 4.8,
                   reviews: s.reviews ? `${s.reviews}k` : "1.2k",
                   duration: "45 mins",
-                  packageTag: null,
                 });
               }
             });
@@ -1040,7 +1032,7 @@ function OrderConfirmationContent() {
               {recommendedServices.map((service) => (
                 <div
                   key={service.id}
-                  className="min-w-[260px] sm:min-w-[280px] max-w-[290px] bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between shrink-0 group"
+                  className="min-w-[270px] sm:min-w-[285px] max-w-[295px] bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between shrink-0 group"
                   style={{ scrollSnapAlign: "start" }}
                 >
                   <div className="h-40 w-full overflow-hidden bg-gray-100 relative">
@@ -1052,57 +1044,52 @@ function OrderConfirmationContent() {
                         e.target.src = "/tas.logo.png";
                       }}
                     />
-                    {service.packageTag && (
-                      <span className="absolute top-2.5 left-2.5 px-2.5 py-0.5 text-[9px] font-extrabold uppercase bg-orange-600 text-white rounded-full shadow-2xs">
-                        {service.packageTag}
-                      </span>
-                    )}
                   </div>
 
                   <div className="p-4 space-y-2.5 flex-1 flex flex-col justify-between">
                     <div>
-                      {service.categoryName && (
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider truncate">
-                          {service.categoryName}
-                        </p>
-                      )}
+                      {/* Only Service/Issue Name (no category/subcategory) */}
                       <h3 className="font-bold text-sm text-gray-900 leading-snug line-clamp-1 group-hover:text-orange-600 transition-colors">
                         {service.name}
                       </h3>
 
+                      {/* Rating & Reviews */}
                       <div className="flex items-center gap-1 text-[11px] font-semibold text-gray-500 mt-1">
-                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                         <span className="font-bold text-gray-800">
                           {service.rating}
                         </span>
                         <span>({service.reviews} Reviews)</span>
                       </div>
+                    </div>
 
-                      <div className="flex items-baseline gap-1.5 mt-2">
-                        <span className="text-base font-extrabold text-gray-900">
+                    {/* Same Row: Amount and Book Now Button */}
+                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-gray-100 mt-2">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-sm sm:text-base font-extrabold text-gray-900">
                           ₹{service.price}
                         </span>
                         {service.strikePrice > service.price && (
-                          <span className="text-xs text-gray-400 line-through">
+                          <span className="text-[11px] text-gray-400 line-through font-medium">
                             ₹{service.strikePrice}
                           </span>
                         )}
-                        <span className="text-[11px] text-gray-500 ml-1">
+                        <span className="text-[10px] text-gray-500 font-medium ml-0.5">
                           {service.duration}
                         </span>
                       </div>
-                    </div>
 
-                    <Link
-                      href={
-                        service.slug.startsWith("/")
-                          ? service.slug
-                          : `/service/${service.slug}`
-                      }
-                      className="w-full py-2 bg-[#ff5500] hover:bg-[#e64d00] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center cursor-pointer mt-2"
-                    >
-                      Book Now
-                    </Link>
+                      <Link
+                        href={
+                          service.slug.startsWith("/")
+                            ? service.slug
+                            : `/service/${service.slug}`
+                        }
+                        className="px-3.5 py-1.5 bg-[#ff5500] hover:bg-[#e64d00] active:scale-[0.97] text-white font-bold text-xs rounded-xl shadow-xs transition-all shrink-0 cursor-pointer"
+                      >
+                        Book Now
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
