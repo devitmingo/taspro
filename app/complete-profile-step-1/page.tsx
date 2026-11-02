@@ -149,7 +149,17 @@ if (!token) {
         contactVerified: true,
       });
 
-      router.push("/");
+      const target =
+        (typeof window !== "undefined" && (
+          new URLSearchParams(window.location.search).get("redirect") ||
+          localStorage.getItem("redirectAfterLogin") ||
+          sessionStorage.getItem("redirectAfterLogin")
+        )) || "/";
+      try {
+        localStorage.removeItem("redirectAfterLogin");
+        sessionStorage.removeItem("redirectAfterLogin");
+      } catch (e) {}
+      router.push(target);
     } else {
       const message = response.data?.message || "";
 
@@ -169,7 +179,17 @@ if (!token) {
           contactVerified: true,
         });
 
-        router.push("/");
+        const target =
+          (typeof window !== "undefined" && (
+            new URLSearchParams(window.location.search).get("redirect") ||
+            localStorage.getItem("redirectAfterLogin") ||
+            sessionStorage.getItem("redirectAfterLogin")
+          )) || "/";
+        try {
+          localStorage.removeItem("redirectAfterLogin");
+          sessionStorage.removeItem("redirectAfterLogin");
+        } catch (e) {}
+        router.push(target);
         return;
       }
 

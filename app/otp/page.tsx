@@ -37,14 +37,6 @@ function OTPVerificationPageContent() {
        localStorage.setItem("token", token);
        localStorage.setItem("customer_id", String(user.id));
 
-       await Swal.fire({
-         icon: "success",
-         title: "OTP Verified",
-         text: "Login successful.",
-         timer: 1500,
-         showConfirmButton: false,
-       });
-
        // Profile already completed
        if (user?.first_name && user.first_name.trim() !== "") {
          login({
@@ -105,16 +97,9 @@ function OTPVerificationPageContent() {
    }
  };
 
- const handleResend = async () => {
-   console.log(`Resending OTP to ${phone}`);
-
-   await Swal.fire({
-     icon: "success",
-     title: "OTP Sent",
-     text: "A new OTP has been sent to your mobile number.",
-     confirmButtonColor: "#f97316",
-   });
- };
+  const handleResend = async () => {
+    console.log(`Resending OTP to ${phone}`);
+  };
 
   const handleBack = () => {
     router.back();

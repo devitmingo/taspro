@@ -55,7 +55,10 @@ export default function PaymentPage() {
           text: "Please login to complete your booking.",
           confirmButtonColor: "#f97316",
         });
-        router.push("/login");
+        if (typeof window !== "undefined") {
+          localStorage.setItem("redirectAfterLogin", "/booking-payment");
+        }
+        window.dispatchEvent(new Event("open-auth-modal"));
         return;
       }
 
@@ -210,7 +213,10 @@ export default function PaymentPage() {
           confirmButtonColor: "#f97316",
         });
         localStorage.removeItem("token");
-        router.push("/login");
+        if (typeof window !== "undefined") {
+          localStorage.setItem("redirectAfterLogin", "/booking-payment");
+        }
+        window.dispatchEvent(new Event("open-auth-modal"));
         return;
       }
 

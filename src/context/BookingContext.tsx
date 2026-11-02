@@ -28,7 +28,8 @@ export interface CartItem {
 export interface BookingContextType {
   cartItems: CartItem[];
   addToCart: (item: CartItem) => void;
-  removeFromCart: (id: string) => void;
+  removeFromCart: (id: string | number) => void;
+  deleteFromCart: (id: string | number) => void;
   clearCart: () => void;
   selectedAddress: any | null;
   setSelectedAddress: (address: any) => void;
@@ -110,7 +111,7 @@ const removeFromCart = (id: number | string) => {
   setCartItems((prev: any[]) =>
     prev
       .map((item) =>
-        item.id === id
+        String(item.id) === String(id) || Number(item.id) === Number(id)
           ? {
               ...item,
               quantity: item.quantity - 1,
@@ -118,6 +119,14 @@ const removeFromCart = (id: number | string) => {
           : item,
       )
       .filter((item) => item.quantity > 0),
+  );
+};
+
+const deleteFromCart = (id: number | string) => {
+  setCartItems((prev: any[]) =>
+    prev.filter(
+      (item) => String(item.id) !== String(id) && Number(item.id) !== Number(id),
+    ),
   );
 };
 
@@ -129,6 +138,7 @@ const removeFromCart = (id: number | string) => {
     cartItems,
     addToCart,
     removeFromCart,
+    deleteFromCart,
     clearCart,
     selectedAddress,
     setSelectedAddress,

@@ -102,14 +102,6 @@ export default function AuthModal({
         setTimeout(() => {
           otpInputsRef.current[0]?.focus();
         }, 100);
-
-        Swal.fire({
-          icon: "success",
-          title: "OTP Sent",
-          text: `OTP has been sent to +${selectedCountry?.code || "91"} ${phone}`,
-          timer: 1500,
-          showConfirmButton: false,
-        });
       } else {
         Swal.fire({
           icon: "error",
@@ -212,18 +204,41 @@ export default function AuthModal({
           contactVerified: true,
         });
 
+        const redirectUrl =
+          (typeof window !== "undefined" && (
+            new URLSearchParams(window.location.search).get("redirect") ||
+            localStorage.getItem("redirectAfterLogin") ||
+            sessionStorage.getItem("redirectAfterLogin")
+          )) || null;
+
+        try {
+          localStorage.removeItem("redirectAfterLogin");
+          sessionStorage.removeItem("redirectAfterLogin");
+        } catch (e) {}
+
         onClose();
 
-        await Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: `Logged in successfully!`,
-          timer: 1500,
-          showConfirmButton: false,
-        });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("user-logged-in", { detail: u }));
+          window.dispatchEvent(new Event("wishlistUpdated"));
+        }
 
         if (!u.first_name || u.first_name.trim() === "") {
-          router.push(`/complete-profile-step-1?phone=${u.mobile}`);
+          const redir = redirectUrl ? `&redirect=${encodeURIComponent(redirectUrl)}` : "";
+          router.push(`/complete-profile-step-1?phone=${u.mobile}${redir}`);
+        } else if (typeof window !== "undefined") {
+          const currentPath = window.location.pathname;
+          if (currentPath === "/login" || currentPath === "/signup") {
+            if (redirectUrl && redirectUrl !== "/login" && redirectUrl !== "/signup") {
+              router.push(redirectUrl);
+            } else if (window.history.length > 1 && document.referrer && !document.referrer.includes("/login")) {
+              router.back();
+            } else {
+              router.push("/");
+            }
+          } else if (redirectUrl && redirectUrl !== currentPath && redirectUrl !== "/login" && redirectUrl !== "/signup") {
+            router.push(redirectUrl);
+          }
         }
       } else {
         Swal.fire({

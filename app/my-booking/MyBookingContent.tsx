@@ -415,7 +415,10 @@ const handleReschedule = async (data: {
         confirmButtonColor: "#f97316",
       });
 
-      router.push("/login");
+      if (typeof window !== "undefined") {
+        localStorage.setItem("redirectAfterLogin", "/my-booking");
+      }
+      window.dispatchEvent(new Event("open-auth-modal"));
       return;
     }
 
@@ -782,12 +785,17 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
             Please Login to View Bookings
           </h2>
-          <a
-            href="/login"
-            className="text-orange-600 font-medium hover:underline"
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                localStorage.setItem("redirectAfterLogin", "/my-booking");
+              }
+              window.dispatchEvent(new Event("open-auth-modal"));
+            }}
+            className="text-orange-600 font-medium hover:underline cursor-pointer"
           >
             Go to Login
-          </a>
+          </button>
         </div>
       </div>
     );

@@ -54,8 +54,17 @@ function CompleteProfileStep2Content() {
       // Update user profile in context
       updateUserProfile(profileData);
 
-      // Profile completion complete - redirect to home
-      router.push("/");
+      const target =
+        (typeof window !== "undefined" && (
+          new URLSearchParams(window.location.search).get("redirect") ||
+          localStorage.getItem("redirectAfterLogin") ||
+          sessionStorage.getItem("redirectAfterLogin")
+        )) || "/";
+      try {
+        localStorage.removeItem("redirectAfterLogin");
+        sessionStorage.removeItem("redirectAfterLogin");
+      } catch (e) {}
+      router.push(target);
     }
   };
 

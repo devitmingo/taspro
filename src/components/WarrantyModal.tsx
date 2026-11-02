@@ -44,7 +44,7 @@ export default function WarrantyModal({ open, onClose, service }: Props) {
   const hasDescription = Boolean(cleanText.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-5">
+    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center px-5">
       <div className="relative w-full max-w-sm bg-white rounded-[28px] p-6 shadow-2xl">
         {/* Close */}
         <button onClick={onClose} className="absolute top-5 right-5 hover:opacity-75 cursor-pointer">
