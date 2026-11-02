@@ -103,6 +103,20 @@ export default function CompletePaymentPage() {
   const giftDeduction = applyGiftCard ? Math.min(basePayable, giftCardBalance) : 0;
   const payableAmount = Math.max(basePayable - giftDeduction, 0);
 
+  const loadRazorpayScript = () => {
+    return new Promise<boolean>((resolve) => {
+      if (typeof window !== "undefined" && (window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const createBooking = async (
     paymentMethod: "ONLINE" | "COD",
     paymentRef: string = "",
@@ -116,6 +130,12 @@ export default function CompletePaymentPage() {
         }
         window.dispatchEvent(new Event("open-auth-modal"));
         setLoading(false);
+        return;
+      }
+
+      // If online payment is requested without a verified reference, launch Razorpay first
+      if (paymentMethod === "ONLINE" && !paymentRef) {
+        handleRazorpayPayment();
         return;
       }
 
@@ -167,9 +187,6 @@ export default function CompletePaymentPage() {
         }
       }
 
-      const refNumber =
-        paymentRef || `pay_rzp_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
-
       const payload = {
         date: formattedDate,
         slot_id: Number(bookingDateTime.slotId || 1),
@@ -186,7 +203,7 @@ export default function CompletePaymentPage() {
         service_id: Number(
           cartItems[0]?.service_id || cartItems[0]?.serviceId || 1,
         ),
-        razorpay_payment_id: paymentMethod === "ONLINE" ? refNumber : "",
+        razorpay_payment_id: paymentMethod === "ONLINE" ? paymentRef : "",
         state_name: "Chhattisgarh",
         city_name: "Raipur",
         enquiry_source: "web",
@@ -294,11 +311,138 @@ export default function CompletePaymentPage() {
     }
   };
 
+  // Launch Razorpay Payment Gateway
+  const handleRazorpayPayment = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("redirectAfterLogin", "/booking-payment");
+        }
+        window.dispatchEvent(new Event("open-auth-modal"));
+        setLoading(false);
+        return;
+      }
+
+      if (!cartItems.length) {
+        Swal.fire({
+          icon: "warning",
+          title: "Cart Empty",
+          text: "Your cart is empty. Please add a service first.",
+          confirmButtonColor: "#ff5500",
+        });
+        setLoading(false);
+        router.push("/cart");
+        return;
+      }
+
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || !(window as any).Razorpay) {
+        Swal.fire({
+          icon: "error",
+          title: "Payment Gateway Error",
+          text: "Razorpay SDK could not be loaded. Please check your internet connection.",
+          confirmButtonColor: "#ff5500",
+        });
+        setLoading(false);
+        return;
+      }
+
+      let customerName = "Customer";
+      let customerPhone = "";
+      let customerEmail = "customer@tascompany.in";
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const u = JSON.parse(userStr);
+          if (u.name) customerName = u.name;
+          if (u.mobile || u.phone) customerPhone = u.mobile || u.phone;
+          if (u.email) customerEmail = u.email;
+        }
+      } catch (e) {}
+
+      const razorKey =
+        process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+        "rzp_test_Sg3z5bMD2SVDOG";
+
+      const options: any = {
+        key: razorKey,
+        amount: Math.round(payableAmount * 100), // in paisa
+        currency: "INR",
+        name: "TASpro Company",
+        description: cartItems[0]?.name || "Home Service Booking",
+        image: "https://files.catbox.moe/l742u1.png",
+        prefill: {
+          name: customerName,
+          contact: customerPhone,
+          email: customerEmail,
+        },
+        theme: {
+          color: "#FF5500",
+        },
+        modal: {
+          ondismiss: function () {
+            console.log("Razorpay checkout closed by user without completing payment.");
+            setLoading(false);
+          },
+        },
+        handler: async function (response: any) {
+          console.log("RAZORPAY PAYMENT SUCCESS:", response);
+          if (response?.razorpay_payment_id) {
+            // ONLY after real verified payment from Razorpay, create the booking!
+            await createBooking("ONLINE", response.razorpay_payment_id);
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Payment Unverified",
+              text: "Payment was not verified by Razorpay. Please try again.",
+              confirmButtonColor: "#ff5500",
+            });
+            setLoading(false);
+          }
+        },
+      };
+
+      // Set preferred payment method in Razorpay if user selected a specific tab
+      if (selectedMethod === "card" || selectedMethod === "saved_cards") {
+        options.prefill.method = "card";
+      } else if (selectedMethod === "upi") {
+        options.prefill.method = "upi";
+      } else if (selectedMethod === "netbanking") {
+        options.prefill.method = "netbanking";
+      }
+
+      const rzpInstance = new (window as any).Razorpay(options);
+      rzpInstance.on("payment.failed", function (failRes: any) {
+        console.error("Razorpay Payment Failed:", failRes?.error);
+        Swal.fire({
+          icon: "error",
+          title: "Payment Failed",
+          text: failRes?.error?.description || "Transaction failed. Please try another payment method.",
+          confirmButtonColor: "#ff5500",
+        });
+        setLoading(false);
+      });
+
+      rzpInstance.open();
+    } catch (err: any) {
+      console.error("Error opening Razorpay:", err);
+      setLoading(false);
+      Swal.fire({
+        icon: "error",
+        title: "Payment Gateway Error",
+        text: err?.message || "Failed to initialize payment gateway.",
+        confirmButtonColor: "#ff5500",
+      });
+    }
+  };
+
   const handlePay = () => {
     if (selectedMethod === "cod") {
       createBooking("COD");
     } else {
-      createBooking("ONLINE");
+      handleRazorpayPayment();
     }
   };
 
@@ -898,9 +1042,9 @@ export default function CompletePaymentPage() {
                       className="w-full py-3 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                     >
                       {loading ? (
-                        <span>Processing Booking...</span>
+                        <span>Processing Payment...</span>
                       ) : (
-                        <span>I Have Paid ₹{payableAmount} (Confirm Booking)</span>
+                        <span>Pay ₹{payableAmount} via UPI (Razorpay)</span>
                       )}
                     </button>
                   </div>
