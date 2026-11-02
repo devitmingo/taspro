@@ -237,7 +237,7 @@ export default function ServiceDetailsModal({
   const warrantyDesc =
     cleanHtmlText(service.warranty_description || service.warrantyDescription) ||
     cleanHtmlText(issueMoreDetailsObj?.warranty_description) ||
-    (warrantyDays ? `${warrantyDays} days testing warranty available on all completed work.` : "");
+    "";
 
   const getBrandLogo = (brand: any) => {
     if (brand?.icon || brand?.image || brand?.logo) {

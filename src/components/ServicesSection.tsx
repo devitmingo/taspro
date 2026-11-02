@@ -216,10 +216,12 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
     return `${name} in ${cleanCity}`;
   };
 
-  const renderServiceLinks = (items: ServiceItem[]) => {
+  const renderServiceLinks = (items: ServiceItem[], isRealApiItem = false) => {
     return items.map((item, index) => {
       const slug = getRouteSlug(item.slug || item.name, item.service_category_id);
-      const url = `/service/${slug}?service_id=${item.id}`;
+      const url = isRealApiItem && item.id
+        ? `/service/${slug}?service_id=${item.id}`
+        : `/service/${slug}`;
       return (
         <span key={item.id || index} className="inline-flex items-center">
           <Link
@@ -251,7 +253,7 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
                   Appliances Repair & Service
                 </h4>
                 <div className="text-xs sm:text-sm leading-relaxed flex flex-wrap items-center gap-y-1">
-                  {renderServiceLinks(appliancesFinal)}
+                  {renderServiceLinks(appliancesFinal, true)}
                 </div>
               </div>
 
@@ -261,7 +263,7 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
                   Deep Cleaning Services
                 </h4>
                 <div className="text-xs sm:text-sm leading-relaxed flex flex-wrap items-center gap-y-1">
-                  {renderServiceLinks(cleaningFinal)}
+                  {renderServiceLinks(cleaningFinal, true)}
                 </div>
               </div>
 
@@ -271,7 +273,7 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
                   Construction & Remodeling
                 </h4>
                 <div className="text-xs sm:text-sm leading-relaxed flex flex-wrap items-center gap-y-1">
-                  {renderServiceLinks(DEFAULT_CONSTRUCTION_SERVICES)}
+                  {renderServiceLinks(DEFAULT_CONSTRUCTION_SERVICES, false)}
                 </div>
               </div>
 
@@ -281,7 +283,7 @@ export default function ServicesSection({ data, dashboardData }: ServicesSection
                   Cleaning Packages
                 </h4>
                 <div className="text-xs sm:text-sm leading-relaxed flex flex-wrap items-center gap-y-1">
-                  {renderServiceLinks(DEFAULT_PACKAGES)}
+                  {renderServiceLinks(DEFAULT_PACKAGES, false)}
                 </div>
               </div>
             </div>

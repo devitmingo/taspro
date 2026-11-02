@@ -123,14 +123,14 @@ const Footer = () => {
 
             {/* Right - Payment Icons */}
             <div className="flex items-center gap-3">
-              <div className="bg-white px-2.5 py-1 rounded-md h-7 flex items-center shadow-sm">
-                <img src="/icons/visa.svg" alt="Visa" className="h-3.5 w-auto" />
+              <div className="bg-white px-2.5 py-1 rounded-md h-7 flex items-center justify-center shadow-sm">
+                <img src="/icons/visa.svg" alt="Visa" className="h-3.5 w-auto object-contain" />
               </div>
-              <div className="bg-white px-2.5 py-1 rounded-md h-7 flex items-center shadow-sm">
-                <img src="/icons/mastercard.svg" alt="Mastercard" className="h-4 w-auto" />
+              <div className="bg-white px-2.5 py-1 rounded-md h-7 flex items-center justify-center shadow-sm">
+                <img src="/icons/mastercard.svg" alt="Mastercard" className="h-4 w-auto object-contain" />
               </div>
-              <div className="bg-white px-2.5 py-1 rounded-md h-7 flex items-center shadow-sm">
-                <img src="/icons/rupay.svg" alt="RuPay" className="h-3.5 w-auto" />
+              <div className="bg-white px-2.5 py-1 rounded-md h-7 flex items-center justify-center shadow-sm">
+                <img src="/icons/rupay.svg" alt="RuPay" className="h-3.5 w-auto object-contain" />
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronRight,
   Star,
@@ -39,7 +39,11 @@ type SubService = {
   discountedPrice: number;
   originalPrice: number;
   warrantyDays?: number;
+  warrantyTitle?: string;
   warrantyDescription?: string;
+  warranty_days?: number;
+  warranty_title?: string;
+  warranty_description?: string;
   packageTag?: string;
   issueDescriptions?: any[];
   issueMoreDetails?: any[];
@@ -54,6 +58,7 @@ export default function Page() {
 }
 
 const ACRepairLayout = () => {
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
 
@@ -63,7 +68,44 @@ const ACRepairLayout = () => {
   const serviceId = searchParams?.get("service_id");
   const subCategoryId = searchParams?.get("sub_category_id");
   const source = searchParams?.get("source") || "";
-  const [wishlistItems, setWishlistItems] = useState<number[]>([]);
+
+  const [selectedLoc, setSelectedLoc] = useState(() => {
+    const paramCity = searchParams?.get("city_name") || searchParams?.get("city");
+    const paramState = searchParams?.get("state_name") || searchParams?.get("state");
+    if (paramCity) {
+      return {
+        state: paramState || "Chhattisgarh",
+        city: paramCity,
+      };
+    }
+    if (typeof window !== "undefined") {
+      try {
+        const savedLoc = localStorage.getItem("selected_location");
+        if (savedLoc) {
+          const parsed = JSON.parse(savedLoc);
+          return {
+            state: parsed.state || "Chhattisgarh",
+            city: parsed.city || "Raipur",
+          };
+        }
+      } catch (e) { }
+    }
+    return { state: "Chhattisgarh", city: "Raipur" };
+  });
+
+  const [wishlistItems, setWishlistItems] = useState<number[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("wishlistItems");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed.map(Number);
+        }
+      } catch (e) { }
+    }
+    return [];
+  });
+  const inFlightWishlistRef = useRef<Set<number>>(new Set());
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const brandsRef = useRef<HTMLDivElement | null>(null);
   const [showDifferentServiceModal, setShowDifferentServiceModal] =
@@ -86,6 +128,7 @@ const ACRepairLayout = () => {
   const [showAMCModal, setShowAMCModal] = useState(false);
   const [selectedCapacity, setSelectedCapacity] = useState<string | null>(null);
   const [selectedWarrantyDays, setSelectedWarrantyDays] = useState<number>(30);
+  const [selectedWarrantyService, setSelectedWarrantyService] = useState<any>(null);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [canScroll, setCanScroll] = useState(false);
   const [atStart, setAtStart] = useState(true);
@@ -227,19 +270,32 @@ const ACRepairLayout = () => {
   };
   const handleWishlist = async (serviceIssueId: number | string) => {
     const id = Number(serviceIssueId);
-    const oldWishlist = [...wishlistItems];
+    if (!id) return;
 
-    const updatedWishlist = oldWishlist.includes(id)
-      ? oldWishlist.filter((itemId) => itemId !== id)
-      : [...oldWishlist, id];
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-    // instant UI
-    setWishlistItems(updatedWishlist);
-    localStorage.setItem("wishlistItems", JSON.stringify(updatedWishlist));
+    if (!token) {
+      window.dispatchEvent(new Event("open-auth-modal"));
+      return;
+    }
+
+    if (inFlightWishlistRef.current.has(id)) {
+      return;
+    }
+    inFlightWishlistRef.current.add(id);
+
+    // Functional state update ensures rapid clicks across multiple services never overwrite each other
+    let wasWishlisted = false;
+    setWishlistItems((prev) => {
+      wasWishlisted = prev.includes(id);
+      const next = wasWishlisted ? prev.filter((itemId) => itemId !== id) : [...prev, id];
+      try {
+        localStorage.setItem("wishlistItems", JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
 
     try {
-      const token = localStorage.getItem("token");
-
       const res = await fetch(
         `${API_BASE_URL}/customers/wish-lists/${id}`,
         {
@@ -254,15 +310,41 @@ const ACRepairLayout = () => {
       const data = await res.json();
 
       if (!data?.status) {
-        setWishlistItems(oldWishlist);
-        localStorage.setItem("wishlistItems", JSON.stringify(oldWishlist));
+        // Rollback optimistic update for this specific item only
+        setWishlistItems((prev) => {
+          const next = wasWishlisted
+            ? (prev.includes(id) ? prev : [...prev, id])
+            : prev.filter((itemId) => itemId !== id);
+          try {
+            localStorage.setItem("wishlistItems", JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+      } else {
+        // Notify other pages only after the backend confirms
+        window.dispatchEvent(
+          new CustomEvent("wishlistUpdated", {
+            detail: { id, source: "service-page" },
+          })
+        );
       }
     } catch (error) {
-      setWishlistItems(oldWishlist);
-      localStorage.setItem("wishlistItems", JSON.stringify(oldWishlist));
       console.log("Wishlist Error:", error);
+      // Rollback optimistic update for this specific item only
+      setWishlistItems((prev) => {
+        const next = wasWishlisted
+          ? (prev.includes(id) ? prev : [...prev, id])
+          : prev.filter((itemId) => itemId !== id);
+        try {
+          localStorage.setItem("wishlistItems", JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+    } finally {
+      inFlightWishlistRef.current.delete(id);
     }
   };
+
   const getWishId = (item: any) =>
     Number(
       item.service_issue_id ||
@@ -272,44 +354,62 @@ const ACRepairLayout = () => {
       item.id,
     );
 
-  useEffect(() => {
-    const fetchWishlistIds = async () => {
-      try {
-        const token = localStorage.getItem("token");
+  const fetchWishlistIds = async () => {
+    // If any item toggle is currently in flight, skip to avoid race-condition overwrite
+    if (inFlightWishlistRef.current.size > 0) return;
 
-        const res = await fetch(
-          `${API_BASE_URL}/customers/wish-lists?state_name=Chhattisgarh&city_name=Raipur`,
-          {
-            headers: {
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!token) return;
+
+      const stateName = selectedLoc?.state || "Chhattisgarh";
+      const cityName = selectedLoc?.city || "Raipur";
+
+      const res = await fetch(
+        `${API_BASE_URL}/customers/wish-lists?state_name=${encodeURIComponent(stateName)}&city_name=${encodeURIComponent(cityName)}`,
+        {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
           },
-        );
+        },
+      );
 
-        const data = await res.json();
+      const data = await res.json();
 
-        const ids = (data?.data || [])
+      if (data?.status && Array.isArray(data?.data)) {
+        if (inFlightWishlistRef.current.size > 0) return;
+
+        const ids = data.data
           .map((item: any) => getWishId(item))
           .filter(Boolean);
 
         setWishlistItems(ids);
         localStorage.setItem("wishlistItems", JSON.stringify(ids));
-      } catch (error) {
-        console.log("Fetch wishlist ids error:", error);
       }
-    };
+    } catch (error) {
+      console.log("Fetch wishlist ids error:", error);
+    }
+  };
 
+  useEffect(() => {
     fetchWishlistIds();
 
-    window.addEventListener("focus", fetchWishlistIds);
-    window.addEventListener("wishlistUpdated", fetchWishlistIds);
+    const handleFocus = () => fetchWishlistIds();
+    const handleExternalWishlistUpdate = (e: any) => {
+      // Don't refetch if triggered by this page's own toggle
+      if (e?.detail?.source === "service-page") return;
+      fetchWishlistIds();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("wishlistUpdated", handleExternalWishlistUpdate);
 
     return () => {
-      window.removeEventListener("focus", fetchWishlistIds);
-      window.removeEventListener("wishlistUpdated", fetchWishlistIds);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("wishlistUpdated", handleExternalWishlistUpdate);
     };
-  }, []);
+  }, [selectedLoc]);
 
   const isMatchingStaticService =
     service && (!serviceId || String(service.id) === String(serviceId));
@@ -391,32 +491,17 @@ const ACRepairLayout = () => {
     return () => clearInterval(interval);
   }, [banners]);
 
-  const [selectedLoc, setSelectedLoc] = useState(() => {
-    const paramCity = searchParams?.get("city_name") || searchParams?.get("city");
-    const paramState = searchParams?.get("state_name") || searchParams?.get("state");
-    if (paramCity) {
-      return {
-        state: paramState || "Chhattisgarh",
-        city: paramCity,
-      };
-    }
-    if (typeof window !== "undefined") {
-      try {
-        const savedLoc = localStorage.getItem("selected_location");
-        if (savedLoc) {
-          const parsed = JSON.parse(savedLoc);
-          return {
-            state: parsed.state || "Chhattisgarh",
-            city: parsed.city || "Raipur",
-          };
-        }
-      } catch (e) { }
-    }
-    return { state: "Chhattisgarh", city: "Raipur" };
-  });
-
   const [showNoServiceModal, setShowNoServiceModal] = useState(false);
   const [availableCitiesList, setAvailableCitiesList] = useState<any[]>([]);
+
+  const isCurrentCityServed =
+    availableCitiesList.length > 0
+      ? availableCitiesList.some(
+          (c: any) =>
+            (typeof c === "string" ? c : c?.name || "").toLowerCase().trim() ===
+            (selectedLoc.city || "").toLowerCase().trim()
+        )
+      : (selectedLoc.city || "").toLowerCase().trim() === "raipur";
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/cities`)
@@ -454,6 +539,11 @@ const ACRepairLayout = () => {
     window.dispatchEvent(
       new CustomEvent("location-changed", { detail: locationData })
     );
+
+    // If current service has no active issues, redirect to home
+    if (!apiService?.issues || apiService.issues.length === 0) {
+      router.push("/");
+    }
   };
 
   useEffect(() => {
@@ -479,11 +569,26 @@ const ACRepairLayout = () => {
             ? `${API_BASE_URL}/service?slug=${slug}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`
             : `${API_BASE_URL}/service?id=${subCategoryId}`;
 
-        const res = await fetch(primaryUrl, {
+        let res = await fetch(primaryUrl, {
           headers: { accept: "application/json" },
         });
 
-        const data = await res.json();
+        let data = await res.json();
+
+        // If query with service_id failed, try fallback by slug if slug is present
+        if (!data?.status && serviceId && slug) {
+          try {
+            const fallbackUrl = `${API_BASE_URL}/service?slug=${slug}&state_name=${encodeURIComponent(selectedLoc.state)}&city_name=${encodeURIComponent(selectedLoc.city)}`;
+            const fallbackRes = await fetch(fallbackUrl, {
+              headers: { accept: "application/json" },
+            });
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData?.status && Array.isArray(fallbackData?.data?.issues) && fallbackData.data.issues.length > 0) {
+              data = fallbackData;
+            }
+          } catch (e) {}
+        }
+
         const issues = data?.data?.issues || [];
         const hasActiveIssues = Array.isArray(issues) && issues.length > 0;
 
@@ -602,8 +707,18 @@ const ACRepairLayout = () => {
         item.strike_price || item.original_price || item.originalPrice || item.base_price || 0,
       ),
     ),
-    warrantyDays: item.warranty_days,
-    warrantyDescription: item.warranty_description,
+    warrantyDays: item.warranty_days ?? item.warrantyDays,
+    warrantyTitle: item.warranty_title ?? item.warrantyTitle,
+    warrantyDescription:
+      item.warranty_description ??
+      item.warrantyDescription ??
+      item.issue_more_details?.warranty_description,
+    warranty_days: item.warranty_days ?? item.warrantyDays,
+    warranty_title: item.warranty_title ?? item.warrantyTitle,
+    warranty_description:
+      item.warranty_description ??
+      item.warrantyDescription ??
+      item.issue_more_details?.warranty_description,
     packageTag: item.package_tag,
     issueDescriptions: item.issue_descriptions || item.descriptions || [],
     issueMoreDetails: item.issue_more_details || item.details || [],
@@ -748,14 +863,23 @@ const ACRepairLayout = () => {
     };
   };
 
-  const totalSavings = Math.round(
+  const totalDiscountedPrice = Math.round(
+    cartItems.reduce(
+      (acc, item) =>
+        acc + getItemActivePrices(item).discountedPrice * item.quantity,
+      0,
+    )
+  );
+
+  const totalOriginalPrice = Math.round(
     cartItems.reduce((acc, item: any) => {
       const { discountedPrice: disc, originalPrice: orig } = getItemActivePrices(item);
-      const actualOrig = orig > disc ? orig : (disc > 0 ? Math.round(disc * 1.25) : 0);
-      const savingsPerUnit = Math.max(actualOrig - disc, 0);
-      return acc + savingsPerUnit * (item.quantity || 1);
+      const displayOrig = orig > disc ? orig : (disc > 0 ? Math.round(disc * 1.25) : 0);
+      return acc + displayOrig * (item.quantity || 1);
     }, 0)
   );
+
+  const totalSavings = Math.max(totalOriginalPrice - totalDiscountedPrice, 0);
 
   return (
     <>
@@ -770,12 +894,17 @@ const ACRepairLayout = () => {
 
                 <span className="mx-1.5 text-gray-400">/</span>
                 <span className="text-gray-700 dark:text-gray-300 font-medium">
-                  {apiService?.name || service?.name}
+                  {apiService?.name || service?.name || (slug ? slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Service")}
                 </span>
               </div>
 
               {(() => {
-                const name = apiService?.name || service?.name || "";
+                const slugTitle = slug
+                  ? slug
+                      .replace(/-/g, " ")
+                      .replace(/\b\w/g, (c: string) => c.toUpperCase())
+                  : "";
+                const name = apiService?.name || service?.name || slugTitle;
                 const hasService = /service$/i.test(name.trim());
                 const formattedName = name ? (hasService ? name : `${name} Service`) : "Service";
                 return (
@@ -821,7 +950,12 @@ const ACRepairLayout = () => {
 
                   <div className="mt-5 space-y-3">
                     <div
-                      onClick={() => setShowWarrantyModal(true)}
+                      onClick={() => {
+                        const firstItem = displayServices?.[0] || apiService?.issues?.[0];
+                        setSelectedWarrantyService(firstItem || apiService);
+                        setSelectedWarrantyDays(firstItem?.warrantyDays || firstItem?.warranty_days || apiService?.warranty_days || 30);
+                        setShowWarrantyModal(true);
+                      }}
                       className="flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer hover:border-orange-500 group transition-all"
                     >
                       <div className="flex gap-2 items-center">
@@ -949,23 +1083,44 @@ const ACRepairLayout = () => {
                   <MapPin className="w-8 h-8 animate-bounce" />
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 leading-tight">
-                  We are currently not serving in <span className="text-orange-500">{selectedLoc.city || "your city"}</span>
+                  {isCurrentCityServed ? (
+                    <>
+                      Service Not Available in{" "}
+                      <span className="text-orange-500">{selectedLoc.city || "this city"}</span>
+                    </>
+                  ) : (
+                    <>
+                      We are currently not serving in{" "}
+                      <span className="text-orange-500">{selectedLoc.city || "your city"}</span>
+                    </>
+                  )}
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed mb-6">
-                  Service issues have not been added for {selectedLoc.city || "this city"} yet. In the meantime, you can pick a served city from the navbar or continue with our operational hub.
+                  {isCurrentCityServed
+                    ? `We haven't launched this specific service in ${selectedLoc.city} yet. You can explore our other popular services available in ${selectedLoc.city}!`
+                    : `Service issues have not been added for ${selectedLoc.city || "this city"} yet. In the meantime, you can pick a served city from the navbar or continue with our operational hub.`}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto">
+                  {isCurrentCityServed ? (
+                    <Link
+                      href="/"
+                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-95 inline-flex items-center justify-center gap-2"
+                    >
+                      Explore Services in {selectedLoc.city}
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => handleContinueDefaultCity("Raipur")}
+                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-95"
+                    >
+                      Continue in Raipur
+                    </button>
+                  )}
                   <button
                     onClick={handleSelectAnotherCity}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md transition-all active:scale-95"
-                  >
-                    Select City from Nav
-                  </button>
-                  <button
-                    onClick={() => handleContinueDefaultCity("Raipur")}
                     className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold py-3 px-4 rounded-xl text-xs sm:text-sm hover:border-orange-500 transition-colors"
                   >
-                    Continue in Raipur
+                    Change City
                   </button>
                 </div>
               </div>
@@ -1134,8 +1289,9 @@ const ACRepairLayout = () => {
                                       <div className="flex items-center justify-between gap-2">
                                         <span
                                           onClick={() => {
+                                            setSelectedWarrantyService(subService);
                                             setSelectedWarrantyDays(
-                                              subService.warrantyDays || 30,
+                                              subService.warrantyDays || 0,
                                             );
                                             setShowWarrantyModal(true);
                                           }}
@@ -1151,13 +1307,23 @@ const ACRepairLayout = () => {
                                             </span>
                                           )}
                                           <button
-                                            onClick={() => handleWishlist(subService.id)}
-                                            className="flex-shrink-0"
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              handleWishlist(subService.id);
+                                            }}
+                                            className="flex-shrink-0 cursor-pointer p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 outline-none focus:outline-none focus:ring-0 active:scale-90 transition-all select-none"
+                                            aria-label={
+                                              wishlistItems.includes(Number(subService.id))
+                                                ? "Remove from wishlist"
+                                                : "Add to wishlist"
+                                            }
                                           >
                                             <Heart
                                               className={`w-6 h-6 transition-all duration-300 ${wishlistItems.includes(Number(subService.id))
                                                 ? "text-red-500 fill-red-500"
-                                                : "text-gray-400"
+                                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                                                 }`}
                                             />
                                           </button>
@@ -1402,19 +1568,21 @@ const ACRepairLayout = () => {
 
                     <div className="mt-4 p-3.5 bg-[#FFF7ED] border border-orange-200/60 rounded-xl flex justify-between items-center shadow-xs">
                       <div>
-                        <p className="font-bold text-gray-900 text-base">
-                          ₹
-                          {Math.round(
-                            cartItems.reduce(
-                              (acc, item) =>
-                                acc + getItemActivePrices(item).discountedPrice * item.quantity,
-                              0,
-                            )
+                        <div className="flex items-baseline gap-1.5">
+                          <p className="font-bold text-gray-900 text-base">
+                            ₹{totalDiscountedPrice}
+                          </p>
+                          {totalOriginalPrice > totalDiscountedPrice && (
+                            <p className="text-xs text-gray-400 line-through font-normal">
+                              ₹{totalOriginalPrice}
+                            </p>
                           )}
-                        </p>
-                        <p className="text-green-700 text-xs font-semibold mt-0.5">
-                          You save ₹{Math.round(totalSavings)} on this order
-                        </p>
+                        </div>
+                        {totalSavings > 0 && (
+                          <p className="text-green-700 text-xs font-semibold mt-0.5">
+                            You save ₹{Math.round(totalSavings)} on this order
+                          </p>
+                        )}
                       </div>
 
                       <Link
@@ -1617,8 +1785,12 @@ const ACRepairLayout = () => {
 
       {showWarrantyModal && (
         <WarrantyModal
+          service={selectedWarrantyService}
           warrantyDays={selectedWarrantyDays}
-          onClose={() => setShowWarrantyModal(false)}
+          onClose={() => {
+            setShowWarrantyModal(false);
+            setSelectedWarrantyService(null);
+          }}
         />
       )}
 
@@ -1679,8 +1851,20 @@ const ACRepairLayout = () => {
         isOpen={showNoServiceModal}
         onClose={() => setShowNoServiceModal(false)}
         cityName={selectedLoc.city}
+        serviceName={
+          apiService?.name ||
+          service?.name ||
+          (slug
+            ? slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "This Service")
+        }
+        isCityServed={isCurrentCityServed}
         onSelectAnotherCity={handleSelectAnotherCity}
         onContinueDefaultCity={handleContinueDefaultCity}
+        onExploreAvailable={() => {
+          setShowNoServiceModal(false);
+          router.push("/");
+        }}
         availableCities={availableCitiesList.map((c: any) => c.name || c)}
       />
     </>
@@ -2035,18 +2219,42 @@ const MobilePhotos = ({ galleryImages }: any) => {
 };
 
 const WarrantyModal = ({
+  service,
   warrantyDays,
   onClose,
 }: {
+  service?: any;
   warrantyDays: number;
   onClose: () => void;
 }) => {
+  const days =
+    service?.warrantyDays ||
+    service?.warranty_days ||
+    service?.issue_more_details?.warranty_days ||
+    warrantyDays ||
+    0;
+
+  const title =
+    service?.warrantyTitle ||
+    service?.warranty_title ||
+    "Service Warranty";
+
+  const rawDescription =
+    service?.warrantyDescription ||
+    service?.warranty_description ||
+    service?.issue_more_details?.warranty_description;
+
+  const cleanText = rawDescription
+    ? rawDescription.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim()
+    : "";
+  const hasDescription = Boolean(cleanText.length > 0);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-4">
       <div className="relative bg-white rounded-[32px] w-full max-w-md p-6 pt-8 shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute -top-3 -right-3 w-9 h-9 bg-orange-500 text-white rounded-full flex items-center justify-center shadow-md z-10"
+          className="absolute -top-3 -right-3 w-9 h-9 bg-orange-500 text-white rounded-full flex items-center justify-center shadow-md z-10 hover:bg-orange-600 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -2062,30 +2270,30 @@ const WarrantyModal = ({
         </div>
 
         <div className="text-center mt-2">
-          <h2 className="text-xl font-bold text-black">Service Warranty</h2>
+          <h2 className="text-xl font-bold text-black">{title}</h2>
 
           <p className="text-[#FF8A00] text-lg font-bold mt-1">
-            {warrantyDays} Days Warranty
+            {days > 0 ? `${days} Days Warranty` : "Warranty Available"}
           </p>
         </div>
 
-        <div className="bg-orange-100 rounded-2xl p-5 mt-4">
-          <h3 className="text-lg font-bold text-black mb-2">
-            What&apos;s Covered?
-          </h3>
+        {hasDescription && (
+          <div className="bg-orange-100 rounded-2xl p-5 mt-4 text-left">
+            <h3 className="text-lg font-bold text-black mb-2">
+              What&apos;s Covered?
+            </h3>
 
-          <ul className="space-y-1 text-gray-500 text-sm leading-relaxed">
-            <li>• Free re-work for the same issue.</li>
-            <li>• Quality assurance on all spare parts.</li>
-            <li>• Genuine service by verified experts.</li>
-            <li>• Priority support for warranty claims.</li>
-          </ul>
-        </div>
+            <div
+              className="text-gray-700 text-sm leading-relaxed prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-1.5 [&_li]:mb-1"
+              dangerouslySetInnerHTML={{ __html: rawDescription }}
+            />
+          </div>
+        )}
 
-        <div className="flex justify-center mt-10">
+        <div className="flex justify-center mt-8">
           <button
             onClick={onClose}
-            className="bg-orange-500 text-white text-xl font-bold px-10 py-3 rounded-full shadow-lg"
+            className="bg-orange-500 hover:bg-orange-600 text-white text-lg font-bold px-10 py-3 rounded-full shadow-lg transition-colors cursor-pointer"
           >
             Got it
           </button>

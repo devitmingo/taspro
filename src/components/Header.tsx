@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Wrench,
   UserRound,
+  ShoppingCart,
   X,
   Check,
   Navigation,
@@ -60,6 +61,10 @@ const getRouteSlug = (nameOrSlug: string, id?: any) => {
 const Header = () => {
   const { user } = useAuth();
   const { cartItems, clearCart } = useBooking();
+  const cartCount = (cartItems || []).reduce(
+    (sum: number, item: any) => sum + (Number(item?.quantity) || 1),
+    0
+  );
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -132,6 +137,13 @@ const Header = () => {
       const params = new URLSearchParams(window.location.search);
       setActiveTab(params.get("tab"));
     }
+    const handleOpenAuth = () => setIsAuthModalOpen(true);
+    window.addEventListener("open-auth-modal", handleOpenAuth);
+    window.addEventListener("open-login-modal", handleOpenAuth);
+    return () => {
+      window.removeEventListener("open-auth-modal", handleOpenAuth);
+      window.removeEventListener("open-login-modal", handleOpenAuth);
+    };
   }, []);
 
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -704,7 +716,7 @@ const Header = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-4 sm:gap-5">
               <Link href="/wishlist">
                 <Heart className="w-5 h-5 sm:w-8 sm:h-8 text-black" />
               </Link>
@@ -714,6 +726,15 @@ const Header = () => {
                 {notificationCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
                     {notificationCount > 99 ? "99+" : notificationCount}
+                  </span>
+                )}
+              </Link>
+
+              <Link href="/cart" className="relative" aria-label="Cart">
+                <ShoppingCart className="w-5 h-5 sm:w-8 sm:h-8 text-black" />
+                {isClient && cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {cartCount > 99 ? "99+" : cartCount}
                   </span>
                 )}
               </Link>
@@ -801,6 +822,23 @@ const Header = () => {
               >
                 <ClipboardList className="w-5 h-5" />
                 <span className="text-[11px] mt-1 font-medium">Booking</span>
+              </Link>
+
+              <Link
+                href="/cart"
+                className={`flex flex-col items-center justify-center relative ${
+                  pathname === "/cart" ? "text-orange-500" : "text-gray-500"
+                }`}
+              >
+                <div className="relative">
+                  <ShoppingCart className="w-5 h-5" />
+                  {isClient && cartCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2 bg-orange-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
+                      {cartCount > 99 ? "99+" : cartCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] mt-1 font-medium">Cart</span>
               </Link>
 
               <Link
@@ -1012,6 +1050,16 @@ const Header = () => {
               {notificationCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
                   {notificationCount > 99 ? "99+" : notificationCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Cart Button (left of account icon) */}
+            <Link href="/cart" className="relative shrink-0" aria-label="Cart">
+              <ShoppingCart className="w-6 h-6 text-gray-800 hover:text-orange-500 transition-colors" />
+              {isClient && cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                  {cartCount > 99 ? "99+" : cartCount}
                 </span>
               )}
             </Link>

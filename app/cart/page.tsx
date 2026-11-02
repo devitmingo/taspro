@@ -785,7 +785,14 @@ const handleDateTimeContinue = (
 
                   <div className="flex justify-between font-semibold text-[20px] text-black">
                     <span className="text-sm">Total</span>
-                    <span className="text-sm">₹{finalAmount.toFixed(2)}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-sm">₹{finalAmount.toFixed(2)}</span>
+                      {totalMRP > finalAmount && (
+                        <span className="text-xs text-gray-400 line-through font-normal">
+                          ₹{totalMRP.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -845,7 +852,14 @@ const handleDateTimeContinue = (
 
                 <div className="flex justify-between font-semibold text-lg mb-4">
                   <span>Total Amount</span>
-                  <span>₹{finalAmount}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span>₹{finalAmount}</span>
+                    {totalMRP > finalAmount && (
+                      <span className="text-sm text-gray-400 line-through font-normal">
+                        ₹{totalMRP}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <button
