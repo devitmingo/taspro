@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useBooking } from "@/context/BookingContext";
 import {
   ArrowLeft,
-  CreditCard,
-  Banknote,
   Lock,
   CheckCircle2,
   Calendar,
@@ -588,12 +586,12 @@ export default function CheckoutConfirmationPage() {
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-gray-500 pl-12 max-w-2xl leading-relaxed">
-            Review your service address, appointment slot, GST invoice details, and choose your payment method to complete checkout.
+            Review your service address, appointment slot, GST invoice details, and complete your secure checkout.
           </p>
         </div>
 
         {/* 2-Column Checkout Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* LEFT COLUMN: Service Address -> Time Slot -> GST -> Payment Options */}
           <div className="lg:col-span-7 space-y-5">
@@ -834,110 +832,7 @@ export default function CheckoutConfirmationPage() {
               )}
             </div>
 
-            {/* 4. PAYMENT OPTIONS CARD */}
-            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all">
-              <div className="flex items-center gap-2.5 pb-3.5 border-b border-gray-100">
-                <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center shrink-0">
-                  <CreditCard className="w-4 h-4 stroke-[2.5]" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-sm sm:text-base text-gray-900 leading-tight">
-                    4. Payment Method
-                  </h2>
-                  <p className="text-[11px] text-gray-400">
-                    Choose how you want to pay for your service
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-3.5 space-y-3">
-                {/* Online Payment Option */}
-                <div
-                  onClick={() => setSelectedPayment("ONLINE")}
-                  className={`rounded-2xl p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                    selectedPayment === "ONLINE"
-                      ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs"
-                      : "border border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                        selectedPayment === "ONLINE"
-                          ? "bg-[#FF6A00] text-white shadow-xs"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      <CreditCard className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-sm">
-                        Online Payment
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Pay securely via Razorpay, Cards, UPI or Wallets
-                      </p>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      selectedPayment === "ONLINE"
-                        ? "border-[#FF6A00] bg-white"
-                        : "border-gray-300"
-                    }`}
-                  >
-                    {selectedPayment === "ONLINE" && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#FF6A00]" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Cash on Delivery Option */}
-                <div
-                  onClick={() => setSelectedPayment("COD")}
-                  className={`rounded-2xl p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                    selectedPayment === "COD"
-                      ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs"
-                      : "border border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                        selectedPayment === "COD"
-                          ? "bg-[#FF6A00] text-white shadow-xs"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      <Banknote className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-sm">
-                        Cash on Delivery
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Pay cash after service completion
-                      </p>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      selectedPayment === "COD"
-                        ? "border-[#FF6A00] bg-white"
-                        : "border-gray-300"
-                    }`}
-                  >
-                    {selectedPayment === "COD" && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#FF6A00]" />
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 5. BOOKED SERVICES SUMMARY */}
+            {/* 4. BOOKED SERVICES SUMMARY */}
             {cartItems.length > 0 && (
               <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
                 <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
@@ -968,144 +863,138 @@ export default function CheckoutConfirmationPage() {
 
           </div>
 
-          {/* RIGHT COLUMN: Amount Summary Card (with GST Included & Final Submission) */}
-          <div className="lg:col-span-5">
-            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 sm:p-6 space-y-5 sticky top-24 shadow-sm">
-              
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h2 className="text-base font-bold text-gray-900">
-                  Amount Summary
-                </h2>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                  Final Checkout
-                </span>
+          {/* RIGHT COLUMN: Sticky Fixed Amount Summary Card */}
+          <div className="lg:col-span-5 relative">
+            <div className="sticky top-24 space-y-3.5">
+              <div className="bg-white border border-gray-200/90 rounded-2xl p-5 sm:p-6 space-y-5 shadow-sm">
+                
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <h2 className="text-base font-bold text-gray-900">
+                    Amount Summary
+                  </h2>
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    Final Checkout
+                  </span>
+                </div>
+
+                <div className="space-y-3.5 text-sm">
+                  
+                  {/* Total Item */}
+                  <div className="flex justify-between items-center text-gray-600">
+                    <span>Total Item ({cartItems.length || 1})</span>
+                    <span className="font-semibold text-gray-900">₹{totalMRP}</span>
+                  </div>
+
+                  {/* Total Discount */}
+                  {totalDiscount > 0 && (
+                    <div className="flex justify-between items-center text-green-600 font-semibold">
+                      <span>Total Discount</span>
+                      <span>-₹{totalDiscount}</span>
+                    </div>
+                  )}
+
+                  {/* Coupon Discount */}
+                  <div className={`flex justify-between items-center ${couponDiscount > 0 ? "text-green-600 font-bold" : "text-gray-500"}`}>
+                    <span>Coupon Discount {appliedCoupon ? `(${appliedCoupon.code})` : ""}</span>
+                    <span>{couponDiscount > 0 ? `-₹${couponDiscount}` : "₹0"}</span>
+                  </div>
+
+                  {/* Taxes & GST line */}
+                  <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
+                    <span className="flex items-center gap-1">
+                      <span>Taxes (18% GST)</span>
+                      <span className="text-[10px] text-gray-400">Included</span>
+                    </span>
+                    <span className="font-semibold text-gray-800">
+                      ₹{gstAmount} (Included)
+                    </span>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-gray-200 pt-4 flex justify-between items-baseline">
+                    <div>
+                      <span className="font-extrabold text-base text-gray-900">Total Amount</span>
+                      <p className="text-[11px] text-green-700 font-semibold mt-0.5">
+                        (Inclusive of all taxes &amp; GST)
+                      </p>
+                    </div>
+                    <span className="text-2xl font-black text-gray-900 tracking-tight">
+                      ₹{finalAmount}
+                    </span>
+                  </div>
+
+                </div>
+
+                {/* Action Checkout Submission Button */}
+                <button
+                  disabled={loading}
+                  onClick={handlePay}
+                  className="w-full py-4 bg-[#FF6A00] hover:bg-[#F05A00] active:scale-[0.99] text-white font-extrabold rounded-xl text-base shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {loading ? (
+                    <span>Processing Checkout...</span>
+                  ) : (
+                    <span>
+                      Pay ₹{finalAmount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Safe & secure checkout + payment logos */}
+                <div className="flex flex-col items-center justify-center gap-2 pt-1 text-center">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                    <Lock className="w-3.5 h-3.5 text-gray-400" />
+                    <span>Safe &amp; secure checkout</span>
+                  </div>
+                  
+                  {/* Visual payment logos from public/grp.png */}
+                  <div className="flex items-center justify-center gap-2 opacity-80 pt-1">
+                    <img
+                      src="/grp.png"
+                      alt="Payment Methods"
+                      className="h-4 object-contain"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
+                    />
+                    <img
+                      src="/icons/visa.svg"
+                      alt="Visa"
+                      className="h-4"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
+                    />
+                    <img
+                      src="/icons/mastercard.svg"
+                      alt="Mastercard"
+                      className="h-4"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
+                    />
+                    <img
+                      src="/icons/rupay.svg"
+                      alt="RuPay"
+                      className="h-3.5"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                </div>
+
               </div>
 
-              <div className="space-y-3.5 text-sm">
-                
-                {/* Total Item */}
-                <div className="flex justify-between items-center text-gray-600">
-                  <span>Total Item ({cartItems.length || 1})</span>
-                  <span className="font-semibold text-gray-900">₹{totalMRP}</span>
-                </div>
-
-                {/* Total Discount */}
-                {totalDiscount > 0 && (
-                  <div className="flex justify-between items-center text-green-600 font-semibold">
-                    <span>Total Discount</span>
-                    <span>-₹{totalDiscount}</span>
-                  </div>
-                )}
-
-                {/* Coupon Discount */}
-                <div className={`flex justify-between items-center ${couponDiscount > 0 ? "text-green-600 font-bold" : "text-gray-500"}`}>
-                  <span>Coupon Discount {appliedCoupon ? `(${appliedCoupon.code})` : ""}</span>
-                  <span>{couponDiscount > 0 ? `-₹${couponDiscount}` : "₹0"}</span>
-                </div>
-
-                {/* Taxes & GST line */}
-                <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
-                  <span className="flex items-center gap-1">
-                    <span>Taxes (18% GST)</span>
-                    <span className="text-[10px] text-gray-400">Included</span>
-                  </span>
-                  <span className="font-semibold text-gray-800">
-                    ₹{gstAmount} (Included)
-                  </span>
-                </div>
-
-                {/* Divider */}
-                <div className="border-t border-gray-200 pt-4 flex justify-between items-baseline">
-                  <div>
-                    <span className="font-extrabold text-base text-gray-900">Total Amount</span>
-                    <p className="text-[11px] text-green-700 font-semibold mt-0.5">
-                      (Inclusive of all taxes &amp; GST)
-                    </p>
-                  </div>
-                  <span className="text-2xl font-black text-gray-900 tracking-tight">
-                    ₹{finalAmount}
-                  </span>
-                </div>
-
-              </div>
-
-              {/* Action Checkout Submission Button */}
-              <button
-                disabled={loading}
-                onClick={handlePay}
-                className="w-full py-4 bg-[#FF6A00] hover:bg-[#F05A00] active:scale-[0.99] text-white font-extrabold rounded-xl text-base shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {loading ? (
-                  <span>Processing Checkout...</span>
-                ) : (
-                  <span>
-                    Pay ₹{finalAmount}
-                  </span>
-                )}
-              </button>
-
-              {/* Safe & secure checkout + payment logos */}
-              <div className="flex flex-col items-center justify-center gap-2 pt-1 text-center">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                  <Lock className="w-3.5 h-3.5 text-gray-400" />
-                  <span>Safe &amp; secure checkout</span>
-                </div>
-                
-                {/* Visual payment logos from public/grp.png */}
-                <div className="flex items-center justify-center gap-2 opacity-80 pt-1">
-                  <img
-                    src="/grp.png"
-                    alt="Payment Methods"
-                    className="h-4 object-contain"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = "none";
-                    }}
-                  />
-                  <img
-                    src="/icons/visa.svg"
-                    alt="Visa"
-                    className="h-4"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = "none";
-                    }}
-                  />
-                  <img
-                    src="/icons/mastercard.svg"
-                    alt="Mastercard"
-                    className="h-4"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = "none";
-                    }}
-                  />
-                  <img
-                    src="/icons/rupay.svg"
-                    alt="RuPay"
-                    className="h-3.5"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = "none";
-                    }}
-                  />
-                </div>
+              {/* Easy Cancellation & Verified Provider Trust Badge */}
+              <div className="flex items-start gap-2.5 px-2">
+                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-gray-500 leading-snug">
+                  Easy Cancellation/Returns, Background Verified Service Provider.
+                </p>
               </div>
 
             </div>
-
-            {/* Easy Cancellation & Verified Provider Trust Badge */}
-            <div className="flex items-start gap-2.5 mt-3.5 px-2">
-              <img
-                src="/tick.png"
-                alt="Verified Service Provider"
-                className="w-5 h-5 shrink-0 object-contain mt-0.5"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = "none";
-                }}
-              />
-              <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-              <p className="text-xs font-medium text-gray-500 leading-snug">
-                Easy Cancellation/Returns, Background Verified Service Provider.
-              </p>
-            </div>
-
           </div>
 
         </div>
