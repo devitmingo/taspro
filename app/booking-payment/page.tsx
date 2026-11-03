@@ -8,7 +8,6 @@ import {
   CreditCard,
   Banknote,
   Building2,
-  Percent,
   ThumbsUp,
   ShieldCheck,
   Check,
@@ -29,7 +28,7 @@ export default function CompletePaymentPage() {
 
   // Active method selection (default: recommended matching Image 1)
   const [selectedMethod, setSelectedMethod] = useState<
-    "recommended" | "saved_cards" | "upi" | "card" | "emi" | "netbanking" | "cod"
+    "recommended" | "saved_cards" | "upi" | "card" | "netbanking" | "cod"
   >("recommended");
 
   // Gift Card State
@@ -58,10 +57,6 @@ export default function CompletePaymentPage() {
 
   // Net banking state
   const [selectedBank, setSelectedBank] = useState("sbi");
-
-  // EMI state
-  const [selectedEmiBank, setSelectedEmiBank] = useState("hdfc");
-  const [selectedEmiTenure, setSelectedEmiTenure] = useState("3");
 
   const [loading, setLoading] = useState(false);
 
@@ -450,8 +445,6 @@ export default function CompletePaymentPage() {
           ? "upi"
           : selectedMethod === "netbanking"
           ? selectedBank || "nb"
-          : selectedMethod === "emi"
-          ? "emi"
           : "card";
 
       const txnRef = `pay_rzp_${methodPrefix}_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
@@ -659,40 +652,7 @@ export default function CompletePaymentPage() {
               </div>
             </div>
 
-            {/* 5. EMI */}
-            <div
-              onClick={() => setSelectedMethod("emi")}
-              className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                selectedMethod === "emi"
-                  ? "border-[#0076B6] bg-blue-50/20 shadow-xs"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
-                  <Percent className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900">EMI</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Get Debit and Cardless EMIs on HDFC Bank
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedMethod === "emi"
-                    ? "border-[#0076B6] bg-[#0076B6]"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedMethod === "emi" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
-
-            {/* 6. Net Banking */}
+            {/* 5. Net Banking */}
             <div
               onClick={() => setSelectedMethod("netbanking")}
               className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
@@ -845,37 +805,9 @@ export default function CompletePaymentPage() {
                 )}
 
                 {/* Fees Subtext with Dotted Underline */}
-                <p className="text-[11px] text-gray-500 inline-block border-b border-dotted border-gray-400 pb-0.5 mb-4">
+                <p className="text-[11px] text-gray-500 inline-block border-b border-dotted border-gray-400 pb-0.5">
                   ₹0 Offer &amp; Payment Handling Fees
                 </p>
-
-                {/* Divider: ---- or ---- */}
-                <div className="relative my-4 text-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200" />
-                  </div>
-                  <span className="relative bg-white px-3 text-xs text-gray-400 font-medium">
-                    or
-                  </span>
-                </div>
-
-                {/* EMI Option Box */}
-                <p className="text-xs font-semibold text-green-700 mb-2">
-                  ₹{totalDiscount > 0 ? totalDiscount : 36} discount applicable.
-                </p>
-                <div
-                  onClick={() => setSelectedMethod("emi")}
-                  className="border border-gray-200 hover:border-gray-300 rounded-xl p-3.5 flex items-center justify-between cursor-pointer group bg-gray-50/40 transition-all mb-2"
-                >
-                  <span className="text-xs sm:text-sm font-semibold text-gray-800">
-                    No cost EMI from ₹
-                    {Math.max(Math.round(payableAmount / 3), 50).toLocaleString(
-                      "en-IN",
-                    )}
-                    /month
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-transform group-hover:translate-x-0.5" />
-                </div>
               </div>
             )}
 
@@ -1176,96 +1108,6 @@ export default function CompletePaymentPage() {
               </div>
             )}
 
-            {/* View D: EMI */}
-            {selectedMethod === "emi" && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-                <h3 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-                  Select EMI Option
-                </h3>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                    Select Bank
-                  </label>
-                  <select
-                    value={selectedEmiBank}
-                    onChange={(e) => setSelectedEmiBank(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none bg-white"
-                  >
-                    <option value="hdfc">HDFC Bank Credit Card EMI</option>
-                    <option value="icici">ICICI Bank Credit Card EMI</option>
-                    <option value="sbi">SBI Credit Card EMI</option>
-                    <option value="axis">Axis Bank Credit Card EMI</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Select Tenure
-                  </label>
-                  {[
-                    {
-                      months: "3",
-                      rate: "No Cost EMI",
-                      perMonth: Math.max(Math.round(payableAmount / 3), 50),
-                    },
-                    {
-                      months: "6",
-                      rate: "No Cost EMI",
-                      perMonth: Math.max(Math.round(payableAmount / 6), 25),
-                    },
-                    {
-                      months: "9",
-                      rate: "15% p.a. standard EMI",
-                      perMonth: Math.max(Math.round((payableAmount * 1.1) / 9), 20),
-                    },
-                  ].map((plan) => (
-                    <div
-                      key={plan.months}
-                      onClick={() => setSelectedEmiTenure(plan.months)}
-                      className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                        selectedEmiTenure === plan.months
-                          ? "border-[#0076B6] bg-blue-50/20"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <div>
-                        <p className="text-xs sm:text-sm font-bold text-gray-900">
-                          ₹{plan.perMonth.toLocaleString("en-IN")} x {plan.months}{" "}
-                          months
-                        </p>
-                        <p className="text-[11px] text-green-700 font-semibold">
-                          {plan.rate}
-                        </p>
-                      </div>
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          selectedEmiTenure === plan.months
-                            ? "border-[#0076B6] bg-[#0076B6]"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {selectedEmiTenure === plan.months && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={handlePay}
-                  disabled={loading}
-                  className="w-full py-3 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  {loading ? (
-                    <span>Processing EMI...</span>
-                  ) : (
-                    <span>Pay ₹{payableAmount.toLocaleString("en-IN")} via EMI</span>
-                  )}
-                </button>
-              </div>
-            )}
 
             {/* View E: Net Banking */}
             {selectedMethod === "netbanking" && (
