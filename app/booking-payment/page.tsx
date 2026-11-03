@@ -12,9 +12,14 @@ import {
   Calendar,
   MapPin,
   FileText,
-  Building,
+  Building2,
   Check,
   AlertCircle,
+  Clock,
+  ChevronDown,
+  Edit3,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
@@ -24,10 +29,10 @@ export default function CheckoutConfirmationPage() {
   const router = useRouter();
   const { cartItems, clearCart } = useBooking();
 
-  // Payment method selection: "ONLINE" or "COD" matching user's screenshot
+  // Payment method selection: "ONLINE" or "COD"
   const [selectedPayment, setSelectedPayment] = useState<"ONLINE" | "COD">("ONLINE");
 
-  // GST Number & Business Invoice State
+  // GST State
   const [addGst, setAddGst] = useState(false);
   const [gstNo, setGstNo] = useState("");
   const [gstName, setGstName] = useState("");
@@ -36,12 +41,34 @@ export default function CheckoutConfirmationPage() {
   const [loading, setLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
-  // Booking review data loaded from localStorage
+  // Address and Slot confirmation states
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [availableAddresses, setAvailableAddresses] = useState<any[]>([]);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [bookingDateTime, setBookingDateTime] = useState<any>({});
-  const [selectedAddress, setSelectedAddress] = useState<any>({});
+  const [userData, setUserData] = useState<any>(null);
 
-  // GST regex validator for standard Indian GSTIN: 2 digits + 5 chars + 4 digits + 1 char + 1 digit/char + Z + 1 digit/char
+  // Standard Indian GST regex (15 chars)
   const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+  const getCityName = (city: any) => {
+    if (!city) return "Raipur";
+    if (typeof city === "object") return city.name || city.cityName || "Raipur";
+    return String(city);
+  };
+
+  const getStateName = (state: any) => {
+    if (!state) return "Chhattisgarh";
+    if (typeof state === "object") return state.name || state.stateName || "Chhattisgarh";
+    return String(state);
+  };
+
+  const getAddressName = (addr: any) => {
+    if (!addr) return userData?.name || userData?.firstName || "Amit Jaiswal";
+    if (addr.name && typeof addr.name === "string") return addr.name;
+    if (addr.first_name) return `${addr.first_name} ${addr.last_name || ""}`.trim();
+    return userData?.name || userData?.firstName || "Amit Jaiswal";
+  };
 
   useEffect(() => {
     loadRazorpayScript();
@@ -61,6 +88,27 @@ export default function CheckoutConfirmationPage() {
         const savedAddr = localStorage.getItem("selectedAddress");
         if (savedAddr) setSelectedAddress(JSON.parse(savedAddr));
       } catch (e) {}
+
+      try {
+        const savedUser = localStorage.getItem("user");
+        if (savedUser) setUserData(JSON.parse(savedUser));
+      } catch (e) {}
+
+      // Fetch customer addresses for address confirmation & switching
+      const token = localStorage.getItem("token");
+      if (token) {
+        axios
+          .get(`${API_BASE_URL}/customers/customer-addresses`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          })
+          .then((res) => {
+            if (res.data?.data?.length > 0) {
+              setAvailableAddresses(res.data.data);
+              setSelectedAddress((prev: any) => prev?.id ? prev : res.data.data[0]);
+            }
+          })
+          .catch((err) => console.log("Address fetch error:", err));
+      }
     }
   }, []);
 
@@ -85,9 +133,9 @@ export default function CheckoutConfirmationPage() {
   const couponDiscount = Math.round(appliedCoupon ? appliedCoupon.discount : 0);
   const finalAmount = Math.max(totalAmount - couponDiscount, 0);
 
-  // Estimated GST (18% inclusive calculation)
+  // Exact 18% GST breakdown
   const basePriceExcludingGst = Math.round(finalAmount / 1.18);
-  const estimatedGst = finalAmount - basePriceExcludingGst;
+  const gstAmount = Math.max(finalAmount - basePriceExcludingGst, 0);
 
   // Dynamically load Razorpay SDK
   const loadRazorpayScript = () => {
@@ -250,7 +298,7 @@ export default function CheckoutConfirmationPage() {
           totalDiscount,
           couponDiscount,
           finalAmount,
-          estimatedGst,
+          gstAmount,
           gstNo: validGstNo,
           gstName: validGstName,
           bookingDateTime,
@@ -364,41 +412,13 @@ export default function CheckoutConfirmationPage() {
         return;
       }
 
-      let customerName = "Customer";
-      let customerPhone = "";
-      let customerEmail = "customer@tascompany.in";
-      try {
-        const userStr = localStorage.getItem("user");
-        if (userStr) {
-          const u = JSON.parse(userStr);
-          if (u.name) customerName = u.name;
-          if (u.firstName)
-            customerName = u.firstName + (u.lastName ? ` ${u.lastName}` : "");
-          if (u.mobile || u.phone) customerPhone = u.mobile || u.phone;
-          if (u.email) customerEmail = u.email;
-        }
-      } catch (e) {}
+      let customerName = userData?.name || userData?.firstName || "Customer";
+      let customerPhone = userData?.mobile || userData?.phone || "";
+      let customerEmail = userData?.email || "customer@tascompany.in";
 
       let addressId = Number(selectedAddress?.id);
       if (!addressId || isNaN(addressId)) {
-        try {
-          const addrRes = await axios.get(
-            `${API_BASE_URL}/customers/customer-addresses`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/json",
-              },
-            },
-          );
-          if (addrRes.data?.data?.length > 0) {
-            addressId = addrRes.data.data[0].id;
-          } else {
-            addressId = 1;
-          }
-        } catch (e) {
-          addressId = 1;
-        }
+        addressId = 1;
       }
 
       let formattedDate = new Date().toISOString().split("T")[0];
@@ -550,66 +570,311 @@ export default function CheckoutConfirmationPage() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-white pb-16">
+    <div className="w-full min-h-screen bg-[#FDFCFB] pb-20">
       <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
         
         {/* Top Header: Title & Subtitle */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+        <div className="mb-7">
+          <div className="flex items-center gap-3 mb-1.5">
             <button
               onClick={() => router.back()}
-              className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+              className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors shadow-2xs cursor-pointer"
               aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-              Checkout
+              Checkout &amp; Confirmation
             </h1>
           </div>
-          <p className="text-sm text-gray-500 pl-12 max-w-2xl leading-relaxed">
-            Choose your preferred payment method to complete your booking. We ensure all transactions are safe and encrypted for your security.
+          <p className="text-xs sm:text-sm text-gray-500 pl-12 max-w-2xl leading-relaxed">
+            Review your service address, appointment slot, GST invoice details, and choose your payment method to complete checkout.
           </p>
         </div>
 
         {/* 2-Column Checkout Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* LEFT COLUMN: Payment Options + GST No + Booking Review */}
-          <div className="lg:col-span-7 space-y-6">
+          {/* LEFT COLUMN: Service Address -> Time Slot -> GST -> Payment Options */}
+          <div className="lg:col-span-7 space-y-5">
             
-            {/* Payment Options Section */}
-            <div>
-              <h2 className="text-base font-bold text-gray-900 mb-3.5">
-                Payment Options
-              </h2>
+            {/* 1. SERVICE ADDRESS CONFIRMATION CARD */}
+            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all">
+              <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center shrink-0">
+                    <MapPin className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-sm sm:text-base text-gray-900 leading-tight">
+                      1. Service Address Confirmation
+                    </h2>
+                    <p className="text-[11px] text-gray-400">
+                      Service will be provided at this address
+                    </p>
+                  </div>
+                </div>
 
-              <div className="space-y-3">
-                
-                {/* 1. Online Payment Option */}
+                {availableAddresses.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddressPicker(!showAddressPicker)}
+                    className="text-xs font-bold text-[#FF6A00] hover:text-orange-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Change</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Selected Address Display */}
+              <div className="pt-3.5">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs sm:text-sm text-gray-900">
+                        {getAddressName(selectedAddress)}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-[#FF6A00] px-2 py-0.5 rounded-full">
+                        {selectedAddress?.type || "Home"}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-gray-600 leading-relaxed max-w-lg">
+                      {selectedAddress?.house_number ? `${selectedAddress.house_number}, ` : ""}
+                      {selectedAddress?.street ? `${selectedAddress.street}, ` : ""}
+                      {selectedAddress?.landmark ? `Near ${selectedAddress.landmark}, ` : ""}
+                      {getCityName(selectedAddress?.city)}, {getStateName(selectedAddress?.state)}
+                      {selectedAddress?.postal_code ? ` - ${selectedAddress.postal_code}` : ""}
+                    </p>
+
+                    <p className="text-xs text-gray-500 font-medium">
+                      Phone: <span className="font-semibold text-gray-800">{selectedAddress?.mobile || selectedAddress?.phone || userData?.mobile || userData?.phone || "+91 7812991993"}</span>
+                    </p>
+                  </div>
+
+                  <div className="w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                </div>
+
+                {/* Address Selector Drawer / List */}
+                {showAddressPicker && availableAddresses.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-gray-100 space-y-2 animate-fadeIn">
+                    <p className="text-xs font-bold text-gray-700">Select Another Address:</p>
+                    <div className="space-y-2">
+                      {availableAddresses.map((addr: any) => (
+                        <div
+                          key={addr.id}
+                          onClick={() => {
+                            setSelectedAddress(addr);
+                            setShowAddressPicker(false);
+                            try {
+                              localStorage.setItem("selectedAddress", JSON.stringify(addr));
+                            } catch (e) {}
+                          }}
+                          className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                            selectedAddress?.id === addr.id
+                              ? "border-[#FF6A00] bg-orange-50/30 font-semibold"
+                              : "border-gray-200 hover:border-gray-300 bg-white"
+                          }`}
+                        >
+                          <div>
+                            <span className="font-bold text-gray-900 uppercase mr-2">[{addr.type || "Address"}]</span>
+                            <span className="text-gray-600">
+                              {addr.house_number ? `${addr.house_number}, ` : ""}
+                              {addr.street ? `${addr.street}, ` : ""}
+                              {getCityName(addr.city)}
+                            </span>
+                          </div>
+                          {selectedAddress?.id === addr.id && (
+                            <Check className="w-4 h-4 text-[#FF6A00]" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. TIME SLOT CONFIRMATION CARD */}
+            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all">
+              <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center shrink-0">
+                    <Calendar className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-sm sm:text-base text-gray-900 leading-tight">
+                      2. Scheduled Time Slot Confirmation
+                    </h2>
+                    <p className="text-[11px] text-gray-400">
+                      Confirmed appointment date and time for technician visit
+                    </p>
+                  </div>
+                </div>
+
+                <div className="w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center shrink-0">
+                  <Check className="w-3 h-3 stroke-[3]" />
+                </div>
+              </div>
+
+              <div className="pt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="flex items-center gap-3 p-3 bg-gray-50/70 border border-gray-100 rounded-xl">
+                  <Clock className="w-4 h-4 text-[#FF6A00] shrink-0" />
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Scheduled Date</p>
+                    <p className="font-bold text-sm text-gray-900 mt-0.5">
+                      {bookingDateTime?.date || "Today"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-gray-50/70 border border-gray-100 rounded-xl">
+                  <Sparkles className="w-4 h-4 text-[#FF6A00] shrink-0" />
+                  <div>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Time Slot</p>
+                    <p className="font-bold text-sm text-gray-900 mt-0.5">
+                      {bookingDateTime?.slotName || "Anytime (Standard Slot)"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {bookingDateTime?.notes && (
+                <div className="mt-2.5 text-[11px] text-gray-500 bg-orange-50/40 p-2.5 rounded-lg border border-orange-100">
+                  <span className="font-bold text-gray-700">Special Instructions:</span> {bookingDateTime.notes}
+                </div>
+              )}
+            </div>
+
+            {/* 3. GST DETAILS CARD (ADD GST NO. FOR TAX INVOICE) */}
+            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all space-y-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-sm sm:text-base text-gray-900 leading-tight">
+                      3. GST Details (Tax Invoice)
+                    </h2>
+                    <p className="text-[11px] text-gray-400">
+                      Add registered GSTIN to claim 18% input tax credit for your business
+                    </p>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={addGst}
+                    onChange={(e) => setAddGst(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF6A00]" />
+                </label>
+              </div>
+
+              {addGst && (
+                <div className="pt-2 space-y-3 border-t border-gray-100 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        GST Number (15 Digits) *
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={15}
+                        placeholder="e.g. 22AAAAA0000A1Z5"
+                        value={gstNo}
+                        onChange={(e) => handleGstChange(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm uppercase font-mono tracking-wider outline-none transition-colors ${
+                          gstError
+                            ? "border-red-400 bg-red-50/20 focus:border-red-500"
+                            : gstNo.length === 15 && !gstError
+                            ? "border-green-400 bg-green-50/20 focus:border-green-500"
+                            : "border-gray-300 focus:border-orange-500"
+                        }`}
+                      />
+                      {gstError && (
+                        <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>{gstError}</span>
+                        </p>
+                      )}
+                      {gstNo.length === 15 && !gstError && (
+                        <p className="text-[11px] text-green-700 mt-1 flex items-center gap-1 font-medium">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                          <span>Valid GSTIN format (18% input credit eligible)</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Registered Company / Business Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TAS Technologies Pvt Ltd"
+                        value={gstName}
+                        onChange={(e) => setGstName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50/60 border border-orange-200/60 rounded-xl p-2.5 flex items-center gap-2 text-[11px] text-orange-800 font-medium">
+                    <Check className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                    <span>Your B2B tax invoice with GSTIN will be sent to your registered email upon booking confirmation.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. PAYMENT OPTIONS CARD */}
+            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all">
+              <div className="flex items-center gap-2.5 pb-3.5 border-b border-gray-100">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center shrink-0">
+                  <CreditCard className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-sm sm:text-base text-gray-900 leading-tight">
+                    4. Payment Method
+                  </h2>
+                  <p className="text-[11px] text-gray-400">
+                    Choose how you want to pay for your service
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-3.5 space-y-3">
+                {/* Online Payment Option */}
                 <div
                   onClick={() => setSelectedPayment("ONLINE")}
-                  className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+                  className={`rounded-2xl p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
                     selectedPayment === "ONLINE"
                       ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs"
                       : "border border-gray-200 bg-white hover:border-gray-300"
                   }`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3.5">
                     <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                         selectedPayment === "ONLINE"
                           ? "bg-[#FF6A00] text-white shadow-xs"
                           : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      <CreditCard className="w-6 h-6" />
+                      <CreditCard className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                      <h3 className="font-bold text-gray-900 text-sm">
                         Online Payment
                       </h3>
-                      <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         Pay securely via Razorpay, Cards, UPI or Wallets
                       </p>
                     </div>
@@ -628,30 +893,30 @@ export default function CheckoutConfirmationPage() {
                   </div>
                 </div>
 
-                {/* 2. Cash on Delivery Option */}
+                {/* Cash on Delivery Option */}
                 <div
                   onClick={() => setSelectedPayment("COD")}
-                  className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+                  className={`rounded-2xl p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
                     selectedPayment === "COD"
                       ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs"
                       : "border border-gray-200 bg-white hover:border-gray-300"
                   }`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3.5">
                     <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                         selectedPayment === "COD"
                           ? "bg-[#FF6A00] text-white shadow-xs"
                           : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      <Banknote className="w-6 h-6" />
+                      <Banknote className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                      <h3 className="font-bold text-gray-900 text-sm">
                         Cash on Delivery
                       </h3>
-                      <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         Pay cash after service completion
                       </p>
                     </div>
@@ -669,160 +934,52 @@ export default function CheckoutConfirmationPage() {
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
 
-            {/* GST Number / Business Invoice Details Card */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5 transition-all">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-gray-900">
-                      Add GST Details (Tax Invoice)
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Claim input tax credit by providing your business GSTIN
-                    </p>
-                  </div>
+            {/* 5. BOOKED SERVICES SUMMARY */}
+            {cartItems.length > 0 && (
+              <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
+                <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-gray-500">
+                    Booked Services ({cartItems.length})
+                  </h3>
+                  <span className="text-[11px] font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-md">
+                    Verified Technicians
+                  </span>
                 </div>
-
-                <label className="relative inline-flex items-center cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={addGst}
-                    onChange={(e) => setAddGst(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF6A00]" />
-                </label>
-              </div>
-
-              {addGst && (
-                <div className="pt-2 space-y-3 border-t border-gray-100 animate-fadeIn">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        GST Number (15 Digits)
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={15}
-                        placeholder="e.g. 22AAAAA0000A1Z5"
-                        value={gstNo}
-                        onChange={(e) => handleGstChange(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm uppercase font-mono tracking-wider outline-none transition-colors ${
-                          gstError
-                            ? "border-red-400 bg-red-50/20 focus:border-red-500"
-                            : gstNo.length === 15 && !gstError
-                            ? "border-green-400 bg-green-50/20 focus:border-green-500"
-                            : "border-gray-300 focus:border-blue-500"
-                        }`}
-                      />
-                      {gstError && (
-                        <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1 font-medium">
-                          <AlertCircle className="w-3 h-3" />
-                          <span>{gstError}</span>
+                <div className="divide-y divide-gray-100 pt-1">
+                  {cartItems.map((item: any, idx: number) => (
+                    <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <p className="font-bold text-gray-900">{item.name || "Home Service"}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Qty: {item.quantity || 1} • 30 Days Free Warranty
                         </p>
-                      )}
-                      {gstNo.length === 15 && !gstError && (
-                        <p className="text-[11px] text-green-700 mt-1 flex items-center gap-1 font-medium">
-                          <Check className="w-3 h-3 stroke-[3]" />
-                          <span>Valid GSTIN format</span>
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Business / Company Name
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. TAS Enterprise"
-                        value={gstName}
-                        onChange={(e) => setGstName(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-2.5 flex items-center gap-2 text-[11px] text-amber-800 font-medium">
-                    <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Your tax invoice with GSTIN will be sent to your registered email upon booking confirmation.</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Booking Details Review Card */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-              <h3 className="font-bold text-sm text-gray-900 border-b border-gray-100 pb-2.5">
-                Service &amp; Delivery Review
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                {/* Service Address */}
-                <div className="flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 shrink-0 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900">Service Address</p>
-                    <p className="text-gray-500 mt-0.5 leading-relaxed">
-                      {selectedAddress?.house_number || selectedAddress?.street
-                        ? `${selectedAddress?.house_number ? `${selectedAddress.house_number}, ` : ""}${selectedAddress?.street || ""}, ${selectedAddress?.city || "Raipur"}`
-                        : "Office No. 201, Altnis Corporate Park, Raipur"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Scheduled Slot */}
-                <div className="flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 shrink-0 mt-0.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900">Scheduled Date &amp; Time</p>
-                    <p className="text-gray-500 mt-0.5 leading-relaxed">
-                      {bookingDateTime?.date || "Today"} • {bookingDateTime?.slotName || "Anytime (Standard Slot)"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Items List */}
-              {cartItems.length > 0 && (
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="font-bold text-gray-700 text-xs mb-2">Booked Services ({cartItems.length}):</p>
-                  <div className="space-y-1.5">
-                    {cartItems.map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center text-xs text-gray-600 bg-gray-50/60 p-2 rounded-lg">
-                        <span className="font-semibold text-gray-800 truncate pr-2">
-                          {item.name || "Home Service"} ({item.quantity || 1}x)
-                        </span>
-                        <span className="font-bold text-gray-900 shrink-0">
-                          ₹{(item.price || item.discountedPrice || 199) * (item.quantity || 1)}
-                        </span>
                       </div>
-                    ))}
-                  </div>
+                      <span className="font-extrabold text-gray-900 text-sm">
+                        ₹{(item.price || item.discountedPrice || 199) * (item.quantity || 1)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
           </div>
 
-          {/* RIGHT COLUMN: Amount Summary Card (Exact match to screenshot) */}
+          {/* RIGHT COLUMN: Amount Summary Card (with GST Included & Final Submission) */}
           <div className="lg:col-span-5">
-            <div className="bg-[#FAF9F6]/80 sm:bg-gray-50/70 border border-gray-200/90 rounded-2xl p-5 sm:p-6 space-y-5 sticky top-24 shadow-xs">
+            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 sm:p-6 space-y-5 sticky top-24 shadow-sm">
               
-              <h2 className="text-base font-bold text-gray-900">
-                Amount Summary
-              </h2>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h2 className="text-base font-bold text-gray-900">
+                  Amount Summary
+                </h2>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  Final Checkout
+                </span>
+              </div>
 
               <div className="space-y-3.5 text-sm">
                 
@@ -846,35 +1003,40 @@ export default function CheckoutConfirmationPage() {
                   <span>{couponDiscount > 0 ? `-₹${couponDiscount}` : "₹0"}</span>
                 </div>
 
-                {/* GST Notice Breakdown */}
+                {/* Taxes & GST line */}
                 <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
-                  <span>Taxes (18% GST)</span>
-                  <span className="font-medium text-gray-700">Included in total</span>
+                  <span className="flex items-center gap-1">
+                    <span>Taxes (18% GST)</span>
+                    <span className="text-[10px] text-gray-400">Included</span>
+                  </span>
+                  <span className="font-semibold text-gray-800">
+                    ₹{gstAmount} (Included)
+                  </span>
                 </div>
 
                 {/* Divider */}
-                <div className="border-t border-gray-200 pt-3.5 flex justify-between items-baseline">
+                <div className="border-t border-gray-200 pt-4 flex justify-between items-baseline">
                   <div>
-                    <span className="font-bold text-base text-gray-900">Total Amount</span>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
+                    <span className="font-extrabold text-base text-gray-900">Total Amount</span>
+                    <p className="text-[11px] text-green-700 font-semibold mt-0.5">
                       (Inclusive of all taxes &amp; GST)
                     </p>
                   </div>
-                  <span className="text-xl font-extrabold text-gray-900 tracking-tight">
+                  <span className="text-2xl font-black text-gray-900 tracking-tight">
                     ₹{finalAmount}
                   </span>
                 </div>
 
               </div>
 
-              {/* Action Checkout Button */}
+              {/* Action Checkout Submission Button */}
               <button
                 disabled={loading}
                 onClick={handlePay}
-                className="w-full py-3.5 bg-[#FF6A00] hover:bg-[#F05A00] active:scale-[0.99] text-white font-extrabold rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                className="w-full py-4 bg-[#FF6A00] hover:bg-[#F05A00] active:scale-[0.99] text-white font-extrabold rounded-xl text-base shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 {loading ? (
-                  <span>Processing...</span>
+                  <span>Processing Checkout...</span>
                 ) : (
                   <span>
                     Pay ₹{finalAmount}
@@ -889,7 +1051,7 @@ export default function CheckoutConfirmationPage() {
                   <span>Safe &amp; secure checkout</span>
                 </div>
                 
-                {/* Visual payment logos from public/grp.png with fallbacks */}
+                {/* Visual payment logos from public/grp.png */}
                 <div className="flex items-center justify-center gap-2 opacity-80 pt-1">
                   <img
                     src="/grp.png"
@@ -928,7 +1090,7 @@ export default function CheckoutConfirmationPage() {
 
             </div>
 
-            {/* Easy Cancellation & Verified Provider Trust Badge (Matching screenshot) */}
+            {/* Easy Cancellation & Verified Provider Trust Badge */}
             <div className="flex items-start gap-2.5 mt-3.5 px-2">
               <img
                 src="/tick.png"
