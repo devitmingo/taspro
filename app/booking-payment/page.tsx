@@ -18,6 +18,8 @@ import {
   Edit3,
   ShieldCheck,
   Sparkles,
+  CreditCard,
+  Banknote,
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
@@ -594,7 +596,7 @@ export default function CheckoutConfirmationPage() {
 
   return (
     <div className="w-full min-h-screen bg-[#FDFCFB] pb-20">
-      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl 2xl:max-w-[92%] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
         {/* Top Header: Title & Subtitle */}
         <div className="mb-7">
@@ -872,7 +874,116 @@ export default function CheckoutConfirmationPage() {
               )}
             </div>
 
-            {/* 4. BOOKED SERVICES SUMMARY */}
+            {/* 4. PAYMENT METHOD (ONLINE / CASH ON DELIVERY) */}
+            <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all">
+              <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center shrink-0">
+                    <CreditCard className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-sm sm:text-base text-gray-900 leading-tight">
+                      4. Payment Method
+                    </h2>
+                    <p className="text-[11px] text-gray-400">
+                      Choose how you would like to pay for your service
+                    </p>
+                  </div>
+                </div>
+
+                <span className="text-[11px] font-bold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-md">
+                  {selectedPayment === "ONLINE" ? "Instant Online" : "Cash on Delivery"}
+                </span>
+              </div>
+
+              <div className="pt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Online Payment Card */}
+                <div
+                  onClick={() => setSelectedPayment("ONLINE")}
+                  className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${
+                    selectedPayment === "ONLINE"
+                      ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs ring-1 ring-orange-200"
+                      : "border border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        selectedPayment === "ONLINE"
+                          ? "bg-[#FF6A00] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm">
+                        Online Payment
+                      </h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        UPI QR, Cards, NetBanking, Wallets
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      selectedPayment === "ONLINE"
+                        ? "border-[#FF6A00] bg-white"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    {selectedPayment === "ONLINE" && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#FF6A00]" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Cash on Delivery Card */}
+                <div
+                  onClick={() => setSelectedPayment("COD")}
+                  className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${
+                    selectedPayment === "COD"
+                      ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs ring-1 ring-orange-200"
+                      : "border border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        selectedPayment === "COD"
+                          ? "bg-[#FF6A00] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <Banknote className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm">
+                        Cash on Delivery
+                      </h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Pay cash after service completion
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      selectedPayment === "COD"
+                        ? "border-[#FF6A00] bg-white"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    {selectedPayment === "COD" && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#FF6A00]" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. BOOKED SERVICES SUMMARY */}
             {cartItems.length > 0 && (
               <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
                 <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
@@ -972,10 +1083,15 @@ export default function CheckoutConfirmationPage() {
                   className="w-full py-4 bg-[#FF6A00] hover:bg-[#F05A00] active:scale-[0.99] text-white font-extrabold rounded-xl text-base shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                 >
                   {loading ? (
-                    <span>Processing Checkout...</span>
+                    <span>Processing {selectedPayment === "COD" ? "Booking..." : "Payment..."}</span>
+                  ) : selectedPayment === "COD" ? (
+                    <span className="flex items-center gap-2">
+                      <Banknote className="w-5 h-5" />
+                      <span>Place Order (Cash on Delivery)</span>
+                    </span>
                   ) : (
                     <span>
-                      Pay ₹{finalAmount}
+                      Pay ₹{finalAmount} via Online
                     </span>
                   )}
                 </button>
@@ -983,45 +1099,55 @@ export default function CheckoutConfirmationPage() {
                 {/* Safe & secure checkout + payment logos */}
                 <div className="flex flex-col items-center justify-center gap-2 pt-1 text-center">
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                    <Lock className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Safe &amp; secure checkout</span>
+                    {selectedPayment === "COD" ? (
+                      <>
+                        <Banknote className="w-3.5 h-3.5 text-green-600" />
+                        <span>Pay ₹{finalAmount} in cash after service completion</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5 text-gray-400" />
+                        <span>Safe &amp; secure online checkout</span>
+                      </>
+                    )}
                   </div>
                   
-                  {/* Visual payment logos from public/grp.png */}
-                  <div className="flex items-center justify-center gap-2 opacity-80 pt-1">
-                    <img
-                      src="/grp.png"
-                      alt="Payment Methods"
-                      className="h-4 object-contain"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = "none";
-                      }}
-                    />
-                    <img
-                      src="/icons/visa.svg"
-                      alt="Visa"
-                      className="h-4"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = "none";
-                      }}
-                    />
-                    <img
-                      src="/icons/mastercard.svg"
-                      alt="Mastercard"
-                      className="h-4"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = "none";
-                      }}
-                    />
-                    <img
-                      src="/icons/rupay.svg"
-                      alt="RuPay"
-                      className="h-3.5"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = "none";
-                      }}
-                    />
-                  </div>
+                  {selectedPayment === "ONLINE" && (
+                    <div className="flex items-center justify-center gap-2 opacity-80 pt-1">
+                      <img
+                        src="/grp.png"
+                        alt="Payment Methods"
+                        className="h-4 object-contain"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
+                      <img
+                        src="/icons/visa.svg"
+                        alt="Visa"
+                        className="h-4"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
+                      <img
+                        src="/icons/mastercard.svg"
+                        alt="Mastercard"
+                        className="h-4"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
+                      <img
+                        src="/icons/rupay.svg"
+                        alt="RuPay"
+                        className="h-3.5"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
               </div>
