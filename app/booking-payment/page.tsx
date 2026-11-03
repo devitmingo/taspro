@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/context/BookingContext";
 import {
-  ArrowLeft,
   Lock,
   CheckCircle2,
   Calendar,
@@ -596,24 +595,15 @@ export default function CheckoutConfirmationPage() {
 
   return (
     <div className="w-full min-h-screen bg-[#FDFCFB] pb-20">
-      <main className="max-w-7xl 2xl:max-w-[92%] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <main className="w-full 2xl:w-[85%] mx-auto px-4 sm:px-5 py-6 sm:py-8">
         
         {/* Top Header: Title & Subtitle */}
         <div className="mb-7">
-          <div className="flex items-center gap-3 mb-1.5">
-            <button
-              onClick={() => router.back()}
-              className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors shadow-2xs cursor-pointer"
-              aria-label="Back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-              Checkout &amp; Confirmation
-            </h1>
-          </div>
-          <p className="text-xs sm:text-sm text-gray-500 pl-12 max-w-2xl leading-relaxed">
-            Review your service address, appointment slot, GST invoice details, and complete your secure checkout.
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight mb-1.5">
+            Checkout &amp; Confirmation
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-500 max-w-2xl leading-relaxed">
+            Review your service address, appointment slot, GST invoice details, and choose your payment method to complete checkout.
           </p>
         </div>
 
@@ -621,7 +611,7 @@ export default function CheckoutConfirmationPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* LEFT COLUMN: Service Address -> Time Slot -> GST -> Payment Options */}
-          <div className="lg:col-span-7 space-y-5">
+          <div className="lg:col-span-8 space-y-5">
             
             {/* 1. SERVICE ADDRESS CONFIRMATION CARD */}
             <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all">
@@ -1015,7 +1005,7 @@ export default function CheckoutConfirmationPage() {
           </div>
 
           {/* RIGHT COLUMN: Sticky Fixed Amount Summary Card */}
-          <div className="lg:col-span-5 relative">
+          <div className="lg:col-span-4 relative">
             <div className="sticky top-24 space-y-3.5">
               <div className="bg-white border border-gray-200/90 rounded-2xl p-5 sm:p-6 space-y-5 shadow-sm">
                 
