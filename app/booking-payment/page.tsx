@@ -7,64 +7,68 @@ import {
   ArrowLeft,
   CreditCard,
   Banknote,
-  Building2,
-  ThumbsUp,
-  ShieldCheck,
-  Check,
-  X,
   Lock,
-  HelpCircle,
-  ChevronRight,
-  QrCode,
-  Smartphone,
+  CheckCircle2,
+  Calendar,
+  MapPin,
+  FileText,
+  Building,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
 import Swal from "sweetalert2";
 
-export default function CompletePaymentPage() {
+export default function CheckoutConfirmationPage() {
   const router = useRouter();
   const { cartItems, clearCart } = useBooking();
 
-  // Active method selection (default: recommended matching Image 1)
-  const [selectedMethod, setSelectedMethod] = useState<
-    "recommended" | "saved_cards" | "upi" | "card" | "netbanking" | "cod"
-  >("recommended");
+  // Payment method selection: "ONLINE" or "COD" matching user's screenshot
+  const [selectedPayment, setSelectedPayment] = useState<"ONLINE" | "COD">("ONLINE");
 
-  // Gift Card State
-  const [applyGiftCard, setApplyGiftCard] = useState(false);
-  const [showGiftModal, setShowGiftModal] = useState(false);
-  const [giftCardNumber, setGiftCardNumber] = useState("");
-  const [giftCardPin, setGiftCardPin] = useState("");
-  const [giftCardBalance, setGiftCardBalance] = useState(996);
-
-  // Form states for various methods
-  const [cvv, setCvv] = useState("");
-  const [showCvvHelp, setShowCvvHelp] = useState(false);
-
-  // Card form states
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
-  const [cardName, setCardName] = useState("");
-  const [saveCard, setSaveCard] = useState(true);
-
-  // UPI states
-  const [upiMode, setUpiMode] = useState<"apps" | "qr" | "id">("qr");
-  const [selectedUpiApp, setSelectedUpiApp] = useState("gpay");
-  const [customUpiId, setCustomUpiId] = useState("");
-  const [upiVerified, setUpiVerified] = useState(false);
-
-  // Net banking state
-  const [selectedBank, setSelectedBank] = useState("sbi");
+  // GST Number & Business Invoice State
+  const [addGst, setAddGst] = useState(false);
+  const [gstNo, setGstNo] = useState("");
+  const [gstName, setGstName] = useState("");
+  const [gstError, setGstError] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
-  // Price calculation
+  // Booking review data loaded from localStorage
+  const [bookingDateTime, setBookingDateTime] = useState<any>({});
+  const [selectedAddress, setSelectedAddress] = useState<any>({});
+
+  // GST regex validator for standard Indian GSTIN: 2 digits + 5 chars + 4 digits + 1 char + 1 digit/char + Z + 1 digit/char
+  const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+  useEffect(() => {
+    loadRazorpayScript();
+
+    if (typeof window !== "undefined") {
+      try {
+        const savedCoupon = localStorage.getItem("appliedCoupon");
+        if (savedCoupon) setAppliedCoupon(JSON.parse(savedCoupon));
+      } catch (e) {}
+
+      try {
+        const savedDateTime = localStorage.getItem("bookingDateTime");
+        if (savedDateTime) setBookingDateTime(JSON.parse(savedDateTime));
+      } catch (e) {}
+
+      try {
+        const savedAddr = localStorage.getItem("selectedAddress");
+        if (savedAddr) setSelectedAddress(JSON.parse(savedAddr));
+      } catch (e) {}
+    }
+  }, []);
+
+  // Price calculations matching exact checkout math
   const rawTotalMRP = cartItems.reduce(
     (sum: number, item: any) =>
       sum +
-      (item.originalPrice || item.price || item.discountedPrice || 0) *
+      (item.originalPrice || item.strike_price || item.price || item.discountedPrice || 0) *
         (item.quantity || 1),
     0,
   );
@@ -75,30 +79,17 @@ export default function CompletePaymentPage() {
     0,
   );
 
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
-
-  useEffect(() => {
-    loadRazorpayScript();
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("appliedCoupon");
-      if (saved) {
-        try {
-          setAppliedCoupon(JSON.parse(saved));
-        } catch (e) {}
-      }
-    }
-  }, []);
-
-  const totalMRP = Math.round(rawTotalMRP) || 236;
-  const totalAmount = Math.round(rawTotalAmount) || 200;
-  const totalDiscount = Math.round(totalMRP - totalAmount);
+  const totalMRP = Math.round(rawTotalMRP) || 219;
+  const totalAmount = Math.round(rawTotalAmount) || 199;
+  const totalDiscount = Math.max(Math.round(totalMRP - totalAmount), 0);
   const couponDiscount = Math.round(appliedCoupon ? appliedCoupon.discount : 0);
-  const basePayable = Math.max(totalAmount - couponDiscount, 0);
+  const finalAmount = Math.max(totalAmount - couponDiscount, 0);
 
-  // If gift card applied
-  const giftDeduction = applyGiftCard ? Math.min(basePayable, giftCardBalance) : 0;
-  const payableAmount = Math.max(basePayable - giftDeduction, 0);
+  // Estimated GST (18% inclusive calculation)
+  const basePriceExcludingGst = Math.round(finalAmount / 1.18);
+  const estimatedGst = finalAmount - basePriceExcludingGst;
 
+  // Dynamically load Razorpay SDK
   const loadRazorpayScript = () => {
     return new Promise<boolean>((resolve) => {
       if (typeof window !== "undefined" && (window as any).Razorpay) {
@@ -113,17 +104,32 @@ export default function CompletePaymentPage() {
     });
   };
 
+  const handleGstChange = (val: string) => {
+    const cleaned = val.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15);
+    setGstNo(cleaned);
+    if (cleaned.length === 15) {
+      if (gstRegex.test(cleaned)) {
+        setGstError("");
+      } else {
+        setGstError("Invalid GST format. (e.g. 22AAAAA0000A1Z5)");
+      }
+    } else if (cleaned.length > 0) {
+      setGstError("GSTIN must be 15 characters long");
+    } else {
+      setGstError("");
+    }
+  };
+
+  // Final booking creator in Laravel
   const createBooking = async (
     paymentMethod: "ONLINE" | "COD",
     paymentRef: string = "",
   ) => {
-    // STRICT SECURITY: Never create an online booking without a real Razorpay payment ID!
     if (paymentMethod === "ONLINE" && (!paymentRef || !paymentRef.startsWith("pay_"))) {
-      console.error("Online booking requires a valid Razorpay payment ID.");
       setLoading(false);
       Swal.fire({
         icon: "error",
-        title: "Payment Required",
+        title: "Payment Incomplete",
         text: "Please complete your payment through Razorpay to confirm the booking.",
         confirmButtonColor: "#ff5500",
       });
@@ -142,20 +148,7 @@ export default function CompletePaymentPage() {
         return;
       }
 
-      let bookingDateTime: any = {};
-      let selectedAddress: any = {};
-      try {
-        bookingDateTime = JSON.parse(
-          localStorage.getItem("bookingDateTime") || "{}",
-        );
-      } catch (e) {}
-      try {
-        selectedAddress = JSON.parse(
-          localStorage.getItem("selectedAddress") || "{}",
-        );
-      } catch (e) {}
-
-      // Fallback address if not saved in local storage
+      // Address resolution
       let addressId = Number(selectedAddress?.id);
       if (!addressId || isNaN(addressId)) {
         try {
@@ -179,7 +172,7 @@ export default function CompletePaymentPage() {
       }
 
       let formattedDate = new Date().toISOString().split("T")[0];
-      if (bookingDateTime.date) {
+      if (bookingDateTime?.date) {
         const parts = bookingDateTime.date.split("-");
         if (parts.length === 3) {
           if (parts[0].length === 2 && parts[2].length === 4) {
@@ -190,13 +183,17 @@ export default function CompletePaymentPage() {
         }
       }
 
+      const validGstNo = addGst && gstRegex.test(gstNo.trim()) ? gstNo.trim() : null;
+      const validGstName = addGst && gstName.trim() ? gstName.trim() : null;
+
       const payload = {
         date: formattedDate,
-        slot_id: Number(bookingDateTime.slotId || 1),
-        customer_notes: bookingDateTime.notes?.trim() || "Urgent doorstep service",
+        slot_id: Number(bookingDateTime?.slotId || 1),
+        customer_notes: bookingDateTime?.notes?.trim() || "Doorstep service request",
         address_id: addressId,
         payment_type: paymentMethod === "COD" ? "COD" : "ONLINE",
-        gst_no: "22AAAAA0000A1Z5",
+        gst_no: validGstNo || "22AAAAA0000A1Z5",
+        gst_name: validGstName || (validGstNo ? "Business Client" : null),
         pan_no: "ABCDE1234F",
         service_category_id: Number(
           cartItems[0]?.service_category_id ||
@@ -225,7 +222,6 @@ export default function CompletePaymentPage() {
         },
       );
 
-      // Verify that a real booking object was created in database
       const bookingObj =
         res.data?.data?.booking ||
         (res.data?.data?.booking_no ? res.data?.data : null);
@@ -236,7 +232,6 @@ export default function CompletePaymentPage() {
         const orderId =
           bookingObj?.booking_no ||
           res.data?.data?.order_id ||
-          res.data?.data?.booking_id ||
           `TS${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}${String(new Date().getDate()).padStart(2, "0")}A${Math.floor(10000 + Math.random() * 90000)}`;
 
         const lastBooking = {
@@ -254,7 +249,10 @@ export default function CompletePaymentPage() {
           totalMRP,
           totalDiscount,
           couponDiscount,
-          finalAmount: payableAmount,
+          finalAmount,
+          estimatedGst,
+          gstNo: validGstNo,
+          gstName: validGstName,
           bookingDateTime,
           selectedAddress,
           paymentMethod,
@@ -269,7 +267,7 @@ export default function CompletePaymentPage() {
         localStorage.removeItem("selectedAddress");
         localStorage.removeItem("cartItems");
 
-        // Direct to order confirmation
+        // Redirect directly to Order Confirmation
         router.push(
           bookingId
             ? `/order-confirmation?booking_id=${bookingId}`
@@ -279,7 +277,7 @@ export default function CompletePaymentPage() {
         Swal.fire({
           icon: "error",
           title: "Booking Failed",
-          text: res.data?.message || "Unable to create booking.",
+          text: res.data?.message || "Unable to complete booking.",
           confirmButtonColor: "#ff5500",
         });
       }
@@ -317,7 +315,7 @@ export default function CompletePaymentPage() {
     }
   };
 
-  // Launch Razorpay Payment Gateway directly here on this payment page
+  // Launch Razorpay Payment Gateway directly here on checkout
   const handleRazorpayPayment = async () => {
     try {
       setLoading(true);
@@ -340,6 +338,17 @@ export default function CompletePaymentPage() {
         });
         setLoading(false);
         router.push("/cart");
+        return;
+      }
+
+      if (addGst && gstNo.trim() && !gstRegex.test(gstNo.trim())) {
+        setLoading(false);
+        Swal.fire({
+          icon: "warning",
+          title: "Invalid GSTIN",
+          text: "Please enter a valid 15-character GST number or uncheck GST option.",
+          confirmButtonColor: "#ff5500",
+        });
         return;
       }
 
@@ -370,19 +379,6 @@ export default function CompletePaymentPage() {
         }
       } catch (e) {}
 
-      let bookingDateTime: any = {};
-      let selectedAddress: any = {};
-      try {
-        bookingDateTime = JSON.parse(
-          localStorage.getItem("bookingDateTime") || "{}",
-        );
-      } catch (e) {}
-      try {
-        selectedAddress = JSON.parse(
-          localStorage.getItem("selectedAddress") || "{}",
-        );
-      } catch (e) {}
-
       let addressId = Number(selectedAddress?.id);
       if (!addressId || isNaN(addressId)) {
         try {
@@ -406,7 +402,7 @@ export default function CompletePaymentPage() {
       }
 
       let formattedDate = new Date().toISOString().split("T")[0];
-      if (bookingDateTime.date) {
+      if (bookingDateTime?.date) {
         const parts = bookingDateTime.date.split("-");
         if (parts.length === 3) {
           if (parts[0].length === 2 && parts[2].length === 4) {
@@ -422,16 +418,19 @@ export default function CompletePaymentPage() {
         process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
         process.env.NEXT_PUBLIC_KEY_ID ||
         "rzp_test_TvL5gF2aAKznOU";
-      let orderAmount = Math.round(payableAmount * 100);
+      let orderAmount = Math.round(finalAmount * 100);
 
       // Create official Razorpay Order via Backend
       try {
+        const validGstNo = addGst && gstRegex.test(gstNo.trim()) ? gstNo.trim() : null;
+        const validGstName = addGst && gstName.trim() ? gstName.trim() : null;
+
         const initOrderRes = await axios.post(
           `${API_BASE_URL}/customers/customer-bookings`,
           {
             date: formattedDate,
-            slot_id: Number(bookingDateTime.slotId || 1),
-            customer_notes: bookingDateTime.notes?.trim() || "Urgent doorstep service",
+            slot_id: Number(bookingDateTime?.slotId || 1),
+            customer_notes: bookingDateTime?.notes?.trim() || "Doorstep service request",
             address_id: addressId,
             payment_type: "ONLINE",
             service_category_id: Number(
@@ -442,6 +441,8 @@ export default function CompletePaymentPage() {
             service_id: Number(
               cartItems[0]?.service_id || cartItems[0]?.serviceId || 1,
             ),
+            gst_no: validGstNo || "22AAAAA0000A1Z5",
+            gst_name: validGstName || null,
             razorpay_payment_id: "", // Blank triggers Razorpay Order creation on backend
             state_name: "Chhattisgarh",
             city_name: "Raipur",
@@ -467,7 +468,7 @@ export default function CompletePaymentPage() {
           }
         }
       } catch (orderErr) {
-        console.warn("Could not create Razorpay order on backend:", orderErr);
+        console.warn("Backend order creation warning:", orderErr);
       }
 
       const options: any = {
@@ -487,7 +488,7 @@ export default function CompletePaymentPage() {
         },
         modal: {
           ondismiss: function () {
-            console.log("Razorpay checkout closed by user without completing payment.");
+            console.log("Razorpay modal dismissed without payment.");
             setLoading(false);
           },
         },
@@ -510,15 +511,6 @@ export default function CompletePaymentPage() {
 
       if (razorpayOrderId) {
         options.order_id = razorpayOrderId;
-      }
-
-      // Prefill preferred payment method in Razorpay if user selected a specific tab
-      if (selectedMethod === "card" || selectedMethod === "saved_cards") {
-        options.prefill.method = "card";
-      } else if (selectedMethod === "upi") {
-        options.prefill.method = "upi";
-      } else if (selectedMethod === "netbanking") {
-        options.prefill.method = "netbanking";
       }
 
       const rzpInstance = new (window as any).Razorpay(options);
@@ -549,7 +541,7 @@ export default function CompletePaymentPage() {
   };
 
   const handlePay = async () => {
-    if (selectedMethod === "cod") {
+    if (selectedPayment === "COD") {
       await createBooking("COD");
       return;
     }
@@ -558,875 +550,405 @@ export default function CompletePaymentPage() {
   };
 
   return (
-    <div className="w-full pb-10">
-      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-2 sm:py-4 flex-1">
-        {/* Top Header: Back Arrow + Complete Payment */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => router.back()}
-            className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors shadow-2xs cursor-pointer"
-            aria-label="Back"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-            Complete Payment
-          </h1>
-        </div>
-
-        {/* Top Gift Card Card */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex items-center justify-between mb-6 shadow-2xs transition-all">
-          <label className="flex items-center gap-3.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={applyGiftCard}
-              onChange={(e) => setApplyGiftCard(e.target.checked)}
-              className="w-5 h-5 rounded accent-[#0076B6] cursor-pointer"
-            />
-            <div>
-              <p className="text-sm font-bold text-gray-900">Apply Gift Card</p>
-              <p className="text-xs text-gray-500 font-medium">
-                Available Balance ₹{giftCardBalance}
-              </p>
-            </div>
-          </label>
-
-          <button
-            type="button"
-            onClick={() => setShowGiftModal(true)}
-            className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-semibold hover:underline cursor-pointer"
-          >
-            Add Gift Card
-          </button>
-        </div>
-
-        {/* Main Payment Section: 2 Columns */}
-        <div className="grid md:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN: Payment Methods List */}
-          <div className="md:col-span-6 lg:col-span-5 space-y-3">
-            {/* 1. Recommended for You */}
-            <div
-              onClick={() => setSelectedMethod("recommended")}
-              className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                selectedMethod === "recommended"
-                  ? "border-[#0076B6] bg-blue-50/20 shadow-xs"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
+    <div className="w-full min-h-screen bg-white pb-16">
+      <main className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        
+        {/* Top Header: Title & Subtitle */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+              aria-label="Back"
             >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                  <ThumbsUp className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900">
-                    Recommended for You
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Fast &amp; secure checkout
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedMethod === "recommended"
-                    ? "border-[#0076B6] bg-[#0076B6]"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedMethod === "recommended" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
-
-            {/* 2. Saved Cards */}
-            <div
-              onClick={() => setSelectedMethod("saved_cards")}
-              className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                selectedMethod === "saved_cards"
-                  ? "border-[#0076B6] bg-blue-50/20 shadow-xs"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900">
-                    Saved Cards
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Fast checkout with saved cards
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedMethod === "saved_cards"
-                    ? "border-[#0076B6] bg-[#0076B6]"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedMethod === "saved_cards" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
-
-            {/* 3. UPI */}
-            <div
-              onClick={() => setSelectedMethod("upi")}
-              className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                selectedMethod === "upi"
-                  ? "border-[#0076B6] bg-blue-50/20 shadow-xs"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 font-extrabold text-[11px] text-gray-800 tracking-tighter">
-                  UPI
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900">UPI</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Pay by any UPI app / Scan QR
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedMethod === "upi"
-                    ? "border-[#0076B6] bg-[#0076B6]"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedMethod === "upi" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
-
-            {/* 4. Credit / Debit / ATM Card */}
-            <div
-              onClick={() => setSelectedMethod("card")}
-              className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                selectedMethod === "card"
-                  ? "border-[#0076B6] bg-blue-50/20 shadow-xs"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900">
-                    Credit / Debit / ATM Card
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Add and secure cards as per RBI guidelines
-                  </p>
-                  <p className="text-[11px] font-semibold text-green-600 mt-1">
-                    Save upto ₹3,750 • 9 offers available
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedMethod === "card"
-                    ? "border-[#0076B6] bg-[#0076B6]"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedMethod === "card" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
-
-            {/* 5. Net Banking */}
-            <div
-              onClick={() => setSelectedMethod("netbanking")}
-              className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                selectedMethod === "netbanking"
-                  ? "border-[#0076B6] bg-blue-50/20 shadow-xs"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900">
-                    Net Banking
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    All major Indian banks supported
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedMethod === "netbanking"
-                    ? "border-[#0076B6] bg-[#0076B6]"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedMethod === "netbanking" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
-
-            {/* 7. Cash on Delivery */}
-            <div
-              onClick={() => setSelectedMethod("cod")}
-              className={`rounded-2xl border p-4 sm:p-4.5 flex items-center justify-between cursor-pointer transition-all ${
-                selectedMethod === "cod"
-                  ? "border-[#0076B6] bg-blue-50/20 shadow-xs"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-green-50 text-green-700 flex items-center justify-center shrink-0">
-                  <Banknote className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900">
-                    Cash on Delivery
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Pay via cash or UPI after service
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedMethod === "cod"
-                    ? "border-[#0076B6] bg-[#0076B6]"
-                    : "border-gray-300"
-                }`}
-              >
-                {selectedMethod === "cod" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                )}
-              </div>
-            </div>
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+              Checkout
+            </h1>
           </div>
+          <p className="text-sm text-gray-500 pl-12 max-w-2xl leading-relaxed">
+            Choose your preferred payment method to complete your booking. We ensure all transactions are safe and encrypted for your security.
+          </p>
+        </div>
 
-          {/* RIGHT COLUMN: Active Method Details (Matching Image 1 EXACTLY!) */}
-          <div className="md:col-span-6 lg:col-span-7">
-            {/* View A: Recommended for You OR Saved Cards */}
-            {(selectedMethod === "recommended" ||
-              selectedMethod === "saved_cards") && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-xs">
-                {/* Header: Bank & Card + SBI Logo */}
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-bold text-gray-900">
-                    SBI Credit Card • 3811
-                  </h3>
-                  {/* Authentic SBI Logo Circle */}
-                  <div
-                    className="w-7 h-7 rounded-full bg-[#0076B6] flex items-center justify-center shrink-0 shadow-xs"
-                    title="State Bank of India"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 100 100" fill="none">
-                      <circle cx="50" cy="50" r="48" fill="#0076B6" />
-                      <circle cx="50" cy="50" r="16" fill="white" />
-                      <rect
-                        x="46"
-                        y="50"
-                        width="8"
-                        height="36"
-                        fill="white"
-                      />
-                    </svg>
-                  </div>
-                </div>
+        {/* 2-Column Checkout Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* LEFT COLUMN: Payment Options + GST No + Booking Review */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* Payment Options Section */}
+            <div>
+              <h2 className="text-base font-bold text-gray-900 mb-3.5">
+                Payment Options
+              </h2>
 
-                {/* Green Discount Text */}
-                <p className="text-xs font-semibold text-green-700 flex items-center gap-1.5 mb-5">
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>
-                    ₹{totalDiscount > 0 ? totalDiscount : 36} discount applied.
-                  </span>
-                </p>
-
-                {/* Form Row: CVV Input + Big Pay Button */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="relative flex items-center">
-                    <input
-                      type="password"
-                      maxLength={4}
-                      placeholder="CVV"
-                      value={cvv}
-                      onChange={(e) =>
-                        setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))
-                      }
-                      className="w-24 sm:w-28 h-11 px-3 border border-gray-300 rounded-xl text-center font-bold tracking-widest text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-400 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCvvHelp(!showCvvHelp)}
-                      className="absolute right-2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                      title="3-digit security code printed on back of card"
-                    >
-                      <HelpCircle className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={handlePay}
-                    disabled={loading}
-                    className="flex-1 h-11 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                  >
-                    {loading ? (
-                      <span>Processing Payment...</span>
-                    ) : (
-                      <span>Pay ₹{payableAmount.toLocaleString("en-IN")}</span>
-                    )}
-                  </button>
-                </div>
-
-                {showCvvHelp && (
-                  <p className="text-[11px] text-gray-500 mb-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
-                    CVV is the 3 or 4-digit security code on the back of your
-                    credit/debit card.
-                  </p>
-                )}
-
-                {/* Fees Subtext with Dotted Underline */}
-                <p className="text-[11px] text-gray-500 inline-block border-b border-dotted border-gray-400 pb-0.5">
-                  ₹0 Offer &amp; Payment Handling Fees
-                </p>
-              </div>
-            )}
-
-            {/* View B: Credit / Debit / ATM Card */}
-            {selectedMethod === "card" && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                  <h3 className="text-base font-bold text-gray-900">
-                    Enter Card Details
-                  </h3>
-                  <div className="flex items-center gap-1.5 opacity-80">
-                    <img src="/icons/visa.svg" alt="Visa" className="h-5" />
-                    <img
-                      src="/icons/mastercard.svg"
-                      alt="Mastercard"
-                      className="h-5"
-                    />
-                    <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Card Number
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={19}
-                    placeholder="XXXX XXXX XXXX XXXX"
-                    value={cardNumber}
-                    onChange={(e) => {
-                      const val = e.target.value
-                        .replace(/\D/g, "")
-                        .replace(/(\d{4})(?=\d)/g, "$1 ");
-                      setCardNumber(val);
-                    }}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium tracking-wide focus:border-blue-500 outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Valid Thru (MM/YY)
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={5}
-                      placeholder="MM/YY"
-                      value={cardExpiry}
-                      onChange={(e) => {
-                        let val = e.target.value.replace(/\D/g, "");
-                        if (val.length >= 2) {
-                          val = val.slice(0, 2) + "/" + val.slice(2, 4);
-                        }
-                        setCardExpiry(val);
-                      }}
-                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-center focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      CVV
-                    </label>
-                    <input
-                      type="password"
-                      maxLength={4}
-                      placeholder="123"
-                      value={cardCvv}
-                      onChange={(e) =>
-                        setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))
-                      }
-                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-center tracking-widest focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Cardholder Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Name as printed on card"
-                    value={cardName}
-                    onChange={(e) => setCardName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium focus:border-blue-500 outline-none"
-                  />
-                </div>
-
-                <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
-                  <input
-                    type="checkbox"
-                    checked={saveCard}
-                    onChange={(e) => setSaveCard(e.target.checked)}
-                    className="w-4 h-4 rounded accent-[#0076B6] cursor-pointer"
-                  />
-                  <span className="text-xs text-gray-600">
-                    Securely save this card as per RBI guidelines
-                  </span>
-                </label>
-
-                <button
-                  onClick={handlePay}
-                  disabled={loading}
-                  className="w-full py-3 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              <div className="space-y-3">
+                
+                {/* 1. Online Payment Option */}
+                <div
+                  onClick={() => setSelectedPayment("ONLINE")}
+                  className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+                    selectedPayment === "ONLINE"
+                      ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs"
+                      : "border border-gray-200 bg-white hover:border-gray-300"
+                  }`}
                 >
-                  {loading ? (
-                    <span>Processing Payment...</span>
-                  ) : (
-                    <span>Pay ₹{payableAmount.toLocaleString("en-IN")}</span>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* View C: UPI */}
-            {selectedMethod === "upi" && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                  <h3 className="text-base font-bold text-gray-900">
-                    Pay via UPI
-                  </h3>
-                  <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-xs font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => setUpiMode("qr")}
-                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                        upiMode === "qr"
-                          ? "bg-white text-orange-600 shadow-2xs font-bold"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      Scan QR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUpiMode("apps")}
-                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                        upiMode === "apps"
-                          ? "bg-white text-orange-600 shadow-2xs font-bold"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      UPI Apps
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUpiMode("id")}
-                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                        upiMode === "id"
-                          ? "bg-white text-orange-600 shadow-2xs font-bold"
-                          : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      UPI ID
-                    </button>
-                  </div>
-                </div>
-
-                {/* Subview 1: Scan UPI QR Code */}
-                {upiMode === "qr" && (
-                  <div className="flex flex-col items-center justify-center py-2 space-y-3">
-                    <div className="p-3 bg-white border-2 border-orange-200 rounded-2xl shadow-xs text-center">
-                      <div className="w-48 h-48 mx-auto bg-gray-50 rounded-xl p-2 flex items-center justify-center border border-gray-100 relative">
-                        {/* Authentic UPI QR Code */}
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=tascompany@okhdfcbank%26pn=TASproCompany%26am=${payableAmount}%26cu=INR`}
-                          alt="UPI QR Code"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <p className="text-xs font-bold text-gray-900 mt-2">
-                        Scan to Pay ₹{payableAmount}
-                      </p>
-                      <p className="text-[10px] text-gray-500 font-medium">
-                        Accepts GPay, PhonePe, Paytm, BHIM, etc.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <ShieldCheck className="w-4 h-4 text-green-600" />
-                      <span>Instant payment confirmation with 256-Bit SSL</span>
-                    </div>
-
-                    <button
-                      onClick={handlePay}
-                      disabled={loading}
-                      className="w-full py-3 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                    >
-                      {loading ? (
-                        <span>Processing Payment...</span>
-                      ) : (
-                        <span>I Have Paid ₹{payableAmount} (Confirm Booking)</span>
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {/* Subview 2: UPI Apps */}
-                {upiMode === "apps" && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      {[
-                        { id: "gpay", name: "Google Pay", color: "#4285F4" },
-                        { id: "phonepe", name: "PhonePe", color: "#5f259f" },
-                        { id: "paytm", name: "Paytm", color: "#00BAF2" },
-                        { id: "bhim", name: "BHIM UPI", color: "#0076B6" },
-                      ].map((app) => (
-                        <button
-                          key={app.id}
-                          type="button"
-                          onClick={() => setSelectedUpiApp(app.id)}
-                          className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                            selectedUpiApp === app.id
-                              ? "border-[#0076B6] bg-blue-50/30 ring-1 ring-[#0076B6]"
-                              : "border-gray-200 hover:border-gray-300 bg-white"
-                          }`}
-                        >
-                          <div
-                            className="w-8 h-8 rounded-lg mx-auto mb-1.5 flex items-center justify-center text-white text-xs font-bold"
-                            style={{ backgroundColor: app.color }}
-                          >
-                            {app.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <span className="text-xs font-bold text-gray-800">
-                            {app.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={handlePay}
-                      disabled={loading}
-                      className="w-full py-3 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                    >
-                      {loading ? (
-                        <span>Connecting UPI App...</span>
-                      ) : (
-                        <span>
-                          Pay ₹{payableAmount.toLocaleString("en-IN")} via App
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {/* Subview 3: Enter UPI ID */}
-                {upiMode === "id" && (
-                  <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="e.g. mobileNumber@upi / name@okhdfcbank"
-                        value={customUpiId}
-                        onChange={(e) => {
-                          setCustomUpiId(e.target.value);
-                          setUpiVerified(false);
-                        }}
-                        className="flex-1 px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:border-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (customUpiId.includes("@")) {
-                            setUpiVerified(true);
-                          }
-                        }}
-                        className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors"
-                      >
-                        {upiVerified ? "✓ Verified" : "Verify"}
-                      </button>
-                    </div>
-
-                    {upiVerified && (
-                      <p className="text-xs text-green-700 font-semibold flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        <span>UPI ID is valid and ready to pay.</span>
-                      </p>
-                    )}
-
-                    <button
-                      onClick={handlePay}
-                      disabled={loading}
-                      className="w-full py-3 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                    >
-                      {loading ? (
-                        <span>Initiating UPI...</span>
-                      ) : (
-                        <span>
-                          Pay ₹{payableAmount.toLocaleString("en-IN")} via UPI
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-
-            {/* View E: Net Banking */}
-            {selectedMethod === "netbanking" && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-                <h3 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-                  Popular Banks
-                </h3>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {[
-                    { id: "sbi", name: "SBI" },
-                    { id: "hdfc", name: "HDFC" },
-                    { id: "icici", name: "ICICI" },
-                    { id: "axis", name: "Axis" },
-                    { id: "kotak", name: "Kotak" },
-                    { id: "pnb", name: "PNB" },
-                  ].map((bank) => (
+                  <div className="flex items-center gap-4">
                     <div
-                      key={bank.id}
-                      onClick={() => setSelectedBank(bank.id)}
-                      className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                        selectedBank === bank.id
-                          ? "border-[#0076B6] bg-blue-50/20"
-                          : "border-gray-200 hover:border-gray-300"
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        selectedPayment === "ONLINE"
+                          ? "bg-[#FF6A00] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      <span className="text-xs font-bold text-gray-800">
-                        {bank.name}
-                      </span>
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          selectedBank === bank.id
-                            ? "border-[#0076B6] bg-[#0076B6]"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {selectedBank === bank.id && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                        )}
-                      </div>
+                      <CreditCard className="w-6 h-6" />
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                        Online Payment
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                        Pay securely via Razorpay, Cards, UPI or Wallets
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="pt-2">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Other Banks
-                  </label>
-                  <select
-                    className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none bg-white"
-                    onChange={(e) => setSelectedBank(e.target.value)}
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      selectedPayment === "ONLINE"
+                        ? "border-[#FF6A00] bg-white"
+                        : "border-gray-300"
+                    }`}
                   >
-                    <option value="">Select from all other banks</option>
-                    <option value="bob">Bank of Baroda</option>
-                    <option value="canara">Canara Bank</option>
-                    <option value="indusind">IndusInd Bank</option>
-                    <option value="yes">Yes Bank</option>
-                    <option value="idbi">IDBI Bank</option>
-                  </select>
+                    {selectedPayment === "ONLINE" && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#FF6A00]" />
+                    )}
+                  </div>
                 </div>
 
-                <button
-                  onClick={handlePay}
-                  disabled={loading}
-                  className="w-full py-3 bg-[#FFC200] hover:bg-[#F5B400] active:scale-[0.99] text-gray-900 font-extrabold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                {/* 2. Cash on Delivery Option */}
+                <div
+                  onClick={() => setSelectedPayment("COD")}
+                  className={`rounded-2xl p-4 sm:p-5 flex items-center justify-between cursor-pointer transition-all ${
+                    selectedPayment === "COD"
+                      ? "border-2 border-[#FF6A00] bg-orange-50/20 shadow-xs"
+                      : "border border-gray-200 bg-white hover:border-gray-300"
+                  }`}
                 >
-                  {loading ? (
-                    <span>Connecting Bank...</span>
-                  ) : (
-                    <span>
-                      Pay ₹{payableAmount.toLocaleString("en-IN")} via Net Banking
-                    </span>
-                  )}
-                </button>
-              </div>
-            )}
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                        selectedPayment === "COD"
+                          ? "bg-[#FF6A00] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <Banknote className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                        Cash on Delivery
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                        Pay cash after service completion
+                      </p>
+                    </div>
+                  </div>
 
-            {/* View F: Cash on Delivery */}
-            {selectedMethod === "cod" && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-                <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                  <div className="w-10 h-10 rounded-xl bg-green-50 text-green-700 flex items-center justify-center shrink-0">
-                    <Banknote className="w-5 h-5" />
+                  <div
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      selectedPayment === "COD"
+                        ? "border-[#FF6A00] bg-white"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    {selectedPayment === "COD" && (
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#FF6A00]" />
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* GST Number / Business Invoice Details Card */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5 transition-all">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-gray-900">
-                      Cash on Delivery
+                    <h3 className="font-bold text-sm text-gray-900">
+                      Add GST Details (Tax Invoice)
                     </h3>
-                    <p className="text-xs text-gray-500">
-                      Pay cash or UPI after service completion
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Claim input tax credit by providing your business GSTIN
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-xl space-y-2 text-xs text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
-                    <span>No advance payment needed to book.</span>
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={addGst}
+                    onChange={(e) => setAddGst(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF6A00]" />
+                </label>
+              </div>
+
+              {addGst && (
+                <div className="pt-2 space-y-3 border-t border-gray-100 animate-fadeIn">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        GST Number (15 Digits)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={15}
+                        placeholder="e.g. 22AAAAA0000A1Z5"
+                        value={gstNo}
+                        onChange={(e) => handleGstChange(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm uppercase font-mono tracking-wider outline-none transition-colors ${
+                          gstError
+                            ? "border-red-400 bg-red-50/20 focus:border-red-500"
+                            : gstNo.length === 15 && !gstError
+                            ? "border-green-400 bg-green-50/20 focus:border-green-500"
+                            : "border-gray-300 focus:border-blue-500"
+                        }`}
+                      />
+                      {gstError && (
+                        <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>{gstError}</span>
+                        </p>
+                      )}
+                      {gstNo.length === 15 && !gstError && (
+                        <p className="text-[11px] text-green-700 mt-1 flex items-center gap-1 font-medium">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                          <span>Valid GSTIN format</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Business / Company Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TAS Enterprise"
+                        value={gstName}
+                        onChange={(e) => setGstName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-green-600 shrink-0" />
-                    <span>
-                      Pay via Cash or scanner UPI directly to our verified technician.
-                    </span>
+
+                  <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-2.5 flex items-center gap-2 text-[11px] text-amber-800 font-medium">
+                    <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Your tax invoice with GSTIN will be sent to your registered email upon booking confirmation.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Booking Details Review Card */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
+              <h3 className="font-bold text-sm text-gray-900 border-b border-gray-100 pb-2.5">
+                Service &amp; Delivery Review
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                {/* Service Address */}
+                <div className="flex items-start gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 shrink-0 mt-0.5">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">Service Address</p>
+                    <p className="text-gray-500 mt-0.5 leading-relaxed">
+                      {selectedAddress?.house_number || selectedAddress?.street
+                        ? `${selectedAddress?.house_number ? `${selectedAddress.house_number}, ` : ""}${selectedAddress?.street || ""}, ${selectedAddress?.city || "Raipur"}`
+                        : "Office No. 201, Altnis Corporate Park, Raipur"}
+                    </p>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => createBooking("COD")}
-                  disabled={loading}
-                  className="w-full py-3 bg-[#FF6A00] hover:bg-orange-600 active:scale-[0.99] text-white font-extrabold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  {loading ? (
-                    <span>Confirming Booking...</span>
-                  ) : (
-                    <span>
-                      Confirm Booking (₹{payableAmount.toLocaleString("en-IN")})
-                    </span>
-                  )}
-                </button>
+                {/* Scheduled Slot */}
+                <div className="flex items-start gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 shrink-0 mt-0.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">Scheduled Date &amp; Time</p>
+                    <p className="text-gray-500 mt-0.5 leading-relaxed">
+                      {bookingDateTime?.date || "Today"} • {bookingDateTime?.slotName || "Anytime (Standard Slot)"}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
 
-            {/* Trust and Guarantee Badge */}
-            <div className="mt-4 p-4 rounded-xl bg-white border border-gray-200 flex items-center justify-between gap-3 shadow-2xs">
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Lock className="w-4 h-4 text-green-600 shrink-0" />
-                <span>100% Safe &amp; Secure Payments with 256-Bit SSL</span>
-              </div>
-              <div className="flex items-center gap-1.5 opacity-70">
-                <img src="/icons/visa.svg" alt="Visa" className="h-4" />
-                <img
-                  src="/icons/mastercard.svg"
-                  alt="Mastercard"
-                  className="h-4"
-                />
-                <img src="/icons/rupay.svg" alt="RuPay" className="h-3.5" />
-              </div>
+              {/* Items List */}
+              {cartItems.length > 0 && (
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="font-bold text-gray-700 text-xs mb-2">Booked Services ({cartItems.length}):</p>
+                  <div className="space-y-1.5">
+                    {cartItems.map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center text-xs text-gray-600 bg-gray-50/60 p-2 rounded-lg">
+                        <span className="font-semibold text-gray-800 truncate pr-2">
+                          {item.name || "Home Service"} ({item.quantity || 1}x)
+                        </span>
+                        <span className="font-bold text-gray-900 shrink-0">
+                          ₹{(item.price || item.discountedPrice || 199) * (item.quantity || 1)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
           </div>
+
+          {/* RIGHT COLUMN: Amount Summary Card (Exact match to screenshot) */}
+          <div className="lg:col-span-5">
+            <div className="bg-[#FAF9F6]/80 sm:bg-gray-50/70 border border-gray-200/90 rounded-2xl p-5 sm:p-6 space-y-5 sticky top-24 shadow-xs">
+              
+              <h2 className="text-base font-bold text-gray-900">
+                Amount Summary
+              </h2>
+
+              <div className="space-y-3.5 text-sm">
+                
+                {/* Total Item */}
+                <div className="flex justify-between items-center text-gray-600">
+                  <span>Total Item ({cartItems.length || 1})</span>
+                  <span className="font-semibold text-gray-900">₹{totalMRP}</span>
+                </div>
+
+                {/* Total Discount */}
+                {totalDiscount > 0 && (
+                  <div className="flex justify-between items-center text-green-600 font-semibold">
+                    <span>Total Discount</span>
+                    <span>-₹{totalDiscount}</span>
+                  </div>
+                )}
+
+                {/* Coupon Discount */}
+                <div className={`flex justify-between items-center ${couponDiscount > 0 ? "text-green-600 font-bold" : "text-gray-500"}`}>
+                  <span>Coupon Discount {appliedCoupon ? `(${appliedCoupon.code})` : ""}</span>
+                  <span>{couponDiscount > 0 ? `-₹${couponDiscount}` : "₹0"}</span>
+                </div>
+
+                {/* GST Notice Breakdown */}
+                <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
+                  <span>Taxes (18% GST)</span>
+                  <span className="font-medium text-gray-700">Included in total</span>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-200 pt-3.5 flex justify-between items-baseline">
+                  <div>
+                    <span className="font-bold text-base text-gray-900">Total Amount</span>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      (Inclusive of all taxes &amp; GST)
+                    </p>
+                  </div>
+                  <span className="text-xl font-extrabold text-gray-900 tracking-tight">
+                    ₹{finalAmount}
+                  </span>
+                </div>
+
+              </div>
+
+              {/* Action Checkout Button */}
+              <button
+                disabled={loading}
+                onClick={handlePay}
+                className="w-full py-3.5 bg-[#FF6A00] hover:bg-[#F05A00] active:scale-[0.99] text-white font-extrabold rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {loading ? (
+                  <span>Processing...</span>
+                ) : (
+                  <span>
+                    Pay ₹{finalAmount}
+                  </span>
+                )}
+              </button>
+
+              {/* Safe & secure checkout + payment logos */}
+              <div className="flex flex-col items-center justify-center gap-2 pt-1 text-center">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                  <Lock className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Safe &amp; secure checkout</span>
+                </div>
+                
+                {/* Visual payment logos from public/grp.png with fallbacks */}
+                <div className="flex items-center justify-center gap-2 opacity-80 pt-1">
+                  <img
+                    src="/grp.png"
+                    alt="Payment Methods"
+                    className="h-4 object-contain"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <img
+                    src="/icons/visa.svg"
+                    alt="Visa"
+                    className="h-4"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <img
+                    src="/icons/mastercard.svg"
+                    alt="Mastercard"
+                    className="h-4"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <img
+                    src="/icons/rupay.svg"
+                    alt="RuPay"
+                    className="h-3.5"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              </div>
+
+            </div>
+
+            {/* Easy Cancellation & Verified Provider Trust Badge (Matching screenshot) */}
+            <div className="flex items-start gap-2.5 mt-3.5 px-2">
+              <img
+                src="/tick.png"
+                alt="Verified Service Provider"
+                className="w-5 h-5 shrink-0 object-contain mt-0.5"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = "none";
+                }}
+              />
+              <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+              <p className="text-xs font-medium text-gray-500 leading-snug">
+                Easy Cancellation/Returns, Background Verified Service Provider.
+              </p>
+            </div>
+
+          </div>
+
         </div>
+
       </main>
-
-      {/* Gift Card Modal */}
-      {showGiftModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 relative shadow-2xl">
-            <button
-              onClick={() => setShowGiftModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">
-              Add Gift Card
-            </h3>
-            <div className="space-y-3 mb-5">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Gift Card Number (16 Digits)
-                </label>
-                <input
-                  type="text"
-                  maxLength={19}
-                  placeholder="XXXX XXXX XXXX XXXX"
-                  value={giftCardNumber}
-                  onChange={(e) =>
-                    setGiftCardNumber(
-                      e.target.value
-                        .replace(/\D/g, "")
-                        .replace(/(\d{4})(?=\d)/g, "$1 "),
-                    )
-                  }
-                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm outline-none focus:border-blue-500 font-medium"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  6-Digit PIN
-                </label>
-                <input
-                  type="password"
-                  maxLength={6}
-                  placeholder="Enter 6-digit PIN"
-                  value={giftCardPin}
-                  onChange={(e) =>
-                    setGiftCardPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
-                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm outline-none focus:border-blue-500 font-medium tracking-widest"
-                />
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  giftCardNumber.replace(/\s/g, "").length === 16 &&
-                  giftCardPin.length === 6
-                ) {
-                  setGiftCardBalance((prev) => prev + 500);
-                  setApplyGiftCard(true);
-                  setShowGiftModal(false);
-                  Swal.fire({
-                    icon: "success",
-                    title: "Gift Card Added!",
-                    text: "₹500 added to your available gift card balance.",
-                    timer: 1500,
-                    showConfirmButton: false,
-                  });
-                } else {
-                  Swal.fire({
-                    icon: "error",
-                    title: "Invalid Details",
-                    text: "Please enter valid 16-digit card number and 6-digit PIN.",
-                    confirmButtonColor: "#ff5500",
-                  });
-                }
-              }}
-              className="w-full py-2.5 bg-[#FF6A00] hover:bg-orange-600 text-white font-bold rounded-xl text-xs sm:text-sm transition-all cursor-pointer"
-            >
-              Apply Gift Card
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
