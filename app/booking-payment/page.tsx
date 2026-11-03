@@ -22,6 +22,7 @@ import {
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
 import Swal from "sweetalert2";
+import { SelectDateTimeModal } from "@/components/booking-flow/SelectDateTimeModal";
 
 export default function CheckoutConfirmationPage() {
   const router = useRouter();
@@ -43,8 +44,32 @@ export default function CheckoutConfirmationPage() {
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [availableAddresses, setAvailableAddresses] = useState<any[]>([]);
   const [showAddressPicker, setShowAddressPicker] = useState(false);
+  const [showDateTimeModal, setShowDateTimeModal] = useState(false);
   const [bookingDateTime, setBookingDateTime] = useState<any>({});
   const [userData, setUserData] = useState<any>(null);
+
+  const handleDateTimeChange = (
+    date: string,
+    time: string,
+    notes: string,
+    slotId?: number
+  ) => {
+    const updated = {
+      date,
+      time,
+      slotName: time,
+      timeSlot: time,
+      slot_time: time,
+      notes,
+      slotId: Number(slotId || 1),
+    };
+    setBookingDateTime(updated);
+    try {
+      localStorage.setItem("bookingDateTime", JSON.stringify(updated));
+      localStorage.setItem("selectedSlotId", String(slotId || 1));
+    } catch (e) {}
+    setShowDateTimeModal(false);
+  };
 
   // Standard Indian GST regex (15 chars)
   const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -713,8 +738,18 @@ export default function CheckoutConfirmationPage() {
                   </div>
                 </div>
 
-                <div className="w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center shrink-0">
-                  <Check className="w-3 h-3 stroke-[3]" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDateTimeModal(true)}
+                    className="text-xs font-bold text-[#FF6A00] hover:text-orange-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Change</span>
+                  </button>
+                  <div className="w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
                 </div>
               </div>
 
@@ -734,7 +769,12 @@ export default function CheckoutConfirmationPage() {
                   <div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Time Slot</p>
                     <p className="font-bold text-sm text-gray-900 mt-0.5">
-                      {bookingDateTime?.slotName || "Anytime (Standard Slot)"}
+                      {bookingDateTime?.time ||
+                        bookingDateTime?.slotName ||
+                        bookingDateTime?.timeSlot ||
+                        bookingDateTime?.slot_time ||
+                        bookingDateTime?.slot ||
+                        "Anytime (Standard Slot)"}
                     </p>
                   </div>
                 </div>
@@ -998,6 +1038,16 @@ export default function CheckoutConfirmationPage() {
           </div>
 
         </div>
+
+        {/* Date Time Selection Modal for changing slot */}
+        <SelectDateTimeModal
+          isOpen={showDateTimeModal}
+          onClose={() => setShowDateTimeModal(false)}
+          onContinue={handleDateTimeChange}
+          serviceId={
+            cartItems?.[0]?.service_id || cartItems?.[0]?.serviceId || 1
+          }
+        />
 
       </main>
     </div>

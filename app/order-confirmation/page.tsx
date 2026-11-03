@@ -222,7 +222,12 @@ function OrderConfirmationContent() {
             month: "short",
             year: "numeric",
           });
-          const timeStr = dt.time || "09:00 AM";
+          const timeStr =
+            dt.time ||
+            dt.timeSlot ||
+            dt.slotName ||
+            dt.slot_time ||
+            "09:00 AM";
 
           const custAddr = parsed.selectedAddress || {};
           const fullAddr = [

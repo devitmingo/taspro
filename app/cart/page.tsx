@@ -726,10 +726,17 @@ export default function CartPage() {
     notes: string,
     slotId?: number,
   ) => {
-    localStorage.setItem(
-      "bookingDateTime",
-      JSON.stringify({ date, time, notes, slotId }),
-    );
+    const data = {
+      date,
+      time,
+      slotName: time,
+      timeSlot: time,
+      slot_time: time,
+      notes,
+      slotId: Number(slotId || 1),
+    };
+    localStorage.setItem("bookingDateTime", JSON.stringify(data));
+    localStorage.setItem("selectedSlotId", String(slotId || 1));
 
     setShowDateTimeModal(false);
     // After time slot selected, open Terms & Conditions modal
