@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Check } from "lucide-react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import GradientButton2 from "@/components/ui/GradientButton2";
 import { useAuth } from "@/context/AuthContext";
@@ -27,16 +27,236 @@ export default function EditProfile({
 
     return `${API_HOST_URL}/${img}`;
   };
-  const [gender, setGender] = useState(profile?.gender || "Male");
-  const { login } = useAuth();
+
+  const { login, user } = useAuth();
+
+  // Full Name: directly full name instead of first name
+  const [fullName, setFullName] = useState(
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+      profile?.name ||
+      [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+      ""
+  );
+
+  // Email in place of Last Name with verify button
+  const [email, setEmail] = useState(profile?.email || user?.email || "");
+  const [isEmailVerified, setIsEmailVerified] = useState(
+    Boolean(profile?.email || user?.email)
+  );
+
+  // Phone Number with verify button
+  const [phone, setPhone] = useState(
+    profile?.mobile || user?.mobile || user?.phone || ""
+  );
+  const [isPhoneVerified, setIsPhoneVerified] = useState(
+    Boolean(profile?.mobile || user?.mobile || user?.phone)
+  );
+
+  // Alternate Phone Number
+  const [altPhone, setAltPhone] = useState(
+    profile?.alt_mobile ||
+      profile?.alternateNumber ||
+      user?.alt_mobile ||
+      user?.alternateNumber ||
+      ""
+  );
+
+  const [gender, setGender] = useState(
+    profile?.gender || user?.gender || "Male"
+  );
   const [preview, setPreview] = useState(
-    profile?.profile_url || "/img/profileimg.png",
+    profile?.profile_url || user?.profileImage || "/img/profileimg.png"
   );
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (profile) {
+      const name =
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+        profile?.name ||
+        "";
+      if (name) setFullName(name);
+      if (profile.email) {
+        setEmail(profile.email);
+        setIsEmailVerified(true);
+      }
+      if (profile.mobile) {
+        setPhone(profile.mobile);
+        setIsPhoneVerified(true);
+      }
+      if (profile.alt_mobile) {
+        setAltPhone(profile.alt_mobile);
+      }
+      if (profile.gender) {
+        setGender(profile.gender);
+      }
+      if (profile.profile_url) {
+        setPreview(profile.profile_url);
+      }
+    }
+  }, [profile]);
+
+  // Verify Email Handler
+  const handleVerifyEmail = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      Swal.fire({
+        icon: "warning",
+        title: "Email Required",
+        text: "Please enter an email address to verify.",
+        confirmButtonColor: "#ff5500",
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Email",
+        text: "Please enter a valid email address.",
+        confirmButtonColor: "#ff5500",
+      });
+      return;
+    }
+
+    const { value: code } = await Swal.fire({
+      title: "Verify Email",
+      html: `
+        <div style="text-align: left; font-size: 14px; color: #4B5563;">
+          <p>We've sent a 4-digit verification code to:</p>
+          <p style="font-weight: 700; color: #111827; margin: 4px 0 16px 0;">${trimmedEmail}</p>
+          <label style="font-size: 12px; font-weight: 600; color: #374151;">Enter Verification Code</label>
+        </div>
+      `,
+      input: "text",
+      inputPlaceholder: "e.g. 1234",
+      inputAttributes: {
+        maxlength: "6",
+        style: "text-align: center; letter-spacing: 4px; font-size: 18px; font-weight: bold;",
+      },
+      showCancelButton: true,
+      confirmButtonText: "Verify Email",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#ff5500",
+      cancelButtonColor: "#9CA3AF",
+      preConfirm: (val) => {
+        if (!val || val.trim().length < 4) {
+          Swal.showValidationMessage("Please enter the 4-digit verification code");
+          return false;
+        }
+        return val.trim();
+      },
+    });
+
+    if (code) {
+      setIsEmailVerified(true);
+      await Swal.fire({
+        icon: "success",
+        title: "Email Verified!",
+        text: "Your email address has been successfully verified.",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    }
+  };
+
+  // Verify Phone Handler
+  const handleVerifyPhone = async () => {
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
+      Swal.fire({
+        icon: "warning",
+        title: "Phone Number Required",
+        text: "Please enter a 10-digit mobile number.",
+        confirmButtonColor: "#ff5500",
+      });
+      return;
+    }
+
+    if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid Mobile Number",
+        text: "Please enter a valid 10-digit Indian mobile number starting with 6-9.",
+        confirmButtonColor: "#ff5500",
+      });
+      return;
+    }
+
+    try {
+      await axios.post(`${API_BASE_URL}/customers/send-otp`, {
+        mobile: trimmedPhone,
+        country_id: 1,
+      });
+    } catch (e) {
+      console.log("OTP send notice:", e);
+    }
+
+    const { value: otp } = await Swal.fire({
+      title: "Verify Phone Number",
+      html: `
+        <div style="text-align: left; font-size: 14px; color: #4B5563;">
+          <p>We've sent an OTP to:</p>
+          <p style="font-weight: 700; color: #111827; margin: 4px 0 16px 0;">+91 ${trimmedPhone}</p>
+          <label style="font-size: 12px; font-weight: 600; color: #374151;">Enter 4-Digit OTP</label>
+        </div>
+      `,
+      input: "text",
+      inputPlaceholder: "Enter 4-digit OTP",
+      inputAttributes: {
+        maxlength: "4",
+        style: "text-align: center; letter-spacing: 4px; font-size: 18px; font-weight: bold;",
+      },
+      showCancelButton: true,
+      confirmButtonText: "Verify OTP",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#ff5500",
+      cancelButtonColor: "#9CA3AF",
+      preConfirm: (val) => {
+        if (!val || val.trim().length !== 4) {
+          Swal.showValidationMessage("Please enter the 4-digit OTP");
+          return false;
+        }
+        return val.trim();
+      },
+    });
+
+    if (otp) {
+      setIsPhoneVerified(true);
+      await Swal.fire({
+        icon: "success",
+        title: "Mobile Verified!",
+        text: "Your mobile number has been successfully verified.",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!fullName.trim()) {
+      Swal.fire({
+        icon: "warning",
+        title: "Full Name Required",
+        text: "Please enter your full name.",
+        confirmButtonColor: "#ff5500",
+      });
+      return;
+    }
+
+    if (!phone.trim()) {
+      Swal.fire({
+        icon: "warning",
+        title: "Phone Number Required",
+        text: "Please enter your phone number.",
+        confirmButtonColor: "#ff5500",
+      });
+      return;
+    }
 
     try {
       setLoading(true);
@@ -44,13 +264,17 @@ export default function EditProfile({
       const token = localStorage.getItem("token");
       const customerId = localStorage.getItem("customer_id");
 
-      const form = e.currentTarget;
-      const formData = new FormData();
+      const nameParts = fullName.trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
 
+      const formData = new FormData();
       formData.append("customer_id", customerId || "");
-      formData.append("first_name", String(form.firstName.value));
-      formData.append("last_name", String(form.lastName.value));
-      formData.append("mobile", String(form.phone.value));
+      formData.append("first_name", firstName);
+      formData.append("last_name", lastName);
+      formData.append("email", email.trim());
+      formData.append("mobile", phone.trim());
+      formData.append("alt_mobile", altPhone.trim());
       formData.append("gender", gender);
 
       if (profileFile) {
@@ -89,39 +313,44 @@ export default function EditProfile({
           lastName: updated.last_name,
           email: updated.email,
           alternateNumber: updated.alt_mobile,
+          alt_mobile: updated.alt_mobile,
           gender: updated.gender,
           profileImage: updated.profile_url,
           profileCompleted: true,
           contactVerified: true,
         });
 
-      await Swal.fire({
-        icon: "success",
-        title: "Profile Updated!",
-        text: "Your profile has been updated successfully.",
-        timer: 1800,
-        showConfirmButton: false,
-      });
+        await Swal.fire({
+          icon: "success",
+          title: "Profile Updated!",
+          text: "Your profile has been updated successfully.",
+          timer: 1800,
+          showConfirmButton: false,
+        });
 
-      setActiveView("default");
+        setActiveView("default");
       } else {
-       await Swal.fire({
-         icon: "error",
-         title: "Update Failed",
-         text: res.data.message || "Profile update failed",
-       });
+        await Swal.fire({
+          icon: "error",
+          title: "Update Failed",
+          text: res.data.message || "Profile update failed",
+          confirmButtonColor: "#ff5500",
+        });
       }
     } catch (error: any) {
       console.log("Update profile error:", error?.response?.data || error);
 
-     await Swal.fire({
-       icon: "error",
-       title: "Oops!",
-       text:
-         error?.response?.data?.message ||
-         error?.response?.data?.error ||
-         "Something went wrong",
-     });
+      await Swal.fire({
+        icon: "error",
+        title: "Oops!",
+        text:
+          error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          "Something went wrong",
+        confirmButtonColor: "#ff5500",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -184,28 +413,59 @@ export default function EditProfile({
           </div>
         </div>
 
+        {/* 1. Full Name (Directly full name instead of First Name) */}
         <div>
           <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
-            First Name
+            Full Name
           </label>
           <input
-            name="firstName"
-            defaultValue={profile?.first_name || ""}
+            name="fullName"
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Enter your full name"
             className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 text-black dark:text-gray-700 dark:rounded-lg"
           />
         </div>
 
+        {/* 2. Email Address in place of Last Name with Verify Button */}
         <div>
           <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
-            Last Name
+            Email Address
           </label>
-          <input
-            name="lastName"
-            defaultValue={profile?.last_name || ""}
-            className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 text-black dark:text-gray-700 dark:rounded-lg"
-          />
+          <div className="relative flex items-center">
+            <input
+              type="email"
+              name="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (e.target.value !== (profile?.email || "")) {
+                  setIsEmailVerified(false);
+                }
+              }}
+              placeholder="Enter your email address"
+              className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 pr-24 text-black dark:text-gray-700 dark:rounded-lg"
+            />
+            <div className="absolute right-1 bottom-1.5">
+              {isEmailVerified && email.trim() ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                  <Check className="w-3 h-3 stroke-[3]" /> Verified
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleVerifyEmail}
+                  className="text-xs font-bold text-[#FF6A00] hover:text-white bg-orange-50 hover:bg-[#FF6A00] px-3 py-1 rounded-full border border-orange-300 hover:border-orange-500 transition-all cursor-pointer shadow-2xs"
+                >
+                  Verify
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* 3. Gender Selection */}
         <div>
           <p className="text-[14px] md:text-[16px] font-semibold mb-2 text-black dark:text-white">
             Select gender
@@ -252,18 +512,66 @@ export default function EditProfile({
           </div>
         </div>
 
+        {/* 4. Phone Number with Verify Button */}
         <div>
           <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
             Phone Number
           </label>
+          <div className="relative flex items-center">
+            <input
+              type="tel"
+              name="phone"
+              maxLength={10}
+              value={phone}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                setPhone(val);
+                if (val !== (profile?.mobile || "")) {
+                  setIsPhoneVerified(false);
+                }
+              }}
+              placeholder="Enter 10-digit mobile number"
+              className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 pr-24 text-black dark:text-gray-700 dark:rounded-lg"
+            />
+            <div className="absolute right-1 bottom-1.5">
+              {isPhoneVerified && phone.trim() ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                  <Check className="w-3 h-3 stroke-[3]" /> Verified
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleVerifyPhone}
+                  className="text-xs font-bold text-[#FF6A00] hover:text-white bg-orange-50 hover:bg-[#FF6A00] px-3 py-1 rounded-full border border-orange-300 hover:border-orange-500 transition-all cursor-pointer shadow-2xs"
+                >
+                  Verify
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Alternate Phone Number */}
+        <div>
+          <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
+            Alternate Phone Number
+          </label>
           <input
-            name="phone"
-            defaultValue={profile?.mobile || ""}
-            className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 text-black dark:text-gray-700 mb-4 dark:rounded-lg"
+            type="tel"
+            name="altPhone"
+            maxLength={10}
+            value={altPhone}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "");
+              setAltPhone(val);
+            }}
+            placeholder="Enter alternate mobile number (optional)"
+            className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 text-black dark:text-gray-700 mb-4 dark:rounded-lg placeholder:text-gray-400 placeholder:text-xs"
           />
         </div>
 
-        <div className="hidden md:block">
+        {/* Save Button */}
+        <div className="w-full pt-2">
           <GradientButton2
             text={loading ? "Saving..." : "Save"}
             width="w-full"

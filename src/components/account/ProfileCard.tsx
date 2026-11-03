@@ -16,7 +16,7 @@ export default function ProfileCard({ profile }: { profile: any }) {
       />
 
       <h4 className="font-semibold text-[#0A0F0D] dark:text-white text-[16px]">
-        {profile?.first_name || "User"}
+        {[profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.name || "User"}
       </h4>
 
       <p className="text-[#808080] text-[14px] dark:text-gray-200">
