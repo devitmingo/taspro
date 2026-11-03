@@ -19,14 +19,16 @@ import MyReviews from "@/components/account/MyReviews";
 import MyCoupon from "@/components/account/MyCoupon";
 import Payment from "@/components/account/Payment";
 import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
-import { House, Wrench, ClipboardList, UserRound } from "lucide-react";
+import { House, Wrench, ClipboardList, UserRound, Trash2 } from "lucide-react";
 import Breadcrumb from "@/components/account/Breadcrumb";
+import Swal from "sweetalert2";
 
 export default function AccountContent() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [activeView, setActiveView] = useState("default");
   const [profile, setProfile] = useState<any>(null);
   const searchParams = useSearchParams();
@@ -60,6 +62,92 @@ export default function AccountContent() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  const handleLogout = () => {
+    Swal.fire({
+      title: "Logout?",
+      text: "Are you sure you want to log out of your account?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#ff5500",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, Logout",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const token = localStorage.getItem("token");
+          if (token) {
+            await axios.get(`${API_BASE_URL}/customers/logout`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            });
+          }
+        } catch (e) {}
+
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        logout();
+        router.push("/");
+      }
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    Swal.fire({
+      title: "Delete Account?",
+      html: `
+        <div class="text-left text-sm text-gray-600 space-y-2.5">
+          <p class="font-medium text-gray-800">Are you sure you want to permanently delete your account?</p>
+          <div class="bg-red-50 p-3 rounded-xl border border-red-200 text-xs text-red-700 space-y-1">
+            <p><strong>Warning:</strong> This action cannot be undone.</p>
+            <p>• Your profile, saved addresses and preferences will be erased.</p>
+            <p>• Any remaining wallet balance will be forfeited.</p>
+          </div>
+        </div>
+      `,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, Delete Account",
+      cancelButtonText: "Keep Account",
+      reverseButtons: true,
+      focusCancel: true,
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const token = localStorage.getItem("token");
+          if (token) {
+            await axios.delete(`${API_BASE_URL}/customers/delete-account`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            });
+          }
+        } catch (e) {
+          console.error("Delete account error:", e);
+        }
+
+        // Clear local storage and log out
+        localStorage.clear();
+        logout();
+
+        Swal.fire({
+          icon: "success",
+          title: "Account Deleted",
+          text: "Your account has been deleted successfully.",
+          confirmButtonColor: "#ff5500",
+        }).then(() => {
+          router.push("/");
+        });
+      }
+    });
+  };
 
   const getBreadcrumbs = () => {
     const base = [{ label: "Home", href: "/" }];
@@ -144,14 +232,24 @@ return (
       )}
     </div>
 
-    {/* Logout Button */}
+    {/* Logout & Delete Account Action Buttons */}
     {activeView === "default" && (
-      <div className="md:mt-10 flex justify-start lg:ml-12">
+      <div className="mt-8 flex flex-col gap-3 justify-start lg:ml-12 w-full max-w-[390px] px-4 lg:px-0">
         <GradientButton
           text="Logout"
-          width="w-full max-w-[390px]"
-          textClassName="text-[20px] font-medium"
+          width="w-full"
+          textClassName="text-[18px] md:text-[20px] font-medium"
+          onClick={handleLogout}
         />
+
+        <button
+          type="button"
+          onClick={handleDeleteAccount}
+          className="w-full h-[40px] sm:h-[44px] rounded-lg border border-red-300 hover:border-red-500 bg-white hover:bg-red-50/70 text-red-600 font-semibold text-sm sm:text-base flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs group"
+        >
+          <Trash2 className="w-4 h-4 text-red-500 group-hover:scale-110 transition-transform" />
+          <span>Delete Account</span>
+        </button>
       </div>
     )}
 
