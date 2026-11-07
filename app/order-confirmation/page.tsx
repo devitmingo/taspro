@@ -524,7 +524,7 @@ function OrderConfirmationContent() {
                 <img
                   src={
                     bookingData?.serviceImage ||
-                    "http://127.0.0.1:8000/storage/services/1786680357_6330.png"
+                    "https://app.tasprocompany.in/storage/services/1786680357_6330.png"
                   }
                   alt="Service"
                   className="w-full h-full object-cover"

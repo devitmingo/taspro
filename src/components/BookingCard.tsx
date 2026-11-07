@@ -1,4 +1,7 @@
-import { Star } from "lucide-react";
+"use client";
+
+import React from "react";
+import { Star, Calendar, Clock, MessageSquare, Phone, ChevronRight, ShieldCheck } from "lucide-react";
 import SafeImage from "@/components/SafeImage";
 
 interface BookingCardProps {
@@ -15,6 +18,7 @@ interface BookingCardProps {
   onChat?: () => void;
   isCompleted?: boolean;
 }
+
 const BookingCard: React.FC<BookingCardProps> = ({
   service,
   subtitle,
@@ -29,120 +33,135 @@ const BookingCard: React.FC<BookingCardProps> = ({
   onChat,
   isCompleted = false,
 }) => {
+  const normStatus = (status || "").toLowerCase();
+
+  const getStatusBadge = () => {
+    if (normStatus === "completed") {
+      return "bg-green-50 text-green-700 border border-green-200/80";
+    }
+    if (normStatus === "rejected" || normStatus === "cancelled") {
+      return "bg-red-50 text-red-700 border border-red-200/80";
+    }
+    if (normStatus === "in progress" || normStatus === "assigned" || normStatus === "visit only") {
+      return "bg-blue-50 text-blue-700 border border-blue-200/80";
+    }
+    if (normStatus === "rescheduled") {
+      return "bg-purple-50 text-purple-700 border border-purple-200/80";
+    }
+    return "bg-amber-50 text-amber-800 border border-amber-200/80";
+  };
+
   return (
     <div
       onClick={onViewDetails}
-      className="bg-white rounded-xl border border-gray-100 shadow-lg p-4 sm:p-5 flex flex-col gap-4 hover:shadow-md transition cursor-pointer"
+      className="bg-white rounded-2xl border border-gray-200/90 hover:border-orange-200 p-4 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between gap-3.5 sm:gap-4 cursor-pointer group w-full min-w-0 overflow-hidden"
     >
-      {/* TOP SECTION */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        {/* LEFT */}
-        <div className="flex gap-3 w-full">
-          {/* IMAGE */}
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-2 border border-gray-100 flex-shrink-0">
+      {/* Top Header: Service Image, Title, Status & Actions */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3.5 min-w-0">
+          {/* Square Image with Curved Corners */}
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-orange-50/40 border border-orange-100 flex items-center justify-center p-2 shrink-0 aspect-square group-hover:scale-105 transition-transform">
             <SafeImage
               src={serviceImage || "/10.svg"}
               alt={service}
-              width={56}
-              height={56}
+              width={64}
+              height={64}
               fallbackSrc="/tas.logo.png"
               className="w-full h-full object-contain"
             />
           </div>
 
-          {/* TEXT */}
-          <div className="flex flex-col flex-1">
-            {/* SERVICE TITLE */}
-            <h3 className="font-semibold text-gray-900 text-[clamp(14px,1.5vw,18px)] leading-tight">
+          <div className="min-w-0 space-y-1">
+            <h3 className="font-bold text-gray-900 text-sm sm:text-base leading-snug line-clamp-1 group-hover:text-[#FF6A00] transition-colors">
               {service}
             </h3>
-
-            {/* SUBTITLE */}
-            <p className="text-gray-500 text-[clamp(12px,1.2vw,14px)]">
-              {subtitle}
+            <p className="text-xs text-gray-400 line-clamp-1">
+              {subtitle || "Professional Home Service"}
             </p>
 
-            {/* RATING */}
-            <div className="flex items-center gap-2 mt-1 text-[clamp(11px,1vw,13px)] text-gray-600">
-              <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-orange-400 text-orange-400" />
-              <span>{rating}</span>
-              <span className="text-gray-400 whitespace-nowrap">
-                | {reviews} reviews
-              </span>
-            </div>
+            {rating !== undefined && (
+              <div className="flex items-center gap-1.5 text-xs text-gray-600 pt-0.5">
+                <span className="flex items-center gap-1 font-bold text-amber-500 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/60">
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                  <span>{rating || 5.0}</span>
+                </span>
+                {reviews !== undefined && (
+                  <span className="text-gray-400 text-[11px]">
+                    ({reviews} reviews)
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* RIGHT */}
-        <div className="flex sm:flex-col justify-between sm:items-end items-center gap-3 w-full sm:w-auto">
-          {/* STATUS */}
+        {/* Right: Status Pill & Call/Chat Actions */}
+        <div className="flex flex-col items-end gap-2 shrink-0">
           <span
-            className={`text-[clamp(11px,1vw,13px)] px-2.5 sm:px-3 py-1 rounded-md font-semibold tracking-wide ${
-              status?.toLowerCase() === "rescheduled"
-                ? "bg-amber-100 text-amber-800 border border-amber-300"
-                : status?.toLowerCase() === "completed"
-                ? "bg-green-100 text-green-700"
-                : status?.toLowerCase() === "rejected" || status?.toLowerCase() === "cancelled"
-                ? "bg-red-100 text-red-700"
-                : status?.toLowerCase() === "assigned" || status?.toLowerCase() === "in progress" || status?.toLowerCase() === "visit only"
-                ? "bg-blue-100 text-blue-700"
-                : "bg-orange-100 text-orange-600"
-            }`}
+            className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${getStatusBadge()}`}
           >
-            {status}
+            {status || "Pending"}
           </span>
 
-          {/* ACTIONS */}
-          <div className="flex gap-3">
-            <img
-              src="/chat.png"
-              alt="chat"
-              className="w-4 h-4 sm:w-5 sm:h-5 cursor-pointer"
+          <div className="flex items-center gap-1.5 pt-1">
+            <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onChat?.();
               }}
-            />
-            <img
-              src="/call.png"
-              alt="call"
-              className="w-4 h-4 sm:w-5 sm:h-5 cursor-pointer"
-              onClick={(e) => e.stopPropagation()}
-            />
+              className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-orange-50 text-gray-500 hover:text-[#FF6A00] border border-gray-200/70 flex items-center justify-center transition-colors cursor-pointer"
+              title="Chat regarding booking"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open("tel:7447000045");
+              }}
+              className="w-8 h-8 rounded-xl bg-gray-50 hover:bg-green-50 text-gray-500 hover:text-green-600 border border-gray-200/70 flex items-center justify-center transition-colors cursor-pointer"
+              title="Call Helpline: 7447-0000-45"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* DIVIDER */}
-      <div className="border-t border-gray-100"></div>
+      {/* Date & Time Row */}
+      <div className="pt-3 border-t border-dashed border-gray-100 flex items-center justify-between text-xs text-gray-600 flex-wrap gap-2">
+        <div className="flex items-center gap-1.5 text-gray-500 min-w-0 flex-1 truncate">
+          <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <span className="font-semibold text-gray-800 font-mono text-[11px] sm:text-xs truncate">
+            {date || "Scheduled Date"}
+          </span>
+          {time && (
+            <>
+              <span className="text-gray-300">•</span>
+              <span className="font-medium text-gray-600 text-[11px] sm:text-xs truncate">{time}</span>
+            </>
+          )}
+        </div>
 
-      {/* DATE & TIME */}
-      <div className="flex justify-between text-[clamp(11px,1vw,13px)] text-gray-600">
-        <span className="text-gray-400 whitespace-nowrap">Date & Time</span>
-        <span className="font-medium text-gray-800 text-right whitespace-nowrap">
-          {date} | {time}
+        <span className="text-[11px] font-bold text-[#FF6A00] flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform shrink-0">
+          <span>Details</span>
+          <ChevronRight className="w-3.5 h-3.5" />
         </span>
       </div>
 
-      {/* COMPLETED */}
+      {/* Completed Warranty Pill or Rework */}
       {isCompleted && (
-        <>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-[clamp(12px,1.2vw,14px)]">
-            <span className="text-gray-400">Warranty</span>
-            <span className="bg-orange-100 text-orange-600 px-3 py-2 rounded-md text-[clamp(11px,1vw,13px)] font-medium">
-              30 Days Remaining
-            </span>
-          </div>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            className="w-full py-2 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-medium text-[clamp(13px,1.2vw,15px)] shadow-md hover:opacity-90 transition"
-          >
-            Create Rework
-          </button>
-        </>
+        <div className="pt-1 flex items-center justify-between text-xs bg-green-50/60 p-2.5 rounded-xl border border-green-200/60">
+          <span className="text-green-800 font-medium flex items-center gap-1 text-[11px]">
+            <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
+            <span>30 Days Free Warranty Active</span>
+          </span>
+          <span className="text-xs font-bold text-green-700 underline">
+            Rework Policy
+          </span>
+        </div>
       )}
     </div>
   );

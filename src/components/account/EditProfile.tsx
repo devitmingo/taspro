@@ -1,10 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowLeft, Check } from "lucide-react";
+import {
+  ArrowLeft,
+  Camera,
+  Check,
+  User,
+  Mail,
+  Phone,
+  Smartphone,
+  ShieldCheck,
+  AlertCircle,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import GradientButton2 from "@/components/ui/GradientButton2";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL, API_HOST_URL } from "@/config/api";
 import Swal from "sweetalert2";
@@ -18,19 +27,25 @@ export default function EditProfile({
   profile: any;
   fetchProfile: () => void;
 }) {
+  const { login, user } = useAuth();
+
   const getImageUrl = (img?: string) => {
     if (!img) return "/img/profileimg.png";
-
     if (img.startsWith("http") || img.startsWith("/")) {
       return img;
     }
-
     return `${API_HOST_URL}/${img}`;
   };
 
-  const { login, user } = useAuth();
+  // Initial values to detect if user changed their phone or email
+  const [initialPhone, setInitialPhone] = useState(
+    profile?.mobile || user?.mobile || user?.phone || ""
+  );
+  const [initialEmail, setInitialEmail] = useState(
+    profile?.email || user?.email || ""
+  );
 
-  // Full Name: directly full name instead of first name
+  // Full Name
   const [fullName, setFullName] = useState(
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
       profile?.name ||
@@ -38,13 +53,13 @@ export default function EditProfile({
       ""
   );
 
-  // Email in place of Last Name with verify button
+  // Email
   const [email, setEmail] = useState(profile?.email || user?.email || "");
   const [isEmailVerified, setIsEmailVerified] = useState(
     Boolean(profile?.email || user?.email)
   );
 
-  // Phone Number with verify button
+  // Phone Number
   const [phone, setPhone] = useState(
     profile?.mobile || user?.mobile || user?.phone || ""
   );
@@ -61,9 +76,12 @@ export default function EditProfile({
       ""
   );
 
+  // Gender: clean values: "Male" | "Female" | "Other"
   const [gender, setGender] = useState(
     profile?.gender || user?.gender || "Male"
   );
+
+  // Profile image preview
   const [preview, setPreview] = useState(
     profile?.profile_url || user?.profileImage || "/img/profileimg.png"
   );
@@ -77,12 +95,15 @@ export default function EditProfile({
         profile?.name ||
         "";
       if (name) setFullName(name);
+
       if (profile.email) {
         setEmail(profile.email);
+        setInitialEmail(profile.email);
         setIsEmailVerified(true);
       }
       if (profile.mobile) {
         setPhone(profile.mobile);
+        setInitialPhone(profile.mobile);
         setIsPhoneVerified(true);
       }
       if (profile.alt_mobile) {
@@ -105,9 +126,9 @@ export default function EditProfile({
         icon: "warning",
         title: "Email Required",
         text: "Please enter an email address to verify.",
-        confirmButtonColor: "#ff5500",
+        confirmButtonColor: "#ff6a00",
       });
-      return;
+      return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -116,30 +137,30 @@ export default function EditProfile({
         icon: "warning",
         title: "Invalid Email",
         text: "Please enter a valid email address.",
-        confirmButtonColor: "#ff5500",
+        confirmButtonColor: "#ff6a00",
       });
-      return;
+      return false;
     }
 
     const { value: code } = await Swal.fire({
-      title: "Verify Email",
+      title: "Verify Email Address",
       html: `
         <div style="text-align: left; font-size: 14px; color: #4B5563;">
           <p>We've sent a 4-digit verification code to:</p>
-          <p style="font-weight: 700; color: #111827; margin: 4px 0 16px 0;">${trimmedEmail}</p>
+          <p style="font-weight: 700; color: #111827; margin: 4px 0 16px 0; font-size: 15px;">${trimmedEmail}</p>
           <label style="font-size: 12px; font-weight: 600; color: #374151;">Enter Verification Code</label>
         </div>
       `,
       input: "text",
-      inputPlaceholder: "e.g. 1234",
+      inputPlaceholder: "••••",
       inputAttributes: {
         maxlength: "6",
-        style: "text-align: center; letter-spacing: 4px; font-size: 18px; font-weight: bold;",
+        style: "text-align: center; letter-spacing: 6px; font-size: 20px; font-weight: bold;",
       },
       showCancelButton: true,
       confirmButtonText: "Verify Email",
       cancelButtonText: "Cancel",
-      confirmButtonColor: "#ff5500",
+      confirmButtonColor: "#ff6a00",
       cancelButtonColor: "#9CA3AF",
       preConfirm: (val) => {
         if (!val || val.trim().length < 4) {
@@ -159,10 +180,12 @@ export default function EditProfile({
         timer: 1800,
         showConfirmButton: false,
       });
+      return true;
     }
+    return false;
   };
 
-  // Verify Phone Handler
+  // Verify Phone Handler with OTP
   const handleVerifyPhone = async () => {
     const trimmedPhone = phone.trim();
     if (!trimmedPhone) {
@@ -170,9 +193,9 @@ export default function EditProfile({
         icon: "warning",
         title: "Phone Number Required",
         text: "Please enter a 10-digit mobile number.",
-        confirmButtonColor: "#ff5500",
+        confirmButtonColor: "#ff6a00",
       });
-      return;
+      return false;
     }
 
     if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
@@ -180,9 +203,9 @@ export default function EditProfile({
         icon: "warning",
         title: "Invalid Mobile Number",
         text: "Please enter a valid 10-digit Indian mobile number starting with 6-9.",
-        confirmButtonColor: "#ff5500",
+        confirmButtonColor: "#ff6a00",
       });
-      return;
+      return false;
     }
 
     try {
@@ -198,21 +221,21 @@ export default function EditProfile({
       title: "Verify Phone Number",
       html: `
         <div style="text-align: left; font-size: 14px; color: #4B5563;">
-          <p>We've sent an OTP to:</p>
-          <p style="font-weight: 700; color: #111827; margin: 4px 0 16px 0;">+91 ${trimmedPhone}</p>
+          <p>We've sent a 4-digit verification OTP to:</p>
+          <p style="font-weight: 700; color: #111827; margin: 4px 0 16px 0; font-size: 16px;">+91 ${trimmedPhone}</p>
           <label style="font-size: 12px; font-weight: 600; color: #374151;">Enter 4-Digit OTP</label>
         </div>
       `,
       input: "text",
-      inputPlaceholder: "Enter 4-digit OTP",
+      inputPlaceholder: "••••",
       inputAttributes: {
         maxlength: "4",
-        style: "text-align: center; letter-spacing: 4px; font-size: 18px; font-weight: bold;",
+        style: "text-align: center; letter-spacing: 6px; font-size: 20px; font-weight: bold;",
       },
       showCancelButton: true,
       confirmButtonText: "Verify OTP",
       cancelButtonText: "Cancel",
-      confirmButtonColor: "#ff5500",
+      confirmButtonColor: "#ff6a00",
       cancelButtonColor: "#9CA3AF",
       preConfirm: (val) => {
         if (!val || val.trim().length !== 4) {
@@ -232,7 +255,9 @@ export default function EditProfile({
         timer: 1800,
         showConfirmButton: false,
       });
+      return true;
     }
+    return false;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -243,7 +268,7 @@ export default function EditProfile({
         icon: "warning",
         title: "Full Name Required",
         text: "Please enter your full name.",
-        confirmButtonColor: "#ff5500",
+        confirmButtonColor: "#ff6a00",
       });
       return;
     }
@@ -253,9 +278,51 @@ export default function EditProfile({
         icon: "warning",
         title: "Phone Number Required",
         text: "Please enter your phone number.",
-        confirmButtonColor: "#ff5500",
+        confirmButtonColor: "#ff6a00",
       });
       return;
+    }
+
+    // OTP verification required if phone changed
+    if (phone.trim() !== initialPhone && !isPhoneVerified) {
+      const result = await Swal.fire({
+        icon: "info",
+        title: "OTP Verification Required",
+        text: `You have changed your phone number to +91 ${phone.trim()}. Please verify with OTP before saving.`,
+        showCancelButton: true,
+        confirmButtonText: "Send & Verify OTP",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#ff6a00",
+      });
+      if (result.isConfirmed) {
+        const verified = await handleVerifyPhone();
+        if (!verified) return;
+      } else {
+        return;
+      }
+    }
+
+    // Verification required if email changed
+    if (
+      email.trim() &&
+      email.trim().toLowerCase() !== initialEmail.trim().toLowerCase() &&
+      !isEmailVerified
+    ) {
+      const result = await Swal.fire({
+        icon: "info",
+        title: "Email Verification Required",
+        text: `You have changed your email to ${email.trim()}. Please verify it before saving.`,
+        showCancelButton: true,
+        confirmButtonText: "Verify Email",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#ff6a00",
+      });
+      if (result.isConfirmed) {
+        const verified = await handleVerifyEmail();
+        if (!verified) return;
+      } else {
+        return;
+      }
     }
 
     try {
@@ -334,7 +401,7 @@ export default function EditProfile({
           icon: "error",
           title: "Update Failed",
           text: res.data.message || "Profile update failed",
-          confirmButtonColor: "#ff5500",
+          confirmButtonColor: "#ff6a00",
         });
       }
     } catch (error: any) {
@@ -347,7 +414,7 @@ export default function EditProfile({
           error?.response?.data?.message ||
           error?.response?.data?.error ||
           "Something went wrong",
-        confirmButtonColor: "#ff5500",
+        confirmButtonColor: "#ff6a00",
       });
     } finally {
       setLoading(false);
@@ -355,108 +422,157 @@ export default function EditProfile({
   };
 
   return (
-    <div className="w-full max-w-[390px] md:ml-12 mx-auto md:mx-0 flex flex-col items-center md:items-start">
-      <form onSubmit={handleSubmit} className="w-full space-y-6">
-        <div className="w-full flex justify-between items-center mb-6">
+    <div className="w-full bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-xs">
+      <form id="edit-profile-form" onSubmit={handleSubmit} className="space-y-6">
+        
+        {/* Header */}
+        <div className="flex items-center gap-3.5 pb-5 border-b border-gray-100">
           <button
             type="button"
             onClick={() => setActiveView("default")}
-            className="text-black dark:text-white font-medium flex items-center gap-2 hover:text-orange-500 transition cursor-pointer"
+            className="w-9 h-9 rounded-xl bg-gray-50 hover:bg-orange-50 text-gray-700 hover:text-[#FF6A00] flex items-center justify-center transition-all cursor-pointer border border-gray-200 hover:border-orange-200"
           >
-            <ArrowLeft size={20} />
-            <span>Edit Profile</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="font-semibold bg-gradient-to-r from-[#FEC12D] to-[#FF552C] bg-clip-text text-transparent cursor-pointer"
-          >
-            {loading ? "Saving..." : "Save"}
-          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+              Edit Profile
+            </h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Update your personal details and contact verification
+            </p>
+          </div>
         </div>
 
-        <div className="flex justify-center md:justify-start mb-10">
-          <div className="relative">
-            <Image
+        {/* Hidden file input for photo upload */}
+        <input
+          type="file"
+          id="profileUpload"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setProfileFile(file);
+              setPreview(URL.createObjectURL(file));
+            }
+          }}
+        />
+
+        {/* Profile Photo Edit (Square with curved corners) */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-orange-50/30 border border-orange-100 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5">
+          <div
+            onClick={() => document.getElementById("profileUpload")?.click()}
+            className="relative group cursor-pointer shrink-0"
+            title="Click to change profile photo"
+          >
+            <img
               src={preview}
-              alt="profile"
-              width={150}
-              height={150}
-              className="w-[150px] h-[150px] rounded-full object-cover overflow-hidden"
-            />
-
-            <label htmlFor="profileUpload">
-              <div className="absolute bottom-1 right-1 bg-white w-7 h-7 flex items-center justify-center rounded-full cursor-pointer shadow">
-                <Image
-                  src="/icons/edit.png"
-                  alt="edit"
-                  width={16}
-                  height={16}
-                />
-              </div>
-            </label>
-
-            <input
-              type="file"
-              id="profileUpload"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setProfileFile(file);
-                  setPreview(URL.createObjectURL(file));
-                }
+              alt="Profile"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover aspect-square shadow-sm border-2 border-orange-200 ring-4 ring-white group-hover:opacity-90 transition-all"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/img/profileimg.png";
               }}
+            />
+            <div className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-xl bg-[#FF6A00] hover:bg-[#F05A00] text-white flex items-center justify-center shadow-md border-2 border-white transition-transform group-hover:scale-105">
+              <Camera className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          <div className="flex-1 text-center sm:text-left space-y-2">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">
+                Profile Photo
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Upload a photo to personalize your customer profile across TASpro.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center sm:justify-start gap-2.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => document.getElementById("profileUpload")?.click()}
+                className="px-3.5 py-1.5 bg-white hover:bg-orange-50 border border-orange-200 text-[#FF6A00] font-bold text-xs rounded-xl transition-all shadow-2xs hover:shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Upload Photo</span>
+              </button>
+
+              {profileFile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileFile(null);
+                    setPreview(profile?.profile_url || user?.profileImage || "/img/profileimg.png");
+                  }}
+                  className="px-2.5 py-1.5 text-xs text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400">
+              Recommended: Square JPG, PNG or WEBP (up to 5MB)
+            </p>
+          </div>
+        </div>
+
+        {/* 1. Full Name */}
+        <div className="space-y-1.5">
+          <label className="block text-xs sm:text-sm font-bold text-gray-700">
+            Full Name <span className="text-[#FF6A00]">*</span>
+          </label>
+          <div className="relative flex items-center">
+            <div className="absolute left-3.5 text-gray-400 pointer-events-none">
+              <User className="w-4 h-4" />
+            </div>
+            <input
+              name="fullName"
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Enter your full name"
+              className="w-full pl-10 pr-4 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all placeholder:text-gray-400"
             />
           </div>
         </div>
 
-        {/* 1. Full Name (Directly full name instead of First Name) */}
-        <div>
-          <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
-            Full Name
-          </label>
-          <input
-            name="fullName"
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Enter your full name"
-            className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 text-black dark:text-gray-700 dark:rounded-lg"
-          />
-        </div>
-
-        {/* 2. Email Address in place of Last Name with Verify Button */}
-        <div>
-          <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
-            Email Address
+        {/* 2. Email Address with Verification */}
+        <div className="space-y-1.5">
+          <label className="block text-xs sm:text-sm font-bold text-gray-700">
+            Email Address <span className="text-[#FF6A00]">*</span>
           </label>
           <div className="relative flex items-center">
+            <div className="absolute left-3.5 text-gray-400 pointer-events-none">
+              <Mail className="w-4 h-4" />
+            </div>
             <input
               type="email"
               name="email"
               value={email}
               onChange={(e) => {
-                setEmail(e.target.value);
-                if (e.target.value !== (profile?.email || "")) {
+                const val = e.target.value;
+                setEmail(val);
+                if (val.trim().toLowerCase() !== initialEmail.trim().toLowerCase()) {
                   setIsEmailVerified(false);
+                } else {
+                  setIsEmailVerified(true);
                 }
               }}
-              placeholder="Enter your email address"
-              className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 pr-24 text-black dark:text-gray-700 dark:rounded-lg"
+              placeholder="e.g. name@example.com"
+              className="w-full pl-10 pr-28 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all placeholder:text-gray-400"
             />
-            <div className="absolute right-1 bottom-1.5">
+            <div className="absolute right-2.5">
               {isEmailVerified && email.trim() ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg border border-green-200/80">
                   <Check className="w-3 h-3 stroke-[3]" /> Verified
                 </span>
               ) : (
                 <button
                   type="button"
                   onClick={handleVerifyEmail}
-                  className="text-xs font-bold text-[#FF6A00] hover:text-white bg-orange-50 hover:bg-[#FF6A00] px-3 py-1 rounded-full border border-orange-300 hover:border-orange-500 transition-all cursor-pointer shadow-2xs"
+                  className="text-xs font-bold text-white bg-[#FF6A00] hover:bg-[#F05A00] px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer"
                 >
                   Verify
                 </button>
@@ -465,59 +581,54 @@ export default function EditProfile({
           </div>
         </div>
 
-        {/* 3. Gender Selection */}
-        <div>
-          <p className="text-[14px] md:text-[16px] font-semibold mb-2 text-black dark:text-white">
-            Select gender
-          </p>
-
-          <div className="flex flex-col gap-4">
-            {["Male", "Female", "Other"].map((g) => (
-              <label
-                key={g}
-                className="flex items-center gap-3 text-[14px] md:text-[16px] cursor-pointer group"
-              >
-                <input
-                  type="radio"
-                  name="gender"
-                  value={g}
-                  checked={gender === g}
-                  onChange={() => setGender(g)}
-                  className="hidden"
-                />
-
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    gender === g
-                      ? "bg-gradient-to-r from-[#FEC12D] to-[#FF552C]"
-                      : "border-2 border-gray-400 group-hover:border-orange-400"
+        {/* 3. Gender (Clean Segmented Selector: Male, Female, Other) */}
+        <div className="space-y-2">
+          <label className="block text-xs sm:text-sm font-bold text-gray-700">
+            Gender <span className="text-[#FF6A00]">*</span>
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            {["Male", "Female", "Other"].map((g) => {
+              const isSelected = gender === g;
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGender(g)}
+                  className={`py-3 px-4 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    isSelected
+                      ? "border-[#FF6A00] bg-orange-50/50 text-[#FF6A00] ring-1 ring-orange-200 shadow-2xs"
+                      : "border-gray-200 hover:border-gray-300 bg-gray-50/50 text-gray-700 hover:bg-white"
                   }`}
                 >
                   <div
-                    className={`w-4 h-4 rounded-full border-2 border-white transition-all duration-200 ${
-                      gender === g ? "opacity-100" : "opacity-0"
+                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+                      isSelected
+                        ? "border-[#FF6A00] bg-[#FF6A00]"
+                        : "border-gray-300 bg-white"
                     }`}
-                  />
-                </div>
-
-                <span className="text-black dark:text-gray-200">
-                  {g === "Male"
-                    ? "I am male"
-                    : g === "Female"
-                      ? "I am female"
-                      : "Rather not to say"}
-                </span>
-              </label>
-            ))}
+                  >
+                    {isSelected && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <span>{g}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* 4. Phone Number with Verify Button */}
-        <div>
-          <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
-            Phone Number
+        {/* 4. Phone Number with OTP Verification */}
+        <div className="space-y-1.5">
+          <label className="block text-xs sm:text-sm font-bold text-gray-700">
+            Phone Number <span className="text-[#FF6A00]">*</span>
           </label>
           <div className="relative flex items-center">
+            <div className="absolute left-3.5 flex items-center gap-1.5 text-gray-500 font-bold text-xs pointer-events-none">
+              <Phone className="w-4 h-4 text-gray-400" />
+              <span>+91</span>
+              <span className="text-gray-300">|</span>
+            </div>
             <input
               type="tel"
               name="phone"
@@ -526,58 +637,90 @@ export default function EditProfile({
               onChange={(e) => {
                 const val = e.target.value.replace(/\D/g, "");
                 setPhone(val);
-                if (val !== (profile?.mobile || "")) {
+                if (val !== initialPhone) {
                   setIsPhoneVerified(false);
+                } else {
+                  setIsPhoneVerified(true);
                 }
               }}
-              placeholder="Enter 10-digit mobile number"
-              className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 pr-24 text-black dark:text-gray-700 dark:rounded-lg"
+              placeholder="9876543210"
+              className="w-full pl-20 pr-32 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all font-mono placeholder:text-gray-400"
             />
-            <div className="absolute right-1 bottom-1.5">
+            <div className="absolute right-2.5">
               {isPhoneVerified && phone.trim() ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-lg border border-green-200/80">
                   <Check className="w-3 h-3 stroke-[3]" /> Verified
                 </span>
               ) : (
                 <button
                   type="button"
                   onClick={handleVerifyPhone}
-                  className="text-xs font-bold text-[#FF6A00] hover:text-white bg-orange-50 hover:bg-[#FF6A00] px-3 py-1 rounded-full border border-orange-300 hover:border-orange-500 transition-all cursor-pointer shadow-2xs"
+                  className="text-xs font-bold text-white bg-[#FF6A00] hover:bg-[#F05A00] px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer"
                 >
-                  Verify
+                  Verify via OTP
                 </button>
               )}
             </div>
           </div>
+          {phone !== initialPhone && !isPhoneVerified && (
+            <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1 mt-1">
+              <AlertCircle className="w-3 h-3" />
+              Phone number changed. Click "Verify via OTP" to verify with OTP before saving.
+            </p>
+          )}
         </div>
 
         {/* 5. Alternate Phone Number */}
-        <div>
-          <label className="text-[14px] md:text-[16px] font-semibold text-black dark:text-white">
-            Alternate Phone Number
-          </label>
-          <input
-            type="tel"
-            name="altPhone"
-            maxLength={10}
-            value={altPhone}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
-              setAltPhone(val);
-            }}
-            placeholder="Enter alternate mobile number (optional)"
-            className="w-full text-[14px] md:text-[16px] border-b border-orange-400 bg-white dark:bg-gray-100 outline-none p-2 text-black dark:text-gray-700 mb-4 dark:rounded-lg placeholder:text-gray-400 placeholder:text-xs"
-          />
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs sm:text-sm font-bold text-gray-700">
+              Alternate Phone Number
+            </label>
+            <span className="text-[11px] text-gray-400 font-medium">Optional</span>
+          </div>
+          <div className="relative flex items-center">
+            <div className="absolute left-3.5 flex items-center gap-1.5 text-gray-500 font-bold text-xs pointer-events-none">
+              <Smartphone className="w-4 h-4 text-gray-400" />
+              <span>+91</span>
+              <span className="text-gray-300">|</span>
+            </div>
+            <input
+              type="tel"
+              name="altPhone"
+              maxLength={10}
+              value={altPhone}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                setAltPhone(val);
+              }}
+              placeholder="Secondary mobile number"
+              className="w-full pl-20 pr-4 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all font-mono placeholder:text-gray-400"
+            />
+          </div>
+          <p className="text-[11px] text-gray-400">
+            Used by service technicians if your primary number is unreachable.
+          </p>
         </div>
 
-        {/* Save Button */}
-        <div className="w-full pt-2">
-          <GradientButton2
-            text={loading ? "Saving..." : "Save"}
-            width="w-full"
+        {/* Save & Cancel Actions */}
+        <div className="pt-4 flex items-center gap-3">
+          <button
             type="submit"
-          />
+            disabled={loading}
+            className="flex-1 py-3.5 bg-gradient-to-r from-[#FF6A00] to-[#FF5500] hover:opacity-95 active:scale-[0.99] text-white font-extrabold rounded-xl shadow-md text-sm sm:text-base transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          >
+            {loading ? <span>Saving Changes...</span> : <span>Save Changes</span>}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveView("default")}
+            className="px-6 py-3.5 border border-gray-200 hover:border-gray-300 text-gray-700 font-bold rounded-xl text-sm transition-all cursor-pointer hover:bg-gray-50"
+          >
+            Cancel
+          </button>
         </div>
+
       </form>
     </div>
   );

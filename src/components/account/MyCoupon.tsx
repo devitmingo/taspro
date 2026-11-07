@@ -1,9 +1,20 @@
 "use client";
+
 import { useState, useEffect } from "react";
-import Image from "next/image";
-import { ArrowLeft, Tag, Copy, Check, TicketPercent } from "lucide-react";
+import {
+  ArrowLeft,
+  Tag,
+  Copy,
+  Check,
+  TicketPercent,
+  Calendar,
+  Sparkles,
+  Percent,
+  Info,
+} from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
+import { useRouter } from "next/navigation";
 
 type Props = {
   setActiveView: (view: string) => void;
@@ -24,6 +35,7 @@ interface CouponItem {
 }
 
 export default function MyCoupon({ setActiveView }: Props) {
+  const router = useRouter();
   const [coupons, setCoupons] = useState<CouponItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -31,8 +43,11 @@ export default function MyCoupon({ setActiveView }: Props) {
   const fetchCoupons = async () => {
     try {
       setLoading(true);
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const headers = token ? { Authorization: `Bearer ${token}`, Accept: "application/json" } : { Accept: "application/json" };
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const headers = token
+        ? { Authorization: `Bearer ${token}`, Accept: "application/json" }
+        : { Accept: "application/json" };
 
       const res = await axios.get(`${API_BASE_URL}/coupons`, { headers });
       if (res.data?.status && Array.isArray(res.data.data)) {
@@ -42,11 +57,13 @@ export default function MyCoupon({ setActiveView }: Props) {
       }
     } catch (error) {
       console.log("Failed to fetch coupons:", error);
-      // Try customer coupons endpoint as fallback
       try {
         const token = localStorage.getItem("token");
         const res = await axios.get(`${API_BASE_URL}/customers/coupons`, {
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
         });
         if (res.data?.status && Array.isArray(res.data.data)) {
           setCoupons(res.data.data);
@@ -75,117 +92,154 @@ export default function MyCoupon({ setActiveView }: Props) {
   };
 
   return (
-    <div className="w-full md:px-6 lg:px-8">
-      <div className="w-full flex justify-between items-center mb-6">
-        {/* Back */}
-        <button
-          onClick={() => setActiveView("default")}
-          className="text-black dark:text-white font-semibold flex items-center gap-2 hover:text-orange-500 transition cursor-pointer"
-        >
-          <ArrowLeft size={20} />
-          <span>My Coupons</span>
-        </button>
+    <div className="w-full bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+      {/* 1. Header with Back Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-100 pb-5">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveView("default")}
+            className="w-10 h-10 rounded-full border border-gray-200 bg-gray-50/60 hover:bg-orange-50 hover:border-orange-200 text-gray-700 hover:text-[#FF6A00] flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight">
+              My Coupons
+            </h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Available promo codes and instant discount vouchers for your home service bookings
+            </p>
+          </div>
+        </div>
 
         {coupons.length > 0 && !loading && (
-          <span className="text-xs font-semibold text-orange-600 bg-orange-50 dark:bg-orange-950/40 px-3 py-1 rounded-full">
-            {coupons.length} Active {coupons.length === 1 ? "Coupon" : "Coupons"}
-          </span>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <span className="text-xs font-bold text-[#FF6A00] bg-orange-50 border border-orange-200 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+              <TicketPercent className="w-3.5 h-3.5" />
+              <span>
+                {coupons.length} Active {coupons.length === 1 ? "Offer" : "Offers"}
+              </span>
+            </span>
+          </div>
         )}
       </div>
 
+      {/* 2. Helpful Info Banner */}
+      <div className="p-4 rounded-2xl bg-orange-50/40 border border-orange-100 flex items-start gap-3 text-xs text-gray-600">
+        <Sparkles className="w-4 h-4 text-[#FF6A00] shrink-0 mt-0.5" />
+        <p className="leading-relaxed">
+          <strong className="text-gray-900">How to use:</strong> Copy your chosen promo code below and apply it in the coupon field during checkout to enjoy instant savings on your order.
+        </p>
+      </div>
+
+      {/* 3. Loading skeleton */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className="h-28 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse"
+              className="h-32 bg-gray-50 border border-gray-100 rounded-2xl animate-pulse p-4"
             />
           ))}
         </div>
       ) : coupons.length === 0 ? (
-        <div className="text-center py-16 px-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 max-w-lg mx-auto">
-          <div className="w-14 h-14 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-3 text-orange-500">
-            <TicketPercent className="w-7 h-7" />
+        /* 4. Empty State */
+        <div className="text-center py-14 px-4 rounded-3xl bg-gray-50/60 border border-dashed border-gray-200 space-y-3">
+          <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200/80 text-[#FF6A00] flex items-center justify-center mx-auto shadow-2xs">
+            <TicketPercent className="w-8 h-8" />
           </div>
-          <p className="text-gray-800 dark:text-gray-200 text-base font-semibold">
-            No Coupons Available
-          </p>
-          <p className="text-gray-400 text-xs mt-1">
-            Check back later for exciting offers and seasonal discounts!
-          </p>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-gray-900">
+              No Coupons Available Right Now
+            </h3>
+            <p className="text-xs text-gray-500 max-w-md mx-auto">
+              Check back frequently! We regularly release festive deals, seasonal discounts and special loyalty rewards.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="px-5 py-2.5 bg-[#FF6A00] hover:bg-[#F05A00] text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2"
+            >
+              <span>Explore All Services</span>
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        /* 5. Coupons Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {coupons.map((item) => {
-            const discountLabel =
-              item.discount_type === "PERCENTAGE"
-                ? `${item.discount_percent}% OFF`
-                : `₹${Math.round(item.discount_amt)} OFF`;
+            const isPercent = item.discount_type === "PERCENTAGE";
+            const discountLabel = isPercent
+              ? `${item.discount_percent}% OFF`
+              : `₹${Math.round(item.discount_amt)} FLAT OFF`;
+
+            const isCopied = copiedCode === item.code;
 
             return (
               <div
                 key={item.id}
-                className="flex items-stretch rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow group relative"
+                className="bg-white border border-gray-200/90 hover:border-orange-200 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all relative flex flex-col justify-between space-y-4 group overflow-hidden"
               >
-                {/* Left Gradient Icon Bar */}
-                <div className="w-24 sm:w-28 flex-shrink-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#FF512F] to-[#F09819] text-white p-3">
-                  <Tag className="w-7 h-7 mb-1 drop-shadow" />
-                  <span className="text-[13px] font-black tracking-tight text-center leading-tight">
-                    {discountLabel}
-                  </span>
-                </div>
+                {/* Decorative subtle border top accent */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF6A00] to-amber-400 opacity-90" />
 
-                {/* Right Content */}
-                <div className="p-4 flex-1 flex flex-col justify-between min-w-0">
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-snug">
+                {/* Top Section */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-orange-50 border border-orange-200/70 text-[#FF6A00] flex items-center justify-center shrink-0">
+                      <Tag className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#FF6A00] bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/60 inline-block mb-1">
+                        {discountLabel}
+                      </span>
+                      <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug">
                         {item.title || discountLabel}
                       </h3>
-                    </div>
-
-                    {item.minimum_order_amt > 0 && (
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                        Min. order: ₹{Math.round(item.minimum_order_amt)}
-                        {item.max_discount_amt > 0 &&
-                          ` • Max discount: ₹${Math.round(item.max_discount_amt)}`}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="mt-3 pt-2 border-t border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                    <div className="bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/60 px-2.5 py-1 rounded-lg">
-                      <span className="font-mono font-bold text-xs sm:text-sm text-orange-600 dark:text-orange-400 tracking-wider">
-                        {item.code}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {item.end_date && (
-                        <span className="text-[10px] text-gray-400">
-                          Valid till {item.end_date}
-                        </span>
+                      {item.minimum_order_amt > 0 && (
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Valid on orders above ₹{Math.round(item.minimum_order_amt)}
+                          {item.max_discount_amt > 0 &&
+                            ` (Max ₹${Math.round(item.max_discount_amt)})`}
+                        </p>
                       )}
-
-                      <button
-                        onClick={() => handleCopy(item.code)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/50 px-2.5 py-1 rounded-md transition cursor-pointer"
-                        title="Copy code"
-                      >
-                        {copiedCode === item.code ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-green-600" />
-                            <span className="text-green-600">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Bottom dashed border & Code Copy Button */}
+                <div className="pt-3 border-t border-dashed border-gray-200 flex items-center justify-between gap-3">
+                  <div className="bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                    <span className="text-[11px] text-gray-400 font-medium">CODE:</span>
+                    <span className="font-mono font-extrabold text-xs sm:text-sm text-gray-900 tracking-wider">
+                      {item.code}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(item.code)}
+                    className={`px-4 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                      isCopied
+                        ? "bg-green-600 text-white"
+                        : "bg-[#FF6A00] hover:bg-[#F05A00] text-white"
+                    }`}
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Code</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             );

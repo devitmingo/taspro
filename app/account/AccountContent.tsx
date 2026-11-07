@@ -10,7 +10,6 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL } from "@/config/api";
 import SettingsList from "@/components/account/SettingsList";
-import ProfileCard from "@/components/account/ProfileCard";
 import GradientButton from "@/components/ui/GradientButton";
 import EditProfile from "@/components/account/EditProfile";
 import ReferEarn from "@/components/account/ReferEarn";
@@ -18,6 +17,7 @@ import MyWallet from "@/components/account/MyWallet";
 import MyReviews from "@/components/account/MyReviews";
 import MyCoupon from "@/components/account/MyCoupon";
 import Payment from "@/components/account/Payment";
+import SavedAddresses from "@/components/account/SavedAddresses";
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import axios from "axios";
@@ -29,17 +29,48 @@ import Swal from "sweetalert2";
 export default function AccountContent() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeView, setActiveView] = useState("default");
   const [profile, setProfile] = useState<any>(null);
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    setActiveView("default");
+    const viewParam = searchParams.get("view");
+    if (viewParam) {
+      setActiveView(viewParam);
+      try {
+        sessionStorage.setItem("accountActiveView", viewParam);
+      } catch (e) {}
+    } else {
+      setActiveView("default");
+      try {
+        sessionStorage.removeItem("accountActiveView");
+      } catch (e) {}
+    }
   }, [searchParams]);
+
+  const handleSetActiveView = (view: string) => {
+    setActiveView(view);
+    try {
+      if (view === "default") {
+        sessionStorage.removeItem("accountActiveView");
+        router.push("/account");
+      } else {
+        sessionStorage.setItem("accountActiveView", view);
+        router.push(`/account?view=${view}`);
+      }
+    } catch (e) {
+      if (view === "default") {
+        router.push("/account");
+      } else {
+        router.push(`/account?view=${view}`);
+      }
+    }
+  };
 
   const fetchProfile = async () => {
     try {
       const token = localStorage.getItem("token");
+      if (!token || token === "null" || token === "undefined") return;
 
       const res = await axios.get(
         `${API_BASE_URL}/customers/profile`,
@@ -54,8 +85,13 @@ export default function AccountContent() {
       if (res.data.status) {
         setProfile(res.data.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log("Profile fetch error:", error);
+      if (error?.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        logout();
+      }
     }
   };
 
@@ -157,6 +193,7 @@ export default function AccountContent() {
 
     const viewLabels: Record<string, string> = {
       editProfile: "Edit Profile",
+      address: "Saved Addresses",
       wallet: "My Wallet",
       payment: "Saved Payment Methods",
       reviews: "My Rating & Reviews",
@@ -166,7 +203,7 @@ export default function AccountContent() {
 
     return [
       ...base,
-      { label: "Account", onClick: () => setActiveView("default") },
+      { label: "Account", onClick: () => handleSetActiveView("default") },
       { label: viewLabels[activeView] || "Account" },
     ];
   };
@@ -176,112 +213,74 @@ export default function AccountContent() {
       case "editProfile":
         return (
           <EditProfile
-            setActiveView={setActiveView}
+            setActiveView={handleSetActiveView}
             profile={profile}
             fetchProfile={fetchProfile}
           />
         );
+      case "address":
+        return <SavedAddresses setActiveView={handleSetActiveView} />;
       case "refer":
-        return <ReferEarn setActiveView={setActiveView} profile={profile} />;
+        return <ReferEarn setActiveView={handleSetActiveView} profile={profile} />;
       case "wallet":
-        return <MyWallet setActiveView={setActiveView} profile={profile} />;
+        return <MyWallet setActiveView={handleSetActiveView} profile={profile} />;
       case "reviews":
-        return <MyReviews setActiveView={setActiveView} />;
+        return <MyReviews setActiveView={handleSetActiveView} />;
       case "coupon":
-        return <MyCoupon setActiveView={setActiveView} />;
+        return <MyCoupon setActiveView={handleSetActiveView} />;
       case "payment":
-        return <Payment setActiveView={setActiveView} />;
+        return <Payment setActiveView={handleSetActiveView} />;
       default:
-        return <SettingsList setActiveView={setActiveView} />;
+        return (
+          <SettingsList
+            setActiveView={handleSetActiveView}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            profile={profile}
+          />
+        );
     }
   };
 
   if (!user) {
     return (
-      <div className="min-h-screen dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Please Login to View Account
-          </h2>
-          <a
-            href="/login"
-            className="text-orange-600 font-medium hover:underline"
-          >
-            Go to Login
-          </a>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-orange-50 text-[#ff5500] flex items-center justify-center mb-4">
+          <UserRound className="w-8 h-8" />
         </div>
+        <h2 className="text-xl sm:text-2xl font-black text-gray-900 mb-2">
+          Please Login to View Account
+        </h2>
+        <p className="text-sm text-gray-500 max-w-sm mb-6">
+          Log in with your phone number to access your account details, bookings, wallet, and saved addresses.
+        </p>
+        <button
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("redirectAfterLogin", "/account");
+            }
+            window.dispatchEvent(new Event("open-auth-modal"));
+          }}
+          className="bg-[#ff5500] hover:bg-orange-600 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-colors shadow-sm cursor-pointer"
+        >
+          Login / Sign In
+        </button>
       </div>
     );
   }
 
-return (
-  <div className="w-full bg-white dark:bg-gray-900 pb-24">
-    {/* Dynamic Breadcrumbs */}
-    <div className="mb-4">
-      <Breadcrumb items={getBreadcrumbs()} />
-    </div>
-
-    {/* Content */}
-    <div className="flex flex-col-reverse lg:flex-row">
-      <div className="w-full lg:flex-1">{renderContent()}</div>
-
-      {activeView === "default" && (
-        <div className="w-full lg:w-[390px] px-10">
-          <ProfileCard profile={profile} />
-        </div>
-      )}
-    </div>
-
-    {/* Logout & Delete Account Action Buttons */}
-    {activeView === "default" && (
-      <div className="mt-8 flex flex-col gap-3 justify-start lg:ml-12 w-full max-w-[390px] px-4 lg:px-0">
-        <GradientButton
-          text="Logout"
-          width="w-full"
-          textClassName="text-[18px] md:text-[20px] font-medium"
-          onClick={handleLogout}
-        />
-
-        <button
-          type="button"
-          onClick={handleDeleteAccount}
-          className="w-full h-[40px] sm:h-[44px] rounded-lg border border-red-300 hover:border-red-500 bg-white hover:bg-red-50/70 text-red-600 font-semibold text-sm sm:text-base flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs group"
-        >
-          <Trash2 className="w-4 h-4 text-red-500 group-hover:scale-110 transition-transform" />
-          <span>Delete Account</span>
-        </button>
+  return (
+    <div className="w-full bg-transparent pb-24">
+      {/* Dynamic Breadcrumbs */}
+      <div className="mb-4">
+        <Breadcrumb items={getBreadcrumbs()} />
       </div>
-    )}
 
-    {/* Mobile Bottom Navigation */}
-    <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-md z-50 md:hidden">
-      <div className="grid grid-cols-3 h-16">
-        <Link
-          href="/"
-          className="flex flex-col items-center justify-center text-gray-500"
-        >
-          <House className="w-5 h-5" />
-          <span className="text-[11px] mt-1 font-medium">Home</span>
-        </Link>
-
-        <Link
-          href="/my-booking"
-          className="flex flex-col items-center justify-center text-gray-500"
-        >
-          <ClipboardList className="w-5 h-5" />
-          <span className="text-[11px] mt-1 font-medium">Booking</span>
-        </Link>
-
-        <Link
-          href="/account"
-          className="flex flex-col items-center justify-center text-orange-500"
-        >
-          <UserRound className="w-5 h-5" />
-          <span className="text-[11px] mt-1 font-medium">Account</span>
-        </Link>
+      {/* Content */}
+      <div className="w-full">
+        {renderContent()}
       </div>
     </div>
-  </div>
-);
+  );
 }
 

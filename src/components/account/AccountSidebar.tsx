@@ -70,9 +70,14 @@
 
 "use client";
 
-import router from "next/dist/shared/lib/router/router";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
+import { useAuth } from "@/context/AuthContext";
+import GradientButton from "@/components/ui/GradientButton";
+import { Camera } from "lucide-react";
 
 type MenuItem = {
   icon: string;
@@ -80,9 +85,69 @@ type MenuItem = {
   href: string;
 };
 
-export default function AccountSidebar() {
+export default function AccountSidebar({
+  profile: propProfile,
+}: {
+  profile?: any;
+}) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<any>(propProfile || null);
+
+  useEffect(() => {
+    if (propProfile) {
+      setProfile(propProfile);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchProfile = async () => {
+      try {
+        const token =
+          typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        if (!token) return;
+
+        const res = await axios.get(`${API_BASE_URL}/customers/profile`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (isMounted && res.data?.status && res.data?.data) {
+          setProfile(res.data.data);
+        }
+      } catch (e) {
+        // Fallback to user from AuthContext
+      }
+    };
+
+    fetchProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [propProfile]);
+
+  const activeProfile = propProfile || profile;
+
+  const avatarUrl =
+    activeProfile?.profile_url ||
+    user?.profileImage ||
+    "/img/profileimg.png";
+
+  const firstName = activeProfile?.first_name || user?.firstName || "";
+  const lastName = activeProfile?.last_name || user?.lastName || "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+  const displayName =
+    fullName ||
+    activeProfile?.name ||
+    (user?.phone || user?.mobile ? `+91 ${user?.phone || user?.mobile}` : "User");
+
+  const displayEmail =
+    activeProfile?.email ||
+    user?.email ||
+    (user?.phone || user?.mobile ? `+91 ${user?.phone || user?.mobile}` : "No email added");
 
   const menu: MenuItem[] = [
     { icon: "/icons/Home.png", label: "Home", href: "/" },
@@ -93,73 +158,149 @@ export default function AccountSidebar() {
   return (
     <div
       className="
-    hidden md:flex flex-col gap-1 lg:gap-2 xl:gap-3
+    hidden md:flex flex-col
     bg-white dark:bg-gray-100 rounded-2xl border border-gray-200
-    md:w-[80px] lg:w-[250px]
-    md:px-3 lg:px-6
-    md:py-2 lg:py-4
-    h-fit sticky top-24 self-start flex-shrink-0 z-10
+    md:w-[80px] lg:w-[270px] xl:w-[280px]
+    md:p-3 lg:p-5
+    h-fit sticky top-24 self-start flex-shrink-0 z-10 shadow-xs
   "
     >
-      {menu.map((item) => {
-        const isActive = pathname === item.href;
+      {/* 1. Profile Section (Desktop lg+) */}
+      <div className="hidden lg:flex flex-col items-center text-center pb-4 border-b border-gray-100 dark:border-gray-200">
+        <Link
+          href="/account?view=editProfile"
+          className="relative group cursor-pointer mb-2.5"
+          title="Edit Profile"
+        >
+          <div className="w-[84px] h-[84px] rounded-full p-0.5 bg-gradient-to-tr from-[#FEC12D] to-[#FF552C] shadow-xs transition-transform duration-200 group-hover:scale-105">
+            <img
+              src={avatarUrl}
+              alt="Profile"
+              className="w-full h-full rounded-full object-cover bg-white"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/img/profileimg.png";
+              }}
+            />
+          </div>
+          <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-[#FF6A00] text-white flex items-center justify-center shadow-md border-2 border-white group-hover:bg-[#E55F00] transition-colors">
+            <Camera className="w-3 h-3" />
+          </div>
+        </Link>
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={(e) => {
-              if (pathname === item.href) {
-                e.preventDefault();
+        <h3 className="text-[16px] font-bold text-[#0A0F0D] dark:text-gray-900 truncate max-w-full tracking-tight">
+          {displayName}
+        </h3>
+        <p className="text-[13px] text-[#808080] dark:text-gray-500 truncate max-w-full font-normal mt-0.5">
+          {displayEmail}
+        </p>
 
-                // 👇 add random query to force rerender
-                router.replace(`${item.href}?refresh=${Date.now()}`);
-              }
+        {/* Action Buttons: My Bookings & Help Center */}
+        <div className="grid grid-cols-2 gap-2 mt-4 w-full">
+          <GradientButton
+            text="My Bookings"
+            width="w-full"
+            height="h-[34px]"
+            textClassName="text-[12px] font-bold"
+            onClick={() => router.push("/my-booking")}
+          />
+
+          <GradientButton
+            text="Help Center"
+            width="w-full"
+            height="h-[34px]"
+            textClassName="text-[12px] font-bold"
+            onClick={() => router.push("/contact-us")}
+          />
+        </div>
+      </div>
+
+      {/* 2. Compact Profile on Tablet (md only) */}
+      <div className="md:flex lg:hidden flex-col items-center pb-3 border-b border-gray-100 dark:border-gray-200">
+        <Link
+          href="/account?view=editProfile"
+          className="relative group cursor-pointer"
+          title={`${displayName} (${displayEmail})`}
+        >
+          <img
+            src={avatarUrl}
+            alt="Profile"
+            className="w-10 h-10 rounded-full object-cover ring-2 ring-orange-200"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = "/img/profileimg.png";
             }}
-            className="flex items-center gap-2 md:gap-2 lg:gap-3 xl:gap-3 px-2 md:px-2 lg:px-3 xl:px-3 py-2 lg:py-2 rounded-xl transition md:justify-center lg:justify-start group"
-          >
-            {/* ICON */}
-            <div className="relative w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8">
-              <img
-                src={item.icon}
-                alt={item.label}
-                className={`w-full h-full object-contain ${
-                  isActive
-                    ? "opacity-0"
-                    : "brightness-0 invert-[75%] group-hover:opacity-0"
-                }`}
-              />
+          />
+        </Link>
+      </div>
 
-              <div
-                className={`absolute inset-0 bg-gradient-to-r from-[#FEC12D] to-[#FF552C] transition-all duration-300 ${
-                  isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                }`}
-                style={{
-                  WebkitMaskImage: `url(${item.icon})`,
-                  WebkitMaskRepeat: "no-repeat",
-                  WebkitMaskPosition: "center",
-                  WebkitMaskSize: "contain",
-                }}
-              />
-            </div>
+      {/* 3. Navigation Links (Menu: Home, Bookings, Account) */}
+      <nav className="flex flex-col gap-1 lg:gap-1.5 pt-3">
+        {menu.map((item) => {
+          const isActive =
+            item.href === "/"
+              ? pathname === "/"
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
-            {/* TEXT */}
-            <span
-              className={`
-                text-sm md:text-[13px] lg:text-[15px] xl:text-base font-semibold whitespace-nowrap
-                md:hidden lg:block
-                ${
-                  isActive
-                    ? "bg-gradient-to-r from-[#FEC12D] to-[#FF552C] bg-clip-text text-transparent"
-                    : "text-[#C1C1C1] hover:bg-gradient-to-r hover:from-[#FEC12D] hover:to-[#FF552C] hover:bg-clip-text hover:text-transparent"
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={(e) => {
+                if (item.href === "/account") {
+                  try {
+                    sessionStorage.removeItem("accountActiveView");
+                  } catch (err) {}
+                  e.preventDefault();
+                  router.push("/account");
+                } else if (pathname === item.href) {
+                  e.preventDefault();
+                  router.replace(`${item.href}?refresh=${Date.now()}`);
                 }
-              `}
+              }}
+              className="flex items-center gap-2 md:gap-2 lg:gap-3 xl:gap-3 px-2 md:px-2 lg:px-3 xl:px-3 py-2 lg:py-2.5 rounded-xl transition md:justify-center lg:justify-start group hover:bg-orange-50/40"
             >
-              {item.label}
-            </span>
-          </Link>
-        );
-      })}
+              {/* ICON */}
+              <div className="relative w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-7 xl:h-7 flex-shrink-0">
+                <img
+                  src={item.icon}
+                  alt={item.label}
+                  className={`w-full h-full object-contain ${
+                    isActive
+                      ? "opacity-0"
+                      : "brightness-0 invert-[75%] group-hover:opacity-0"
+                  }`}
+                />
+
+                <div
+                  className={`absolute inset-0 bg-gradient-to-r from-[#FEC12D] to-[#FF552C] transition-all duration-300 ${
+                    isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  }`}
+                  style={{
+                    WebkitMaskImage: `url(${item.icon})`,
+                    WebkitMaskRepeat: "no-repeat",
+                    WebkitMaskPosition: "center",
+                    WebkitMaskSize: "contain",
+                  }}
+                />
+              </div>
+
+              {/* TEXT */}
+              <span
+                className={`
+                  text-sm md:text-[13px] lg:text-[15px] xl:text-base font-semibold whitespace-nowrap
+                  md:hidden lg:block
+                  ${
+                    isActive
+                      ? "bg-gradient-to-r from-[#FEC12D] to-[#FF552C] bg-clip-text text-transparent"
+                      : "text-[#C1C1C1] group-hover:bg-gradient-to-r group-hover:from-[#FEC12D] group-hover:to-[#FF552C] group-hover:bg-clip-text group-hover:text-transparent"
+                  }
+                `}
+              >
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

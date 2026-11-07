@@ -92,7 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem('user', JSON.stringify(freshUser));
             }
           })
-          .catch(() => {});
+          .catch((err) => {
+            if (err?.response?.status === 401) {
+              console.warn("Session token invalid or rejected by API (401). Clearing stale session.");
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+              setUser(null);
+            }
+          });
       }
     }
   }, []);

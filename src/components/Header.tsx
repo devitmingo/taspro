@@ -1100,14 +1100,24 @@ const Header = () => {
 
                 <Link
                   href="/my-booking"
-                  className="block px-4 py-2 text-sm hover:bg-orange-50"
+                  onClick={() => {
+                    try {
+                      sessionStorage.removeItem("accountActiveView");
+                    } catch (e) {}
+                  }}
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#FF6A00] font-medium transition-colors"
                 >
                   My Booking
                 </Link>
 
                 <Link
                   href="/account"
-                  className="block px-4 py-2 text-sm hover:bg-orange-50"
+                  onClick={() => {
+                    try {
+                      sessionStorage.removeItem("accountActiveView");
+                    } catch (e) {}
+                  }}
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#FF6A00] font-medium transition-colors"
                 >
                   Account
                 </Link>

@@ -1839,7 +1839,17 @@ const ACRepairLayout = () => {
       <ServiceDetailsModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        service={selectedService}
+        service={
+          selectedService
+            ? {
+                ...selectedService,
+                reviews_list: apiService?.reviews,
+                ratings_distribution: apiService?.ratings_distribution,
+                rating: apiService?.avg_rating || selectedService?.rating,
+                review_count: apiService?.total_reviews || selectedService?.reviews,
+              }
+            : null
+        }
         onAdd={() => {
           if (selectedService) {
             handleAddService(selectedService);

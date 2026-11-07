@@ -778,7 +778,7 @@ export default function CartPage() {
                   <h2 className="text-base font-bold text-gray-900">
                     Customer Details
                   </h2>
-                  {isLogged ? (
+                  {isLogged && (
                     <button
                       onClick={() => {
                         setIsBookingFlow(true);
@@ -787,18 +787,6 @@ export default function CartPage() {
                       className="border border-[#ff5500] text-[#ff5500] px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-orange-50 transition-colors"
                     >
                       {displayAddress ? "Change Address" : "Add Address"}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                          localStorage.setItem("redirectAfterLogin", "/cart");
-                        }
-                        window.dispatchEvent(new Event("open-auth-modal"));
-                      }}
-                      className="bg-[#ff5500] hover:bg-orange-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs transition-colors shadow-xs cursor-pointer"
-                    >
-                      Login / Sign In
                     </button>
                   )}
                 </div>

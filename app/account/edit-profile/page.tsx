@@ -163,6 +163,22 @@ const EditProfilePage = () => {
       return;
     }
 
+    if (phone.trim() !== (user?.mobile || user?.phone || "") && !isPhoneVerified) {
+      const result = await Swal.fire({
+        icon: "info",
+        title: "OTP Verification Required",
+        text: `You have changed your phone number to +91 ${phone.trim()}. Please verify with OTP before saving.`,
+        showCancelButton: true,
+        confirmButtonText: "Send & Verify OTP",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#ff6a00",
+      });
+      if (result.isConfirmed) {
+        await handleVerifyPhone();
+      }
+      return;
+    }
+
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -260,20 +276,8 @@ const EditProfilePage = () => {
           </div>
           <div className="flex-1">
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              {/* Profile Image */}
-              <div className="flex justify-center mb-8">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                    <User className="w-12 h-12 text-gray-400" />
-                  </div>
-                  <button className="absolute bottom-0 right-0 p-2 bg-orange-500 rounded-full text-white hover:bg-orange-600 transition-colors cursor-pointer">
-                    <Camera className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
               {/* Form */}
-              <div className="space-y-6 max-w-2xl mx-auto">
+              <div className="space-y-6 w-full">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Full Name */}
                   <div>

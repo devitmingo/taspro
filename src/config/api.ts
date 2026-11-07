@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://app.tasprocompany.in/api";
 
 export const API_HOST_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 export const LIVE_MEDIA_BASE_URL = API_HOST_URL;
@@ -52,6 +52,12 @@ export const getImageUrl = (src?: string | null, fallback = "/tas.logo.png"): st
   if (src.startsWith("http://") || src.startsWith("https://")) {
     if (src.startsWith("http://app.tasprocompany.in")) {
       return src.replace(/^http:\/\//, "https://");
+    }
+    if (
+      API_HOST_URL.includes("tasprocompany.in") &&
+      (src.includes("127.0.0.1:8000") || src.includes("localhost:8000"))
+    ) {
+      return src.replace(/^http:\/\/(?:127\.0\.0\.1|localhost):8000/, API_HOST_URL);
     }
     return src;
   }
