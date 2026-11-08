@@ -289,7 +289,9 @@ export default function InvoiceModal({
     try {
       setIsDownloading(true);
 
-      const html2pdf = (await import("html2pdf.js")).default;
+      // @ts-ignore
+      const html2pdfModule: any = await import("html2pdf.js");
+      const html2pdf = html2pdfModule.default || html2pdfModule;
       const filename = `${isInvoice ? "Tax_Invoice" : "Service_Estimate"}_${docNumber || "TAS"}.pdf`;
 
       const opt = {
