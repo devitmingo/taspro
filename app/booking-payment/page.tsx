@@ -503,7 +503,18 @@ export default function CheckoutConfirmationPage() {
       }
 
       let customerName = userData?.name || userData?.firstName || "Customer";
-      let customerPhone = userData?.mobile || userData?.phone || "";
+      let customerPhone =
+        userData?.mobile ||
+        userData?.phone ||
+        selectedAddress?.contact_number ||
+        selectedAddress?.phone ||
+        "";
+      if (customerPhone) {
+        customerPhone = customerPhone.replace(/\D/g, "").slice(-10);
+      }
+      if (!customerPhone || customerPhone.length !== 10) {
+        customerPhone = "7812991993";
+      }
       let customerEmail = userData?.email || "customer@tascompany.in";
 
       let addressId = Number(selectedAddress?.id);
@@ -530,55 +541,92 @@ export default function CheckoutConfirmationPage() {
         "rzp_test_TvL5gF2aAKznOU";
       let orderAmount = Math.round(finalAmount * 100);
 
-      // Create official Razorpay Order via Backend
-      try {
-        const validGstNo = addGst && gstRegex.test(gstNo.trim()) ? gstNo.trim() : null;
-        const validGstName = addGst && gstName.trim() ? gstName.trim() : null;
-
-        const initOrderRes = await axios.post(
-          `${API_BASE_URL}/customers/customer-bookings`,
-          {
-            date: formattedDate,
-            slot_id: Number(bookingDateTime?.slotId || 1),
-            customer_notes: bookingDateTime?.notes?.trim() || "Doorstep service request",
-            address_id: addressId,
-            payment_type: "ONLINE",
-            service_category_id: Number(
-              cartItems[0]?.service_category_id ||
-              cartItems[0]?.serviceCategoryId ||
-              1,
-            ),
-            service_id: Number(
-              cartItems[0]?.service_id || cartItems[0]?.serviceId || 1,
-            ),
-            gst_no: validGstNo || "22AAAAA0000A1Z5",
-            gst_name: validGstName || null,
-            razorpay_payment_id: "", // Blank triggers Razorpay Order creation on backend
-            state_name: "Chhattisgarh",
-            city_name: "Raipur",
-            enquiry_source: "web",
-            platform_type: "web",
-          },
-          {
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          },
+      // Helper to check if an order_id is an authentic Razorpay order ID (must start with order_ and contain letters, not PHP numeric fallback)
+      const isRealRazorpayOrderId = (id?: string) =>
+        Boolean(
+          id &&
+          typeof id === "string" &&
+          /^order_[a-zA-Z0-9]{14,}$/.test(id) &&
+          /[a-zA-Z]/.test(id.replace("order_", ""))
         );
 
-        if (initOrderRes.data?.data?.razorpay_order_id) {
-          razorpayOrderId = initOrderRes.data.data.razorpay_order_id;
-          if (initOrderRes.data.data.key) {
-            razorKey = initOrderRes.data.data.key;
+      // 1. Create official Razorpay Order via Next.js backend API
+      try {
+        const orderRes = await axios.post("/api/razorpay/create-order", {
+          amount: orderAmount,
+          currency: "INR",
+          receipt: `rcpt_${Date.now()}`,
+          notes: {
+            service_name: cartItems[0]?.name || "Home Service Booking",
+            customer_name: customerName,
+            customer_phone: customerPhone,
+          },
+        });
+
+        if (orderRes.data?.status && isRealRazorpayOrderId(orderRes.data?.order_id)) {
+          razorpayOrderId = orderRes.data.order_id;
+          if (orderRes.data.key) {
+            razorKey = orderRes.data.key;
           }
-          if (initOrderRes.data.data.amount) {
-            orderAmount = initOrderRes.data.data.amount;
+          if (orderRes.data.amount) {
+            orderAmount = orderRes.data.amount;
           }
         }
       } catch (orderErr) {
-        console.warn("Backend order creation warning:", orderErr);
+        console.warn("Direct Razorpay order creation notice:", orderErr);
+      }
+
+      // 2. Only if direct Razorpay order wasn't obtained, check backend order attempt
+      if (!razorpayOrderId) {
+        try {
+          const validGstNo = addGst && gstRegex.test(gstNo.trim()) ? gstNo.trim() : null;
+          const validGstName = addGst && gstName.trim() ? gstName.trim() : null;
+
+          const initOrderRes = await axios.post(
+            `${API_BASE_URL}/customers/customer-bookings`,
+            {
+              date: formattedDate,
+              slot_id: Number(bookingDateTime?.slotId || 1),
+              customer_notes: bookingDateTime?.notes?.trim() || "Doorstep service request",
+              address_id: addressId,
+              payment_type: "ONLINE",
+              service_category_id: Number(
+                cartItems[0]?.service_category_id ||
+                cartItems[0]?.serviceCategoryId ||
+                1,
+              ),
+              service_id: Number(
+                cartItems[0]?.service_id || cartItems[0]?.serviceId || 1,
+              ),
+              gst_no: validGstNo || "22AAAAA0000A1Z5",
+              gst_name: validGstName || null,
+              razorpay_payment_id: "", // Blank triggers Razorpay Order creation on backend
+              state_name: "Chhattisgarh",
+              city_name: "Raipur",
+              enquiry_source: "web",
+              platform_type: "web",
+            },
+            {
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+
+          if (initOrderRes.data?.data?.razorpay_order_id && isRealRazorpayOrderId(initOrderRes.data.data.razorpay_order_id)) {
+            razorpayOrderId = initOrderRes.data.data.razorpay_order_id;
+            if (initOrderRes.data.data.key) {
+              razorKey = initOrderRes.data.data.key;
+            }
+            if (initOrderRes.data.data.amount) {
+              orderAmount = initOrderRes.data.data.amount;
+            }
+          }
+        } catch (orderErr) {
+          console.warn("Backend order notification notice:", orderErr);
+        }
       }
 
       let rzpMethod: string | undefined = undefined;
@@ -604,10 +652,9 @@ export default function CheckoutConfirmationPage() {
         currency: "INR",
         name: "TASpro Company",
         description: cartItems[0]?.name || "Home Service Booking",
-        image: "https://files.catbox.moe/l742u1.png",
         prefill: prefillData,
         theme: {
-          color: "#FFA05C",
+          color: "#ffffff",
           backdrop_color: "rgba(0, 0, 0, 0.65)",
         },
         modal: {
@@ -633,7 +680,8 @@ export default function CheckoutConfirmationPage() {
         },
       };
 
-      if (razorpayOrderId) {
+      // Only pass order_id if it is a real verified Razorpay order
+      if (isRealRazorpayOrderId(razorpayOrderId)) {
         options.order_id = razorpayOrderId;
       }
 

@@ -1392,28 +1392,72 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
       }
 
       // Step 1: Request Razorpay Order from backend
-      const orderRes = await axios.post(
-        `${BASE_URL}/customers/booking-payment`,
-        {
-          booking_id: numericBookingId,
-          amount: balanceDue,
-          payment_type: "ONLINE",
-        },
-        {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      // Helper to check if an order_id is an authentic Razorpay order ID (must start with order_ and contain letters, not PHP numeric fallback)
+      const isRealRazorpayOrderId = (id?: string) =>
+        Boolean(
+          id &&
+          typeof id === "string" &&
+          /^order_[a-zA-Z0-9]{14,}$/.test(id) &&
+          /[a-zA-Z]/.test(id.replace("order_", ""))
+        );
 
-      const orderData = orderRes.data?.data;
-      const razorpayOrderId = orderData?.razorpay_order_id;
-      const razorKey =
-        orderData?.key ||
+      let razorpayOrderId = "";
+      let razorKey =
         process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
         "rzp_test_TvL5gF2aAKznOU";
+
+      // 1. Create verified order via Next.js API
+      try {
+        const createRes = await axios.post("/api/razorpay/create-order", {
+          amount: Math.round(balanceDue * 100),
+          currency: "INR",
+          receipt: `rcpt_bk_${numericBookingId}_${Date.now()}`,
+          notes: {
+            booking_id: String(numericBookingId),
+            customer_name: bCustomer?.name || displayName || "Customer",
+          },
+        });
+
+        if (createRes.data?.status && isRealRazorpayOrderId(createRes.data?.order_id)) {
+          razorpayOrderId = createRes.data.order_id;
+          if (createRes.data.key) {
+            razorKey = createRes.data.key;
+          }
+        }
+      } catch (e) {
+        console.warn("Direct order creation notice:", e);
+      }
+
+      // 2. Only if direct verified order wasn't obtained, check backend order attempt
+      if (!razorpayOrderId) {
+        try {
+          const orderRes = await axios.post(
+            `${BASE_URL}/customers/booking-payment`,
+            {
+              booking_id: numericBookingId,
+              amount: balanceDue,
+              payment_type: "ONLINE",
+            },
+            {
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          const orderData = orderRes.data?.data;
+          if (orderData?.razorpay_order_id && isRealRazorpayOrderId(orderData.razorpay_order_id)) {
+            razorpayOrderId = orderData.razorpay_order_id;
+          }
+          if (orderData?.key) {
+            razorKey = orderData.key;
+          }
+        } catch (e) {
+          console.warn("Backend booking payment notice:", e);
+        }
+      }
 
       const cName = bCustomer?.name || customerAddress?.full_name || profile?.name || displayName || "Customer";
       const cMobile = bCustomer?.phone || customerAddress?.contact_number || profile?.mobile || "7812991993";
@@ -1425,14 +1469,13 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
         currency: "INR",
         name: "TASpro Company",
         description: `Payment for Booking #${selectedBooking?.booking_no || currentBookingId}`,
-        image: "https://files.catbox.moe/l742u1.png",
         prefill: {
           name: cName,
           contact: cMobile,
           email: cEmail,
         },
         theme: {
-          color: "#FFA05C",
+          color: "#ffffff",
           backdrop_color: "rgba(0, 0, 0, 0.65)",
         },
         modal: {
@@ -1495,7 +1538,7 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
         },
       };
 
-      if (razorpayOrderId) {
+      if (isRealRazorpayOrderId(razorpayOrderId)) {
         options.order_id = razorpayOrderId;
       }
 
