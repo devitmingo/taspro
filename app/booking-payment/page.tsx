@@ -1124,7 +1124,7 @@ export default function CheckoutConfirmationPage() {
 
               {/* RIGHT COLUMN: Sticky Fixed Amount Summary Card */}
               <div className="lg:col-span-4 relative">
-                <div className="sticky top-24 space-y-3.5">
+                <div className="lg:sticky lg:top-24 space-y-3.5">
                   <div className="bg-white border border-gray-200/90 rounded-2xl p-5 sm:p-6 space-y-5 shadow-sm">
 
                     <div className="flex items-center justify-between border-b border-gray-100 pb-3">

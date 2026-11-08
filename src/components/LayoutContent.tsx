@@ -21,7 +21,7 @@ export default function LayoutContent({
         <Header />
       </Suspense>
 
-      <div className="w-full max-w-full overflow-x-hidden mx-auto px-0 pt-0 pb-0">{children}</div>
+      <div className="w-full max-w-full overflow-x-clip mx-auto px-0 pt-0 pb-0">{children}</div>
 
       {/* FOOTER */}
       <Footer />
