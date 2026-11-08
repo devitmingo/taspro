@@ -616,7 +616,7 @@ const ACRepairLayout = () => {
           }
         } else {
           // If service not found or no service issues added for this city
-          setServiceDetails(data?.status ? data : null);
+          setServiceDetails(null);
           setShowNoServiceModal(true);
         }
       } catch (error) {
@@ -654,22 +654,24 @@ const ACRepairLayout = () => {
   const issues = apiService?.issues || [];
 
   const apiTabs =
-    subCategories.map((cat: any) => {
-      const catId = cat.id ?? cat.sub_category_id;
-      const catName = cat.name ?? cat.sub_category_name;
-      const catIcon = cat.icon_url ?? cat.icon ?? cat.image;
-      const items =
-        cat.items && cat.items.length > 0
-          ? cat.items
-          : issues.filter((issue: any) => Number(issue.service_sub_category_id) === Number(catId));
+    subCategories
+      .map((cat: any) => {
+        const catId = cat.id ?? cat.sub_category_id;
+        const catName = cat.name ?? cat.sub_category_name;
+        const catIcon = cat.icon_url ?? cat.icon ?? cat.image;
+        const items =
+          cat.items && cat.items.length > 0
+            ? cat.items
+            : issues.filter((issue: any) => Number(issue.service_sub_category_id) === Number(catId));
 
-      return {
-        id: String(catId),
-        name: catName,
-        image: catIcon,
-        items: items || [],
-      };
-    }) || [];
+        return {
+          id: String(catId),
+          name: catName,
+          image: catIcon,
+          items: items || [],
+        };
+      })
+      .filter((tab: any) => tab.items && tab.items.length > 0) || [];
 
   // If no subcategories exist but issues exist, create a default tab
   if (apiTabs.length === 0 && issues.length > 0) {
