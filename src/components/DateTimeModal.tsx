@@ -278,48 +278,43 @@ const DateTimeModal = ({ isOpen, onClose, onContinue }: DateTimeModalProps) => {
 
         {/* Section 2: Select Time Slot */}
         <div className="mt-5 sm:mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shrink-0">
-                <Clock className="w-4 h-4 text-orange-500" />
-              </div>
-              <span className="text-sm sm:text-base font-bold text-gray-900">
-                Select Time Slot <span className="text-orange-500">*</span>
-              </span>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shrink-0">
+              <Clock className="w-4 h-4 text-orange-500" />
             </div>
-            {selectedTimeSlot && (
-              <span className="text-[11px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">
-                Selected
-              </span>
-            )}
+            <span className="text-sm sm:text-base font-bold text-gray-900">
+              Select Time Slot <span className="text-orange-500">*</span>
+            </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-            {DEFAULT_SLOTS.map((slot) => {
-              const isSelected = selectedTimeSlot === slot;
-              return (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => {
-                    setSelectedTimeSlot(slot);
-                    setError(null);
-                  }}
-                  className={`flex items-center justify-center py-2.5 px-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                    isSelected
-                      ? "border-orange-500 ring-1 ring-orange-500 bg-[#FFF9F5] text-orange-600 font-bold shadow-2xs"
-                      : "border-gray-200 bg-white text-gray-800 hover:border-orange-200 hover:bg-orange-50/20"
-                  }`}
-                >
-                  {isSelected && (
-                    <span className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-white mr-1.5 shrink-0">
-                      <Check className="w-2.5 h-2.5 stroke-[3]" />
-                    </span>
-                  )}
-                  <span>{slot}</span>
-                </button>
-              );
-            })}
+          <div className="relative min-h-[198px] flex flex-col justify-center">
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+              {DEFAULT_SLOTS.map((slot) => {
+                const isSelected = selectedTimeSlot === slot;
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTimeSlot(slot);
+                      setError(null);
+                    }}
+                    className={`flex items-center justify-center py-2.5 px-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? "border-orange-500 ring-1 ring-orange-500 bg-[#FFF9F5] text-orange-600 font-bold shadow-2xs"
+                        : "border-gray-200 bg-white text-gray-800 hover:border-orange-200 hover:bg-orange-50/20"
+                    }`}
+                  >
+                    {isSelected && (
+                      <span className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-white mr-1.5 shrink-0">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
+                    <span>{slot}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

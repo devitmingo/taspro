@@ -368,51 +368,72 @@ export const SelectDateTimeModal: React.FC<SelectDateTimeModalProps> = ({
             </span>
           </div>
 
-          {/* Slots Grid */}
-          {slotLoading ? (
-            <div className="flex items-center justify-center py-7 text-xs font-semibold text-gray-500 gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
-              <span>Loading available slots...</span>
-            </div>
-          ) : timeSlots.length > 0 ? (
-            <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-              {timeSlots.map((slot: any) => {
-                const isSelected = selectedTime === slot.slot_time;
-                return (
-                  <button
-                    key={slot.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTime(slot.slot_time);
-                      setError(null);
-                      localStorage.setItem("selectedSlotId", String(slot.id));
-                    }}
-                    className={`flex items-center justify-center py-2.5 px-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                      isSelected
-                        ? "border-orange-500 ring-1 ring-orange-500 bg-[#FFF9F5] text-orange-600 font-bold shadow-2xs"
-                        : "border-gray-200 bg-white text-gray-800 hover:border-orange-200 hover:bg-orange-50/20"
-                    }`}
-                  >
-                    {isSelected && (
-                      <span className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-white mr-1.5 shrink-0">
-                        <Check className="w-2.5 h-2.5 stroke-[3]" />
-                      </span>
-                    )}
-                    <span>{slot.slot_time}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-6 px-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-              <p className="text-xs font-semibold text-gray-600">
-                No slots available for this date.
-              </p>
-              <p className="text-[11px] text-gray-400 mt-1">
-                Please select another date above.
-              </p>
-            </div>
-          )}
+          {/* Slots Container with stable height to prevent modal fluctuations */}
+          <div className="relative min-h-[198px] flex flex-col justify-center">
+            {/* Small centered loader overlay */}
+            {slotLoading && (
+              <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[0.5px] rounded-2xl flex items-center justify-center transition-opacity duration-150">
+                <div className="flex items-center gap-2 bg-white/95 px-3.5 py-1.5 rounded-full shadow-md border border-orange-100 text-xs font-semibold text-orange-600">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-500" />
+                  <span>Loading slots...</span>
+                </div>
+              </div>
+            )}
+
+            {timeSlots.length > 0 ? (
+              <div
+                className={`grid grid-cols-3 gap-2 sm:gap-2.5 transition-opacity duration-150 ${
+                  slotLoading ? "opacity-35 pointer-events-none" : "opacity-100"
+                }`}
+              >
+                {timeSlots.map((slot: any) => {
+                  const isSelected = selectedTime === slot.slot_time;
+                  return (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTime(slot.slot_time);
+                        setError(null);
+                        localStorage.setItem("selectedSlotId", String(slot.id));
+                      }}
+                      className={`flex items-center justify-center py-2.5 px-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-orange-500 ring-1 ring-orange-500 bg-[#FFF9F5] text-orange-600 font-bold shadow-2xs"
+                          : "border-gray-200 bg-white text-gray-800 hover:border-orange-200 hover:bg-orange-50/20"
+                      }`}
+                    >
+                      {isSelected && (
+                        <span className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-white mr-1.5 shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </span>
+                      )}
+                      <span>{slot.slot_time}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : slotLoading ? (
+              /* Skeleton placeholders on initial cold load */
+              <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                {[...Array(9)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-[42px] bg-gray-100 rounded-xl sm:rounded-2xl animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="min-h-[198px] flex flex-col items-center justify-center py-6 px-4 bg-gray-50/70 rounded-2xl border border-dashed border-gray-200 text-center">
+                <p className="text-xs font-semibold text-gray-600">
+                  No slots available for this date.
+                </p>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Please select another date above.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Section 3: Special Notes */}
