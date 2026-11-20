@@ -97,6 +97,14 @@ export default function AccountContent() {
 
   useEffect(() => {
     fetchProfile();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const handleLoginEvent = () => {
+      fetchProfile();
+    };
+    window.addEventListener("user-logged-in", handleLoginEvent);
+    return () => window.removeEventListener("user-logged-in", handleLoginEvent);
   }, []);
 
   const handleLogout = () => {

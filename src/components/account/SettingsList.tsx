@@ -19,6 +19,9 @@ import {
   Camera,
   Mail,
   Phone,
+  HandCoins,
+  CalendarDays,
+  ArrowRight,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { SelectAddressModal } from "../booking-flow/SelectAddressModal";
@@ -50,6 +53,87 @@ export default function SettingsList({
 
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loadingAddress, setLoadingAddress] = useState(false);
+
+  const [stats, setStats] = useState({
+    walletBalance: "2,450.00",
+    totalSavings: "1,860.00",
+    availableCoupons: 5,
+    totalBookings: 24,
+  });
+
+  useEffect(() => {
+    if (
+      profile?.wallet_balance !== undefined &&
+      profile?.wallet_balance !== null &&
+      Number(profile.wallet_balance) > 0
+    ) {
+      setStats((prev) => ({
+        ...prev,
+        walletBalance: Number(profile.wallet_balance).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      }));
+    }
+    if (
+      profile?.total_savings !== undefined &&
+      profile?.total_savings !== null &&
+      Number(profile.total_savings) > 0
+    ) {
+      setStats((prev) => ({
+        ...prev,
+        totalSavings: Number(profile.total_savings).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      }));
+    }
+
+    const fetchAdditionalStats = async () => {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!token) return;
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      };
+
+      try {
+        const couponsRes = await axios.get(`${API_BASE_URL}/coupons`, {
+          headers,
+        });
+        if (
+          couponsRes.data?.status &&
+          Array.isArray(couponsRes.data.data) &&
+          couponsRes.data.data.length > 0
+        ) {
+          setStats((prev) => ({
+            ...prev,
+            availableCoupons: couponsRes.data.data.length,
+          }));
+        }
+      } catch (e) {}
+
+      try {
+        const bookingsRes = await axios.get(
+          `${API_BASE_URL}/customers/bookings`,
+          { headers },
+        );
+        if (
+          bookingsRes.data?.status &&
+          Array.isArray(bookingsRes.data.data) &&
+          bookingsRes.data.data.length > 0
+        ) {
+          setStats((prev) => ({
+            ...prev,
+            totalBookings: bookingsRes.data.data.length,
+          }));
+        }
+      } catch (e) {}
+    };
+
+    fetchAdditionalStats();
+  }, [profile]);
 
   const fetchAddresses = async () => {
     const token = localStorage.getItem("token");
@@ -85,21 +169,24 @@ export default function SettingsList({
     if (!token) return;
 
     const cleanPhone = (value: string) => {
-      const digits = value
-        .replace(/\D/g, "")
-        .replace(/^91/, "")
-        .replace(/^0/, "");
-      return `+91 ${digits}`;
+      if (!value) return "";
+      const digits = value.replace(/\D/g, "");
+      const last10 = digits.length > 10 ? digits.slice(-10) : digits;
+      return last10 ? `+91 ${last10}` : "";
     };
+
+    const altPhone =
+      formData.alternateNumber ||
+      formData.alt_contact_number ||
+      formData.altPhone ||
+      "";
 
     const payload = {
       full_name: formData.fullName || formData.name || "",
       contact_number: cleanPhone(
         formData.contactNumber || formData.phone || "",
       ),
-      alt_contact_number: cleanPhone(
-        formData.alternateNumber || formData.altPhone || formData.phone || "",
-      ),
+      alt_contact_number: altPhone ? cleanPhone(altPhone) : null,
       postal_code: formData.postalCode || formData.pincode || "",
       latitude: formData.latitude || 21.2514,
       longitude: formData.longitude || 81.6296,
@@ -149,7 +236,7 @@ export default function SettingsList({
   const avatarUrl =
     profile?.profile_url ||
     (user as any)?.profileImage ||
-    "/img/profileimg.png";
+    null;
 
   return (
     <div className="w-full space-y-6">
@@ -163,14 +250,29 @@ export default function SettingsList({
               className="relative group cursor-pointer shrink-0"
               title="Customer profile"
             >
-              <img
-                src={avatarUrl}
-                alt="Profile"
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover aspect-square ring-3 ring-white shadow-md border-2 border-orange-200/80 group-hover:opacity-95 transition-all"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = "/img/profileimg.png";
-                }}
-              />
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Profile"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover aspect-square ring-3 ring-white shadow-md border-2 border-orange-200/80 group-hover:opacity-95 transition-all"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = "none";
+                    const fallback = e.currentTarget.parentElement?.querySelector(".settings-avatar-fallback");
+                    if (fallback) (fallback as HTMLElement).classList.remove("hidden");
+                  }}
+                />
+              ) : null}
+              <div
+                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-orange-100/90 text-[#FF6A00] flex items-center justify-center font-black text-2xl ring-3 ring-white shadow-md border-2 border-orange-200/80 group-hover:scale-105 transition-all settings-avatar-fallback ${
+                  avatarUrl ? "hidden" : ""
+                }`}
+              >
+                {displayName && displayName !== "Customer" && displayName !== "User" && !displayName.startsWith("+91") ? (
+                  <span>{displayName.charAt(0).toUpperCase()}</span>
+                ) : (
+                  <User className="w-8 h-8 sm:w-10 sm:h-10 text-[#FF6A00]" />
+                )}
+              </div>
             </div>
 
             <div className="min-w-0">
@@ -233,90 +335,118 @@ export default function SettingsList({
         <div className="absolute -bottom-12 right-24 w-32 h-32 bg-amber-200/20 rounded-full blur-xl pointer-events-none" />
       </div>
 
-      {/* 2. Quick Stat Highlights */}
+      {/* 2. Quick Stat Highlights - Premium Statistics Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* 1. My Wallet */}
         <div
           onClick={() => setActiveView("wallet")}
-          className="p-4 sm:p-4.5 rounded-2xl bg-white hover:bg-emerald-50/30 border border-gray-100 hover:border-emerald-300 transition-all cursor-pointer group shadow-xs hover:shadow-sm"
+          className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] hover:shadow-md hover:border-emerald-200 transition-all duration-300 cursor-pointer group flex flex-col justify-between p-4 sm:p-5"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500 group-hover:text-emerald-700 transition-colors">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-semibold text-gray-500 truncate">
               My Wallet
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Wallet className="w-4 h-4" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#E8F8EE] text-[#1EAA55] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+              <Wallet className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.2} />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-extrabold text-gray-900 group-hover:text-emerald-900 transition-colors">
-            ₹0.00
-          </p>
-          <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-            <span>View Balance</span>
-            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-          </p>
+
+          <div className="my-2 sm:my-3">
+            <p className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight leading-none">
+              ₹{stats.walletBalance || "0.00"}
+            </p>
+          </div>
+
+          <div>
+            <span className="text-[11px] sm:text-xs font-bold text-[#1EAA55] flex items-center gap-1 group-hover:gap-1.5 transition-all">
+              <span>View Balance</span>
+              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </span>
+          </div>
         </div>
 
+        {/* 2. Addresses */}
         <div
           onClick={handleSavedAddressClick}
-          className="p-4 sm:p-4.5 rounded-2xl bg-white hover:bg-blue-50/30 border border-gray-100 hover:border-blue-300 transition-all cursor-pointer group shadow-xs hover:shadow-sm"
+          className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] hover:shadow-md hover:border-blue-200 transition-all duration-300 cursor-pointer group flex flex-col justify-between p-4 sm:p-5"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500 group-hover:text-blue-700 transition-colors">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-semibold text-gray-500 truncate">
               Addresses
             </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <MapPin className="w-4 h-4" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#EFF6FF] text-[#2563EB] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+              <MapPin className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.2} />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-extrabold text-gray-900 group-hover:text-blue-900 transition-colors">
-            {addresses.length ? `${addresses.length} Saved` : "Manage"}
-          </p>
-          <p className="text-[11px] text-blue-600 font-semibold mt-1 flex items-center gap-1">
-            <span>Manage Locations</span>
-            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-          </p>
+
+          <div className="my-2 sm:my-3">
+            <p className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight leading-none">
+              {addresses.length > 0 ? `${addresses.length} Saved` : "1 Saved"}
+            </p>
+          </div>
+
+          <div>
+            <span className="text-[11px] sm:text-xs font-bold text-[#2563EB] flex items-center gap-1 group-hover:gap-1.5 transition-all">
+              <span>Manage Locations</span>
+              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </span>
+          </div>
         </div>
 
+        {/* 3. Coupons */}
         <div
           onClick={() => setActiveView("coupon")}
-          className="p-4 sm:p-4.5 rounded-2xl bg-white hover:bg-amber-50/30 border border-gray-100 hover:border-amber-300 transition-all cursor-pointer group shadow-xs hover:shadow-sm"
+          className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] hover:shadow-md hover:border-amber-200 transition-all duration-300 cursor-pointer group flex flex-col justify-between p-4 sm:p-5"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500 group-hover:text-amber-700 transition-colors">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-semibold text-gray-500 truncate">
               Coupons
             </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Ticket className="w-4 h-4" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#FFF7ED] text-[#F97316] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+              <Ticket className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.2} />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-extrabold text-gray-900 group-hover:text-amber-900 transition-colors">
-            Offers
-          </p>
-          <p className="text-[11px] text-amber-600 font-semibold mt-1 flex items-center gap-1">
-            <span>View Coupons</span>
-            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-          </p>
+
+          <div className="my-2 sm:my-3">
+            <p className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight leading-none">
+              Offers
+            </p>
+          </div>
+
+          <div>
+            <span className="text-[11px] sm:text-xs font-bold text-[#F97316] flex items-center gap-1 group-hover:gap-1.5 transition-all">
+              <span>View Coupons</span>
+              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </span>
+          </div>
         </div>
 
+        {/* 4. Bookings */}
         <div
           onClick={() => router.push("/my-booking")}
-          className="p-4 sm:p-4.5 rounded-2xl bg-white hover:bg-purple-50/30 border border-gray-100 hover:border-purple-300 transition-all cursor-pointer group shadow-xs hover:shadow-sm"
+          className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] hover:shadow-md hover:border-purple-200 transition-all duration-300 cursor-pointer group flex flex-col justify-between p-4 sm:p-5"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500 group-hover:text-purple-700 transition-colors">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-semibold text-gray-500 truncate">
               Bookings
             </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <ClipboardList className="w-4 h-4" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#F5F0FF] text-[#9333EA] flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+              <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.2} />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-extrabold text-gray-900 group-hover:text-purple-900 transition-colors">
-            History
-          </p>
-          <p className="text-[11px] text-purple-600 font-semibold mt-1 flex items-center gap-1">
-            <span>Track Services</span>
-            <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-          </p>
+
+          <div className="my-2 sm:my-3">
+            <p className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight leading-none">
+              History
+            </p>
+          </div>
+
+          <div>
+            <span className="text-[11px] sm:text-xs font-bold text-[#9333EA] flex items-center gap-1 group-hover:gap-1.5 transition-all">
+              <span>Track Services</span>
+              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </span>
+          </div>
         </div>
       </div>
 

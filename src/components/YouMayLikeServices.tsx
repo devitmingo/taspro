@@ -37,6 +37,7 @@ interface Props {
   categoryId?: number | string;
   serviceId?: number | string;
   currentSlug?: string;
+  excludeIds?: (string | number)[];
 }
 
 export default function YouMayLikeServices({
@@ -44,13 +45,15 @@ export default function YouMayLikeServices({
   categoryId,
   serviceId,
   currentSlug,
+  excludeIds = [],
 }: Props) {
   const [items, setItems] = useState<ServiceIssueItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCurrentCategoryServices = async () => {
+    const fetchServices = async () => {
       try {
+        setLoading(true);
         const savedLocation = typeof window !== "undefined" ? localStorage.getItem("selected_location") : null;
         let stateName = "Chhattisgarh";
         let cityName = "Raipur";
@@ -60,6 +63,44 @@ export default function YouMayLikeServices({
             if (loc.state) stateName = loc.state;
             if (loc.city) cityName = loc.city;
           } catch (e) {}
+        }
+
+        const isCartFrequentlyAdded = title.toLowerCase().includes("frequently");
+
+        if (isCartFrequentlyAdded) {
+          // Fetch service-issues which have real prices, package tags, and add-on info
+          let issuesUrl = `${API_BASE_URL}/service-issues?state_name=${encodeURIComponent(stateName)}&city_name=${encodeURIComponent(cityName)}`;
+          if (categoryId) {
+            issuesUrl += `&service_category_id=${encodeURIComponent(String(categoryId))}`;
+          }
+
+          let res = await fetch(issuesUrl);
+          let json = await res.json();
+          let data: ServiceIssueItem[] = json?.data || json || [];
+
+          // If city-specific returned empty, fallback to general service-issues
+          if (!Array.isArray(data) || data.length === 0) {
+            const fallbackRes = await fetch(`${API_BASE_URL}/service-issues`);
+            const fallbackJson = await fallbackRes.json();
+            data = fallbackJson?.data || fallbackJson || [];
+          }
+
+          if (Array.isArray(data) && data.length > 0) {
+            let filtered = data.filter((item) => {
+              if (excludeIds && excludeIds.length > 0) {
+                if (excludeIds.some((exId) => String(exId).trim() === String(item.id).trim())) {
+                  return false;
+                }
+              }
+              return true;
+            });
+
+            if (filtered.length > 0) {
+              setItems(filtered.slice(0, 6));
+              setLoading(false);
+              return;
+            }
+          }
         }
 
         // Helper to check if item is the current service being viewed
@@ -86,7 +127,7 @@ export default function YouMayLikeServices({
           return false;
         };
 
-        // Fetch services table data directly
+        // Fetch services table data directly (for other pages like "You may like our other services")
         const res = await fetch(
           `${API_BASE_URL}/services?state_name=${encodeURIComponent(stateName)}&city_name=${encodeURIComponent(cityName)}`
         );
@@ -96,7 +137,26 @@ export default function YouMayLikeServices({
         if (Array.isArray(data) && data.length > 0) {
           let filtered = data.filter((item) => !isSelf(item));
 
-          if (categoryId) {
+          const isAcContext =
+            (currentSlug || "").toLowerCase().includes("ac") ||
+            (serviceId && Number(serviceId) === 1);
+
+          if (isAcContext) {
+            const acFiltered = filtered.filter((s: any) => {
+              const name = (s.name || s.title || "").toLowerCase();
+              const slug = (s.slug || "").toLowerCase();
+              return (
+                name.includes("ac ") ||
+                name.includes(" ac") ||
+                name.includes("air conditioner") ||
+                slug.includes("ac-") ||
+                slug.includes("-ac")
+              );
+            });
+            if (acFiltered.length > 0) {
+              filtered = acFiltered;
+            }
+          } else if (categoryId) {
             const sameCat = filtered.filter(
               (s) => String(s.service_category_id || "") === String(categoryId)
             );
@@ -105,15 +165,22 @@ export default function YouMayLikeServices({
             }
           }
 
-          setItems(filtered.slice(0, 6));
-        } else {
-          // Fallback to service-issues table
-          const issuesRes = await fetch(`${API_BASE_URL}/service-issues`);
-          const issuesJson = await issuesRes.json();
-          const issuesData = issuesJson?.data || issuesJson || [];
-          let filtered = Array.isArray(issuesData) ? issuesData.filter((item) => !isSelf(item)) : [];
-          setItems(filtered.slice(0, 6));
+          if (filtered.length > 0) {
+            setItems(filtered.slice(0, 6));
+            setLoading(false);
+            return;
+          }
         }
+
+        // Fallback to service-issues table if no other services found
+        const issuesRes = await fetch(`${API_BASE_URL}/service-issues?state_name=${encodeURIComponent(stateName)}&city_name=${encodeURIComponent(cityName)}`);
+        const issuesJson = await issuesRes.json();
+        const issuesData = issuesJson?.data || issuesJson || [];
+        let filteredIssues = Array.isArray(issuesData) ? issuesData.filter((item) => !isSelf(item)) : [];
+        if (filteredIssues.length === 0 && Array.isArray(issuesData)) {
+          filteredIssues = issuesData;
+        }
+        setItems(filteredIssues.slice(0, 6));
       } catch (err) {
         console.error("Error fetching services for Frequently Added Together:", err);
       } finally {
@@ -121,8 +188,21 @@ export default function YouMayLikeServices({
       }
     };
 
-    fetchCurrentCategoryServices();
-  }, [categoryId, serviceId, currentSlug]);
+    fetchServices();
+
+    const handleLocChange = () => {
+      fetchServices();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("location-changed", handleLocChange);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("location-changed", handleLocChange);
+      }
+    };
+  }, [categoryId, serviceId, currentSlug, title, JSON.stringify(excludeIds)]);
 
   if (loading) {
     return (
@@ -158,7 +238,8 @@ export default function YouMayLikeServices({
 
           const serviceSlug =
             item.service?.slug ||
-            "ac-repair-service";
+            item.slug ||
+            "ac-repair-appliances-repair-service";
 
           const currentPrice = Number(item.base_price || item.price || 0);
           const strikePrice = Number(item.strike_price || item.originalPrice || 0);

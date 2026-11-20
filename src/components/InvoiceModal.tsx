@@ -289,13 +289,34 @@ export default function InvoiceModal({
     try {
       setIsDownloading(true);
 
+      // Clone element into offscreen container with fixed desktop A4 width (794px at 96 DPI)
+      // This prevents responsive collapse or distortion on mobile/tablet viewports
+      const clone = element.cloneNode(true) as HTMLElement;
+      clone.id = "printable-invoice-pdf-clone";
+      clone.style.width = "794px";
+      clone.style.maxWidth = "794px";
+      clone.style.minWidth = "794px";
+      clone.style.padding = "28px 32px";
+      clone.style.margin = "0";
+      clone.style.background = "#ffffff";
+      clone.style.boxSizing = "border-box";
+      clone.style.position = "fixed";
+      clone.style.left = "-9999px";
+      clone.style.top = "0";
+      clone.style.zIndex = "-9999";
+      clone.style.borderRadius = "0";
+      clone.style.border = "none";
+      clone.style.boxShadow = "none";
+
+      document.body.appendChild(clone);
+
       // @ts-ignore
       const html2pdfModule: any = await import("html2pdf.js");
       const html2pdf = html2pdfModule.default || html2pdfModule;
       const filename = `${isInvoice ? "Tax_Invoice" : "Service_Estimate"}_${docNumber || "TAS"}.pdf`;
 
       const opt = {
-        margin: [6, 8, 6, 8] as [number, number, number, number],
+        margin: [6, 6, 6, 6] as [number, number, number, number],
         filename: filename,
         image: { type: "jpeg" as const, quality: 0.98 },
         html2canvas: {
@@ -303,13 +324,22 @@ export default function InvoiceModal({
           useCORS: true,
           letterRendering: true,
           scrollY: 0,
+          scrollX: 0,
+          windowWidth: 1024,
         },
         jsPDF: { unit: "mm" as const, format: "a4", orientation: "portrait" as const },
       };
 
-      await html2pdf().set(opt).from(element).save();
+      await html2pdf().set(opt).from(clone).save();
+      if (document.body.contains(clone)) {
+        document.body.removeChild(clone);
+      }
     } catch (err) {
       console.error("PDF generation error, attempting direct download link:", err);
+      const existingClone = document.getElementById("printable-invoice-pdf-clone");
+      if (existingClone && document.body.contains(existingClone)) {
+        document.body.removeChild(existingClone);
+      }
       // Fallback: If backend invoice link exists, trigger direct download
       if (isInvoice && bookingDetails?.invoice) {
         const link = document.createElement("a");
@@ -441,6 +471,7 @@ export default function InvoiceModal({
                 <img
                   src="/tas.logo.png"
                   alt="TASpro Company"
+                  crossOrigin="anonymous"
                   className="h-9 w-auto object-contain mb-2"
                 />
                 <h4 className="font-extrabold text-sm text-gray-950 uppercase tracking-tight">
@@ -525,28 +556,49 @@ export default function InvoiceModal({
                 )}
               </div>
 
-              <div className="p-3.5 rounded-xl bg-gray-50/80 border border-gray-100 space-y-1">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-                  Service &amp; Job Details
-                </span>
-                <p className="text-[11px]">
-                  <span className="text-gray-500">Scheduled Service: </span>
-                  <strong className="text-gray-900">{scheduledDate}</strong>
-                </p>
-                <p className="text-[11px]">
-                  <span className="text-gray-500">Payment Mode: </span>
-                  <strong className="text-gray-800">
-                    {bookingDetails?.payment_method || (isInvoice ? "Online (Razorpay)" : "Pay on Service / COD")}
-                  </strong>
-                </p>
-                <p className="text-[11px]">
-                  <span className="text-gray-500">Place of Supply: </span>
-                  <strong className="text-gray-800">Raipur, Chhattisgarh (22)</strong>
-                </p>
-                <p className="text-[11px]">
-                  <span className="text-gray-500">Warranty Coverage: </span>
-                  <strong className="text-emerald-700">30 Days Certified Warranty</strong>
-                </p>
+              <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-100 flex flex-col justify-between space-y-2">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                    Service &amp; Job Details
+                  </span>
+                  <p className="text-[11px]">
+                    <span className="text-gray-500">Payment Mode: </span>
+                    <strong className="text-gray-800">
+                      {bookingDetails?.payment_method || (isInvoice ? "Online (Razorpay)" : "Pay on Service / COD")}
+                    </strong>
+                  </p>
+                  <p className="text-[11px]">
+                    <span className="text-gray-500">Place of Supply: </span>
+                    <strong className="text-gray-800">Raipur, Chhattisgarh (22)</strong>
+                  </p>
+                </div>
+
+                {/* Warranty Badge matching reference image */}
+                <div className="pt-1">
+                  <div className="inline-flex items-center gap-3 px-3 py-1.5 bg-white rounded-xl border border-gray-300 shadow-2xs">
+                    <svg
+                      className="w-5 h-5 text-gray-800 shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      <path d="m9 12 2 2 4-4" />
+                    </svg>
+                    <div className="w-[1.5px] h-6 bg-gray-300 shrink-0" />
+                    <div className="text-left">
+                      <div className="text-[10px] font-bold text-gray-900 leading-tight">
+                        Service Warranty
+                      </div>
+                      <div className="text-xs font-black text-gray-950 leading-tight">
+                        {serviceItems[0]?.warranty_days || 30} Days
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -657,7 +709,11 @@ export default function InvoiceModal({
                     <li>30-day warranty applies strictly to service issues inspected &amp; fixed.</li>
                     <li>Payment receipts subject to bank realization in case of online transfer.</li>
                     <li>All legal disputes subject to Raipur (C.G.) jurisdiction only.</li>
-                    <li>This is a computer generated document and requires no physical signature.</li>
+                    <li>
+                      {isInvoice
+                        ? "This is a system-generated invoice and does not require a physical signature."
+                        : "This is a system-generated estimate and does not require a physical signature."}
+                    </li>
                   </ol>
                 </div>
               </div>
@@ -706,19 +762,40 @@ export default function InvoiceModal({
               </div>
             </div>
 
-            {/* Authorized Signature & Footer Seal */}
+            {/* Footer: Warranty Card & System Generated Notice */}
             <div className="pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-emerald-700 text-[11px] font-bold">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>TASpro Certified Service Guarantee (30 Days Warranty)</span>
+              <div className="inline-flex items-center gap-3.5 px-4 py-2 bg-white rounded-xl border border-gray-300 shadow-2xs">
+                <svg
+                  className="w-6 h-6 text-gray-800 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+                <div className="w-[1.5px] h-7 bg-gray-300 shrink-0" />
+                <div className="text-left">
+                  <div className="text-xs font-bold text-gray-900 leading-tight">
+                    Service Warranty
+                  </div>
+                  <div className="text-sm font-black text-gray-950 leading-tight">
+                    {serviceItems[0]?.warranty_days || 30} Days
+                  </div>
+                </div>
               </div>
 
               <div className="text-center sm:text-right space-y-1">
-                <div className="font-serif italic text-gray-400 text-sm tracking-wide">
+                <div className="font-serif italic text-gray-500 text-sm tracking-wide">
                   TASpro Service India Pvt. Ltd.
                 </div>
-                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                  Authorized Signatory
+                <div className="text-[10px] text-gray-500 font-medium leading-tight max-w-xs sm:text-right">
+                  {isInvoice
+                    ? "This is a system-generated invoice and does not require a physical signature."
+                    : "This is a system-generated estimate and does not require a physical signature."}
                 </div>
               </div>
             </div>

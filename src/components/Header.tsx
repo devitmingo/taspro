@@ -25,7 +25,7 @@ import {
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { API_BASE_URL, API_HOST_URL, getImageUrl } from "@/config/api";
+import { API_BASE_URL, API_HOST_URL, getImageUrl, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { SERVICES_DATA } from "@/data/services";
 import AuthModal from "./AuthModal";
 import { useBooking } from "@/context/BookingContext";
@@ -147,7 +147,6 @@ const Header = () => {
   }, []);
 
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const GOOGLE_MAPS_API_KEY = "AIzaSyB5BXHlIhGcjTGYsBM57A99eV--ti4ePOs";
 
   const detectCurrentLocation = (force = false) => {
     if (typeof window === "undefined" || !navigator.geolocation) return;
@@ -524,6 +523,17 @@ const Header = () => {
     setIsClient(true);
   }, []);
 
+  const userDisplayName =
+    user?.firstName ||
+    (user as any)?.first_name ||
+    user?.name ||
+    (user as any)?.fullName ||
+    (user?.phone ? `+91 ${String(user.phone).replace(/\D/g, "").slice(-10)}` : "");
+
+  const userInitial = userDisplayName && !userDisplayName.startsWith("+91")
+    ? userDisplayName.charAt(0).toUpperCase()
+    : null;
+
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -608,146 +618,189 @@ const Header = () => {
     <header className="sticky top-0 z-50 bg-[#fafafa] border-b border-gray-200 shadow-xs">
       <div className="w-full 2xl:w-[85%] mx-auto px-4 sm:px-5">
         {/* MOBILE HEADER */}
-        <div className="md:hidden py-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Hey! {user?.firstName || "User"}
-              </h2>
-
-              {/* Mobile Location Dropdown Trigger */}
-              <div ref={mobileLocationRef} className="relative mt-1">
-                <div
-                  onClick={() => setIsLocationOpen(!isLocationOpen)}
-                  className="flex items-center gap-1 text-sm cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <MapPin className="w-5 h-5 text-orange-500 fill-orange-500 shrink-0" />
-                  <span className="text-gray-700 font-medium">{currentCity}</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isLocationOpen ? "rotate-180" : ""}`} />
+        <div className="md:hidden py-2.5">
+          <div className="flex items-center justify-between gap-2">
+            {/* Left: Brand Icon + City Location Selector */}
+            <div className="flex items-center gap-2 min-w-0">
+              <Link href="/" className="shrink-0" title="TASpro Home">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-200/70 p-1 flex items-center justify-center shadow-2xs">
+                  <img src="/tas.logo.png" alt="TASpro" className="w-full h-full object-contain" />
                 </div>
-
-                {/* Mobile Floating Dropdown */}
-                {isLocationOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-3 overflow-hidden animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                        Select City
-                      </span>
-                      <span className="text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full">
-                        {currentCity}
-                      </span>
-                    </div>
-
-                    {/* Master State Filters */}
-                    {stateTabs.length > 1 && (
-                      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar py-2 border-b border-gray-100">
-                        {stateTabs.map((st) => (
-                          <button
-                            key={st}
-                            onClick={() => setActiveStateTab(st)}
-                            className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors shrink-0 ${
-                              activeStateTab === st
-                                ? "bg-orange-500 text-white"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                            }`}
-                          >
-                            {st}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Current Location button */}
-                    <button
-                      type="button"
-                      onClick={() => detectCurrentLocation(true)}
-                      disabled={isDetectingLocation}
-                      className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs cursor-pointer"
-                    >
-                      <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin text-orange-500" : ""}`} />
-                      <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location"}</span>
-                    </button>
-
-                    {/* Search box */}
-                    <div className="my-2">
-                      <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-200">
-                        <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <input
-                          type="text"
-                          value={locationSearch}
-                          onChange={(e) => setLocationSearch(e.target.value)}
-                          placeholder="Search city..."
-                          className="w-full text-xs bg-transparent outline-none text-gray-700"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Cities List ONLY */}
-                    <div className="max-h-60 overflow-y-auto py-1">
-                      {filteredCities.length > 0 ? (
-                        filteredCities.map((city) => {
-                          const isSelected = city.name.toLowerCase() === currentCity.toLowerCase();
-                          return (
-                            <div
-                              key={city.id}
-                              onClick={() => handleCitySelect(city)}
-                              className={`px-3 py-2.5 rounded-xl cursor-pointer flex items-center justify-between text-xs font-medium transition-colors ${
-                                isSelected
-                                  ? "bg-orange-50 text-orange-600 font-bold"
-                                  : "text-gray-700 hover:bg-gray-50"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <MapPin className={`w-3.5 h-3.5 ${isSelected ? "text-orange-500" : "text-gray-400"}`} />
-                                <span>{city.name}</span>
-                              </div>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-orange-500" />}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="p-3 text-center text-xs text-gray-400">
-                          No cities found
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 sm:gap-5">
-              <Link href="/wishlist">
-                <Heart className="w-5 h-5 sm:w-8 sm:h-8 text-black" />
               </Link>
 
-              <Link href="/notifications" className="relative">
-                <Bell className="w-5 h-5 sm:w-8 sm:h-8 text-black fill-black" />
+              <div ref={mobileLocationRef} className="relative min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsLocationOpen(!isLocationOpen)}
+                  className="flex items-center gap-1 text-left cursor-pointer group"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-[#FF6A00] fill-[#FF6A00] shrink-0" />
+                  <span className="font-extrabold text-[15px] text-gray-900 tracking-tight leading-none truncate max-w-[120px]">
+                    {currentCity}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-500 group-hover:text-gray-800 transition-transform duration-200 shrink-0 ${isLocationOpen ? "rotate-180" : ""}`} />
+                </button>
+                <p className="text-[10px] text-gray-500 font-medium truncate max-w-[130px] leading-none mt-1">
+                  {isClient && user ? `Hi, ${userDisplayName || "Customer"}` : (currentState || "Select Location")}
+                </p>
+
+                  {/* Mobile Floating Dropdown */}
+                  {isLocationOpen && (
+                    <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-3 overflow-hidden animate-in fade-in duration-150">
+                      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          Select City
+                        </span>
+                        <span className="text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full">
+                          {currentCity}
+                        </span>
+                      </div>
+
+                      {/* Master State Filters */}
+                      {stateTabs.length > 1 && (
+                        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar py-2 border-b border-gray-100">
+                          {stateTabs.map((st) => (
+                            <button
+                              key={st}
+                              onClick={() => setActiveStateTab(st)}
+                              className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors shrink-0 ${
+                                activeStateTab === st
+                                  ? "bg-orange-500 text-white"
+                                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              }`}
+                            >
+                              {st}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Current Location button */}
+                      <button
+                        type="button"
+                        onClick={() => detectCurrentLocation(true)}
+                        disabled={isDetectingLocation}
+                        className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs cursor-pointer"
+                      >
+                        <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin text-orange-500" : ""}`} />
+                        <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location"}</span>
+                      </button>
+
+                      {/* Search box */}
+                      <div className="my-2">
+                        <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-200">
+                          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <input
+                            type="text"
+                            value={locationSearch}
+                            onChange={(e) => setLocationSearch(e.target.value)}
+                            placeholder="Search city..."
+                            className="w-full text-xs bg-transparent outline-none text-gray-700"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Cities List ONLY */}
+                      <div className="max-h-60 overflow-y-auto py-1">
+                        {filteredCities.length > 0 ? (
+                          filteredCities.map((city) => {
+                            const isSelected = city.name.toLowerCase() === currentCity.toLowerCase();
+                            return (
+                              <div
+                                key={city.id}
+                                onClick={() => handleCitySelect(city)}
+                                className={`px-3 py-2.5 rounded-xl cursor-pointer flex items-center justify-between text-xs font-medium transition-colors ${
+                                  isSelected
+                                    ? "bg-orange-50 text-orange-600 font-bold"
+                                    : "text-gray-700 hover:bg-gray-50"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <MapPin className={`w-3.5 h-3.5 ${isSelected ? "text-orange-500" : "text-gray-400"}`} />
+                                  <span>{city.name}</span>
+                                </div>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-orange-500" />}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="p-3 text-center text-xs text-gray-400">
+                            No cities found
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            {/* Right: Clean, uncrowded controls */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Wishlist */}
+              <Link
+                href="/wishlist"
+                className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:text-orange-500 hover:border-orange-300 transition-all shadow-2xs"
+                title="Wishlist"
+              >
+                <Heart className="w-4 h-4" />
+              </Link>
+
+              {/* Notification */}
+              <Link
+                href="/notifications"
+                className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 hover:text-orange-500 hover:border-orange-300 relative transition-all shadow-2xs"
+                title="Notifications"
+              >
+                <Bell className="w-4 h-4 fill-gray-700" />
                 {notificationCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] min-w-[15px] h-[15px] px-0.5 rounded-full flex items-center justify-center font-bold shadow-2xs">
                     {notificationCount > 99 ? "99+" : notificationCount}
                   </span>
                 )}
               </Link>
 
-              <Link href="/cart" className="relative" aria-label="Cart">
-                <ShoppingCart className="w-5 h-5 sm:w-8 sm:h-8 text-black" />
-                {isClient && cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                    {cartCount > 99 ? "99+" : cartCount}
-                  </span>
-                )}
-              </Link>
+              {/* Profile Avatar if logged in OR sleek Login pill if logged out */}
+              {isClient && user ? (
+                <Link
+                  href="/account"
+                  className="w-8 h-8 rounded-full overflow-hidden shrink-0 border-2 border-orange-400 bg-orange-50 flex items-center justify-center shadow-2xs cursor-pointer hover:border-orange-500 transition-all"
+                  title="My Account"
+                >
+                  {(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile) ? (
+                    <img
+                      src={getProfileImage(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile)}
+                      alt={userDisplayName || "Profile"}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-orange-100 text-[#FF6A00] flex items-center justify-center font-black text-xs">
+                      {userInitial || <User className="w-4 h-4 text-[#FF6A00]" />}
+                    </div>
+                  )}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="px-3 py-1.5 bg-gradient-to-r from-[#FF6A00] to-[#FF8533] hover:brightness-105 active:scale-95 text-white text-xs font-bold rounded-full transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Login</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* MOBILE SEARCH BAR */}
-          <div ref={mobileSearchRef} className="relative mt-2">
+          <div ref={mobileSearchRef} className="relative mt-2.5">
             <form
               onSubmit={handleSearchSubmit}
-              className="border border-orange-500 rounded-xl px-4 py-2 flex items-center gap-3 bg-white shadow-sm"
+              className="rounded-2xl px-3.5 py-2 flex items-center gap-2.5 bg-white border border-gray-200 shadow-2xs focus-within:border-[#FF6A00] focus-within:ring-2 focus-within:ring-orange-500/15 transition-all"
             >
-              <Search className="w-4 h-4 text-gray-400 shrink-0" />
+              <Search className="w-4 h-4 text-[#FF6A00] shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
@@ -756,13 +809,20 @@ const Header = () => {
                   setIsSearchOpen(true);
                 }}
                 onFocus={() => setIsSearchOpen(true)}
-                placeholder={`Search services in ${currentCity}...`}
-                className="flex-1 outline-none bg-transparent text-sm placeholder:text-gray-400 text-gray-800"
+                placeholder={`Search "AC Repair", "Cleaning", "Plumber"...`}
+                className="flex-1 outline-none bg-transparent text-xs font-medium placeholder:text-gray-400 text-gray-900"
               />
-              {searchQuery && (
+              {searchQuery ? (
                 <X
                   onClick={() => setSearchQuery("")}
                   className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600"
+                />
+              ) : (
+                <Mic
+                  onClick={handleVoiceSearch}
+                  className={`w-4 h-4 cursor-pointer transition-colors ${
+                    isListening ? "text-red-500 animate-pulse" : "text-gray-400 hover:text-orange-500"
+                  }`}
                 />
               )}
             </form>
@@ -1064,23 +1124,36 @@ const Header = () => {
               )}
             </Link>
 
-            {/* Login */}
+            {/* Login / Profile */}
             {!isClient ? null : user ? (
             <div className="relative group flex items-center gap-2 cursor-pointer">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 bg-gray-200 border border-gray-200/50 flex items-center justify-center">
-                <img
-                  src={getProfileImage(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile)}
-                  alt={user?.firstName || "Profile"}
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = "/profile.png";
-                  }}
-                  className="w-full h-full object-cover rounded-full"
-                />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 border border-orange-200/60 flex items-center justify-center bg-orange-50">
+                {(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile) ? (
+                  <img
+                    src={getProfileImage(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile)}
+                    alt={user?.firstName || "Profile"}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+                      }
+                    }}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-orange-100 text-[#FF6A00] flex items-center justify-center font-bold text-xs sm:text-sm">
+                    {user?.firstName ? (
+                      user.firstName.charAt(0).toUpperCase()
+                    ) : (
+                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF6A00]" />
+                    )}
+                  </div>
+                )}
               </div>
 
               <span className="hidden lg:text-base text-[10px] md:inline text-gray-700 font-medium">
-                {user.firstName || "Login"}
+                {user.firstName || (user as any)?.name || (user.phone ? `+91 ${user.phone}` : "Account")}
               </span>
 
               <ChevronDown className="w-4 h-4 text-gray-500" />
@@ -1090,11 +1163,11 @@ const Header = () => {
                   <p className="font-medium text-gray-900">
                     {user.firstName && user.lastName
                       ? `${user.firstName} ${user.lastName}`
-                      : user.firstName || "User"}
+                      : (user.firstName || (user as any)?.name || "User")}
                   </p>
 
                   <p className="text-sm text-gray-500">
-                    {user.email || user.phone}
+                    {user.email || (user.phone ? `+91 ${user.phone}` : "")}
                   </p>
                 </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useBooking } from "@/context/BookingContext";
 import {
@@ -23,9 +23,12 @@ import {
   QrCode,
   Percent,
   Wallet,
+  Wrench,
+  X,
+  RotateCw,
 } from "lucide-react";
 import axios from "axios";
-import { API_BASE_URL } from "@/config/api";
+import { API_BASE_URL, getImageUrl } from "@/config/api";
 import Swal from "sweetalert2";
 import { SelectDateTimeModal } from "@/components/booking-flow/SelectDateTimeModal";
 
@@ -103,6 +106,21 @@ export default function CheckoutConfirmationPage() {
   const [gstNo, setGstNo] = useState("");
   const [gstName, setGstName] = useState("");
   const [gstError, setGstError] = useState("");
+  const [gstSaved, setGstSaved] = useState(false);
+
+  // Enriched cart items for consistent problem images, subtitles & warranties
+  const [enrichedCartItems, setEnrichedCartItems] = useState<any[]>([]);
+
+  // COD OTP Confirmation States
+  const [showCodOtpModal, setShowCodOtpModal] = useState(false);
+  const [codPhone, setCodPhone] = useState("");
+  const [codOtpDigits, setCodOtpDigits] = useState<string[]>(["", "", "", ""]);
+  const [codOtpError, setCodOtpError] = useState("");
+  const [otpTimer, setOtpTimer] = useState(30);
+  const [canResendOtp, setCanResendOtp] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
@@ -184,6 +202,20 @@ export default function CheckoutConfirmationPage() {
         if (savedUser) setUserData(JSON.parse(savedUser));
       } catch (e) { }
 
+      // Restore saved GST details if previously entered & saved
+      try {
+        const savedGst = localStorage.getItem("saved_gst");
+        if (savedGst) {
+          const parsed = JSON.parse(savedGst);
+          if (parsed.gstNo) {
+            setGstNo(parsed.gstNo);
+            setGstName(parsed.gstName || "");
+            setAddGst(true);
+            setGstSaved(true);
+          }
+        }
+      } catch (e) { }
+
       // Fetch customer addresses for address confirmation & switching
       const token = localStorage.getItem("token");
       if (token) {
@@ -201,6 +233,100 @@ export default function CheckoutConfirmationPage() {
       }
     }
   }, []);
+
+  // Enrich cart items dynamically from API to guarantee exact problem image, subtitle and warranty
+  useEffect(() => {
+    if (!cartItems || cartItems.length === 0) {
+      setEnrichedCartItems([]);
+      return;
+    }
+
+    const enrichItems = async () => {
+      try {
+        const serviceId = cartItems[0]?.service_id || cartItems[0]?.serviceId || 1;
+        const res = await axios.get(
+          `${API_BASE_URL}/service?service_id=${serviceId}&state_name=Chhattisgarh&city_name=Raipur`
+        );
+        const issues = res.data?.data?.issues || [];
+        const subCats = res.data?.data?.sub_categories || res.data?.data?.subServices || [];
+        const subCatMap: Record<string, string> = {};
+        subCats.forEach((sc: any) => {
+          const scId = sc.id ?? sc.sub_category_id;
+          const scName = sc.name ?? sc.sub_category_name;
+          if (scId && scName) subCatMap[String(scId)] = scName;
+        });
+
+        const issueMap: Record<string, any> = {};
+        issues.forEach((iss: any) => {
+          if (iss?.id) issueMap[String(iss.id)] = iss;
+        });
+
+        const merged = cartItems.map((item: any) => {
+          const issue = issueMap[String(item.id)] || {};
+          const subCatName =
+            item.subCategoryName ||
+            item.sub_category_name ||
+            subCatMap[String(issue.service_sub_category_id || item.service_sub_category_id)] ||
+            issue.service_sub_category?.name ||
+            item.subService ||
+            "Split AC";
+
+          let baseName = item.baseName || issue.name || item.name || "Service";
+          const match = baseName.match(/^(.*?)\s*\((.*?)\)$/);
+          if (match) {
+            baseName = match[1].trim();
+          }
+
+          const rawImg =
+            issue.icon_url ||
+            issue.icon ||
+            item.image ||
+            item.icon_url ||
+            item.icon;
+
+          return {
+            ...item,
+            baseName,
+            subCategoryName: subCatName,
+            sub_category_name: subCatName,
+            warrantyDays:
+              issue.warranty_days ??
+              item.warrantyDays ??
+              item.warranty_days ??
+              15,
+            image: rawImg,
+            price: Number(item.price || item.discountedPrice || issue.final_price || 199),
+            originalPrice: Number(
+              item.originalPrice ||
+                issue.strike_price ||
+                Math.round((item.price || 199) * 1.15)
+            ),
+          };
+        });
+
+        setEnrichedCartItems(merged);
+      } catch (e) {
+        setEnrichedCartItems(cartItems);
+      }
+    };
+
+    enrichItems();
+  }, [cartItems]);
+
+  // Timer countdown for COD OTP modal
+  useEffect(() => {
+    let interval: any = null;
+    if (showCodOtpModal && otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (otpTimer === 0) {
+      setCanResendOtp(true);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [showCodOtpModal, otpTimer]);
 
   // Price calculations matching exact checkout math
   const rawTotalMRP = cartItems.reduce(
@@ -242,9 +368,250 @@ export default function CheckoutConfirmationPage() {
     });
   };
 
+  const getServiceImage = (item: any) => {
+    const raw = item?.image || item?.icon_url || item?.icon;
+    if (!raw || typeof raw !== "string" || raw.trim() === "") return "/tas.logo.png";
+    if (!raw.includes("/") && !raw.startsWith("http")) {
+      const host = API_BASE_URL.replace(/\/api\/?$/, "");
+      return `${host}/storage/service-issues/${raw}`;
+    }
+    return getImageUrl(raw, "/tas.logo.png");
+  };
+
+  const getDisplayDetails = (item: any) => {
+    let baseName = item?.baseName || item?.name || "Service";
+    let subCat =
+      item?.subCategoryName ||
+      item?.sub_category_name ||
+      item?.subService ||
+      "";
+
+    const match = baseName.match(/^(.*?)\s*\((.*?)\)$/);
+    if (match) {
+      baseName = match[1].trim();
+      if (!subCat) subCat = match[2].trim();
+    }
+
+    if (!subCat) {
+      subCat = "Split AC";
+    }
+
+    return { baseName, subCat };
+  };
+
+  const handleSaveGst = () => {
+    const trimmedNo = gstNo.trim().toUpperCase();
+    if (!trimmedNo) {
+      setGstError("Please enter 15-character GST number");
+      return;
+    }
+    if (!gstRegex.test(trimmedNo)) {
+      setGstError("Invalid GST format. (e.g. 22AAAAA0000A1Z5)");
+      return;
+    }
+    setGstError("");
+    setGstNo(trimmedNo);
+    setGstSaved(true);
+    try {
+      localStorage.setItem(
+        "saved_gst",
+        JSON.stringify({
+          gstNo: trimmedNo,
+          gstName: gstName.trim(),
+        })
+      );
+    } catch (e) { }
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "GST Saved Successfully",
+      text: "Your GSTIN has been saved for tax invoice.",
+      showConfirmButton: false,
+      timer: 2000,
+    });
+  };
+
+  // Trigger COD OTP verification modal
+  const handleInitiateCodOtp = async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("redirectAfterLogin", "/booking-payment");
+      }
+      window.dispatchEvent(new Event("open-auth-modal"));
+      return;
+    }
+
+    if (!cartItems.length) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cart Empty",
+        text: "Your cart is empty. Please add a service first.",
+        confirmButtonColor: "#ff5500",
+      });
+      return;
+    }
+
+    let customerPhone =
+      userData?.mobile ||
+      userData?.phone ||
+      selectedAddress?.contact_number ||
+      selectedAddress?.phone ||
+      "";
+    if (customerPhone) {
+      customerPhone = customerPhone.replace(/\D/g, "").slice(-10);
+    }
+    if (!customerPhone || customerPhone.length !== 10) {
+      customerPhone = "7812991993";
+    }
+
+    setCodPhone(customerPhone);
+    setCodOtpDigits(["", "", "", ""]);
+    setCodOtpError("");
+    setOtpTimer(30);
+    setCanResendOtp(false);
+    setShowCodOtpModal(true);
+
+    setTimeout(() => {
+      otpInputsRef.current[0]?.focus();
+    }, 150);
+
+    try {
+      setOtpSending(true);
+      await axios.post(`${API_BASE_URL}/customers/send-otp`, {
+        country_id: 1,
+        mobile: customerPhone,
+      });
+    } catch (e: any) {
+      console.warn("COD OTP send error/notice:", e?.response?.data || e);
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleResendCodOtp = async () => {
+    if (!codPhone) return;
+    try {
+      setOtpSending(true);
+      setCodOtpError("");
+      setOtpTimer(30);
+      setCanResendOtp(false);
+      setCodOtpDigits(["", "", "", ""]);
+
+      const res = await axios.post(`${API_BASE_URL}/customers/send-otp`, {
+        country_id: 1,
+        mobile: codPhone,
+      });
+
+      if (res.data?.status) {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "success",
+          title: "New OTP Sent Successfully",
+          showConfirmButton: false,
+          timer: 2000,
+        });
+        setTimeout(() => {
+          otpInputsRef.current[0]?.focus();
+        }, 100);
+      } else {
+        setCodOtpError(res.data?.message || "Failed to resend OTP.");
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "Could not resend OTP. Please try again.";
+      setCodOtpError(msg);
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyCodOtpAndBook = async (explicitOtp?: string) => {
+    const fullOtp = typeof explicitOtp === "string" ? explicitOtp : codOtpDigits.join("");
+    if (fullOtp.length !== 4) {
+      setCodOtpError("Please enter the complete 4-digit OTP.");
+      return;
+    }
+
+    try {
+      setOtpVerifying(true);
+      setCodOtpError("");
+
+      const res = await axios.post(`${API_BASE_URL}/customers/verify-otp`, {
+        country_id: 1,
+        mobile: codPhone,
+        otp: fullOtp,
+      });
+
+      if (res.data?.status) {
+        if (res.data?.token) {
+          localStorage.setItem("token", res.data.token);
+        }
+        setShowCodOtpModal(false);
+        await createBooking("COD");
+      } else {
+        setCodOtpError(res.data?.message || "Invalid OTP code.");
+      }
+    } catch (err: any) {
+      console.error("COD Verify OTP Error:", err?.response?.data || err);
+      const msg =
+        err?.response?.data?.message ||
+        "Invalid or expired OTP. Please check the code and try again.";
+      setCodOtpError(msg);
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
+  const handleCodOtpDigitChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    if (codOtpError) setCodOtpError("");
+
+    const newDigits = [...codOtpDigits];
+    newDigits[index] = value.slice(-1);
+    setCodOtpDigits(newDigits);
+
+    if (value && index < 3) {
+      otpInputsRef.current[index + 1]?.focus();
+    }
+
+    const fullOtp = newDigits.join("");
+    if (fullOtp.length === 4) {
+      handleVerifyCodOtpAndBook(fullOtp);
+    }
+  };
+
+  const handleCodOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !codOtpDigits[index] && index > 0) {
+      otpInputsRef.current[index - 1]?.focus();
+    }
+  };
+
+  const handleCodOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    if (codOtpError) setCodOtpError("");
+    const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    if (!pastedData) return;
+
+    const newDigits = ["", "", "", ""];
+    for (let i = 0; i < pastedData.length; i++) {
+      newDigits[i] = pastedData[i];
+    }
+    setCodOtpDigits(newDigits);
+    const nextIdx = Math.min(pastedData.length, 3);
+    otpInputsRef.current[nextIdx]?.focus();
+
+    if (pastedData.length === 4) {
+      handleVerifyCodOtpAndBook(pastedData);
+    }
+  };
+
   const handleGstChange = (val: string) => {
     const cleaned = val.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15);
     setGstNo(cleaned);
+    setGstSaved(false);
     if (cleaned.length === 15) {
       if (gstRegex.test(cleaned)) {
         setGstError("");
@@ -333,6 +700,7 @@ export default function CheckoutConfirmationPage() {
         gst_no: validGstNo || "22AAAAA0000A1Z5",
         gst_name: validGstName || (validGstNo ? "Business Client" : null),
         pan_no: "ABCDE1234F",
+        alt_mobile: selectedAddress?.alt_contact_number || selectedAddress?.altPhone || userData?.alt_mobile || null,
         service_category_id: Number(
           cartItems[0]?.service_category_id ||
           cartItems[0]?.serviceCategoryId ||
@@ -387,12 +755,14 @@ export default function CheckoutConfirmationPage() {
           totalMRP,
           totalDiscount,
           couponDiscount,
+          couponCode: appliedCoupon?.code || null,
           finalAmount,
           gstAmount,
           gstNo: validGstNo,
           gstName: validGstName,
           bookingDateTime,
           selectedAddress,
+          altPhone: selectedAddress?.alt_contact_number || selectedAddress?.altPhone || userData?.alt_mobile || "",
           paymentMethod,
         };
 
@@ -714,12 +1084,14 @@ export default function CheckoutConfirmationPage() {
 
   const handlePay = async () => {
     if (selectedMethod === "cod") {
-      await createBooking("COD");
+      handleInitiateCodOtp();
       return;
     }
 
     await handleRazorpayPayment(selectedMethod);
   };
+
+  const displayItems = enrichedCartItems.length > 0 ? enrichedCartItems : cartItems;
 
   return (
     <div className="w-full min-h-screen bg-[#FDFCFB] pb-20">
@@ -738,7 +1110,7 @@ export default function CheckoutConfirmationPage() {
             {/* 2-Column Checkout Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-              {/* LEFT COLUMN: Service Address -> Time Slot -> GST -> Payment Options */}
+              {/* LEFT COLUMN: Service Address -> Service Details -> Time Slot -> GST -> Payment Options */}
               <div className="lg:col-span-8 space-y-5">
 
                 {/* 1. SERVICE ADDRESS CONFIRMATION CARD */}
@@ -840,6 +1212,109 @@ export default function CheckoutConfirmationPage() {
                   </div>
                 </div>
 
+                {/* SERVICE DETAILS CARD (PLACED BELOW SERVICE ADDRESS) */}
+                {cartItems.length > 0 && (
+                  <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all space-y-4">
+                    <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center shrink-0">
+                          <Wrench className="w-4 h-4 stroke-[2.5]" />
+                        </div>
+                        <div>
+                          <h2 className="font-bold text-sm sm:text-base text-gray-900 leading-tight">
+                            Service Details
+                          </h2>
+                          <p className="text-[11px] text-gray-400">
+                            Selected service items and warranty details
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="text-xs font-bold text-[#FF6A00] bg-orange-50 border border-orange-200/70 px-3 py-1 rounded-full">
+                        {cartItems.length} {cartItems.length === 1 ? "Service" : "Services"}
+                      </span>
+                    </div>
+
+                    <div className="divide-y divide-gray-100">
+                      {displayItems.map((item: any, idx: number) => {
+                        const { baseName, subCat } = getDisplayDetails(item);
+                        const qty = item.quantity || 1;
+                        const itemPrice = Math.round(Number(item.price || item.discountedPrice || 199));
+                        const itemOriginalPrice = Math.round(
+                          Number(item.originalPrice || Math.round(itemPrice * 1.15))
+                        );
+                        const discountPercent =
+                          itemOriginalPrice > itemPrice
+                            ? Math.round(((itemOriginalPrice - itemPrice) / itemOriginalPrice) * 100)
+                            : 0;
+                        const warrantyDays = item.warrantyDays || item.warranty_days || 15;
+
+                        return (
+                          <div
+                            key={item.id || idx}
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                              idx > 0 ? "pt-4" : ""
+                            } ${idx < displayItems.length - 1 ? "pb-4" : ""}`}
+                          >
+                            {/* Left: Problem Image + Title & Subtitle + Warranty Badge + Qty */}
+                            <div className="flex items-start sm:items-center gap-3.5 sm:gap-4 min-w-0">
+                              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-orange-50/50 border border-orange-100/80 p-1.5 flex items-center justify-center shrink-0 overflow-hidden">
+                                <img
+                                  src={getServiceImage(item)}
+                                  alt={baseName}
+                                  className="w-full h-full object-contain"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src = "/tas.logo.png";
+                                  }}
+                                />
+                              </div>
+
+                              <div className="min-w-0 space-y-1">
+                                <h3 className="font-bold text-sm sm:text-base text-gray-900 leading-snug">
+                                  {baseName}
+                                </h3>
+                                <p className="text-xs text-gray-500 font-medium">
+                                  {subCat}
+                                </p>
+
+                                <div className="flex items-center gap-2 pt-1 flex-wrap">
+                                  <span className="inline-flex items-center gap-1 bg-orange-50 text-[#FF6A00] border border-orange-200/70 text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                    <span>{warrantyDays} Days Warranty</span>
+                                  </span>
+
+                                  <span className="inline-flex items-center text-xs font-bold text-gray-700 bg-gray-100 border border-gray-200/80 px-2.5 py-0.5 rounded-lg">
+                                    Qty: {qty}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right: Pricing */}
+                            <div className="text-right sm:text-right shrink-0 self-end sm:self-center pl-2">
+                              <div className="flex sm:flex-col items-baseline sm:items-end justify-end gap-2 sm:gap-0.5">
+                                <span className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">
+                                  ₹{itemPrice * qty}
+                                </span>
+                                {itemOriginalPrice > itemPrice && (
+                                  <span className="text-xs text-gray-400 line-through">
+                                    ₹{itemOriginalPrice * qty}
+                                  </span>
+                                )}
+                              </div>
+                              {discountPercent > 0 && (
+                                <span className="inline-block mt-0.5 text-[10px] font-extrabold text-green-700 bg-green-50 border border-green-200/80 px-1.5 py-0.5 rounded">
+                                  {discountPercent}% OFF
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* 2. TIME SLOT CONFIRMATION CARD */}
                 <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-xs transition-all">
                   <div className="flex items-center justify-between pb-3.5 border-b border-gray-100">
@@ -927,7 +1402,10 @@ export default function CheckoutConfirmationPage() {
                       <input
                         type="checkbox"
                         checked={addGst}
-                        onChange={(e) => setAddGst(e.target.checked)}
+                        onChange={(e) => {
+                          setAddGst(e.target.checked);
+                          if (!e.target.checked) setGstSaved(false);
+                        }}
                         className="sr-only peer"
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FF6A00]" />
@@ -946,7 +1424,10 @@ export default function CheckoutConfirmationPage() {
                             maxLength={15}
                             placeholder="e.g. 22AAAAA0000A1Z5"
                             value={gstNo}
-                            onChange={(e) => handleGstChange(e.target.value)}
+                            onChange={(e) => {
+                              handleGstChange(e.target.value);
+                              setGstSaved(false);
+                            }}
                             className={`w-full px-3.5 py-2.5 border rounded-xl text-xs sm:text-sm uppercase font-mono tracking-wider outline-none transition-colors ${gstError
                                 ? "border-red-400 bg-red-50/20 focus:border-red-500"
                                 : gstNo.length === 15 && !gstError
@@ -976,10 +1457,48 @@ export default function CheckoutConfirmationPage() {
                             type="text"
                             placeholder="e.g. TAS Technologies Pvt Ltd"
                             value={gstName}
-                            onChange={(e) => setGstName(e.target.value)}
+                            onChange={(e) => {
+                              setGstName(e.target.value);
+                              setGstSaved(false);
+                            }}
                             className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:border-orange-500"
                           />
                         </div>
+                      </div>
+
+                      {/* Dedicated Save Button for GST */}
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="text-[11px]">
+                          {gstSaved ? (
+                            <span className="text-green-700 font-bold flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>GST details saved &amp; ready for tax invoice</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">
+                              Click Save to confirm GSTIN for this booking
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleSaveGst}
+                          className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                            gstSaved
+                              ? "bg-green-600 hover:bg-green-700 text-white"
+                              : "bg-[#FF6A00] hover:bg-[#E05500] text-white active:scale-95"
+                          }`}
+                        >
+                          {gstSaved ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>Saved</span>
+                            </>
+                          ) : (
+                            <span>Save GST</span>
+                          )}
+                        </button>
                       </div>
 
                       <div className="bg-orange-50/60 border border-orange-200/60 rounded-xl p-2.5 flex items-center gap-2 text-[11px] text-orange-800 font-medium">
@@ -1093,32 +1612,6 @@ export default function CheckoutConfirmationPage() {
                 </div>
               )}
             </div>
-
-            {/* 5. BOOKED SERVICES SUMMARY */}
-            {cartItems.length > 0 && (
-              <div className="bg-white border border-gray-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
-                <div className="pb-2.5 border-b border-gray-100">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-gray-500">
-                    Booked Services ({cartItems.length})
-                  </h3>
-                </div>
-                <div className="divide-y divide-gray-100 pt-1">
-                  {cartItems.map((item: any, idx: number) => (
-                    <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
-                      <div>
-                        <p className="font-bold text-gray-900">{item.name || "Home Service"}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          Qty: {item.quantity || 1} • 30 Days Free Warranty
-                        </p>
-                      </div>
-                      <span className="font-extrabold text-gray-900 text-sm">
-                        ₹{(item.price || item.discountedPrice || 199) * (item.quantity || 1)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
               </div>
 
@@ -1272,6 +1765,116 @@ export default function CheckoutConfirmationPage() {
                 cartItems?.[0]?.service_id || cartItems?.[0]?.serviceId || 1
               }
             />
+
+            {/* COD Booking Confirmation OTP Modal */}
+            {showCodOtpModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+                <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-gray-100 relative">
+                  {/* Close Modal Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!otpVerifying) setShowCodOtpModal(false);
+                    }}
+                    className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+
+                  {/* Top Banknote/Security Icon */}
+                  <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 text-[#FF6A00] flex items-center justify-center mx-auto mb-3.5 shadow-2xs">
+                    <Banknote className="w-7 h-7" />
+                  </div>
+
+                  <h3 className="text-xl font-extrabold text-gray-900 text-center tracking-tight">
+                    Confirm COD Booking
+                  </h3>
+                  <p className="text-xs text-gray-500 text-center mt-1.5 max-w-xs mx-auto leading-relaxed">
+                    Enter the 4-digit verification code sent to{" "}
+                    <span className="font-bold text-gray-800">
+                      +91 {codPhone.slice(0, 2)}******{codPhone.slice(-2)}
+                    </span>{" "}
+                    to confirm your Cash on Delivery booking.
+                  </p>
+
+                  {/* 4-digit OTP Input Fields */}
+                  <div className="flex justify-center gap-3 my-6">
+                    {codOtpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => {
+                          otpInputsRef.current[idx] = el;
+                        }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleCodOtpDigitChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleCodOtpKeyDown(idx, e)}
+                        onPaste={idx === 0 ? handleCodOtpPaste : undefined}
+                        className={`w-12 h-14 text-center text-xl font-black rounded-xl border transition-all outline-none ${
+                          codOtpError
+                            ? "border-red-400 bg-red-50/20 text-red-600 focus:border-red-500"
+                            : digit
+                            ? "border-[#FF6A00] bg-orange-50/20 text-gray-900 shadow-xs"
+                            : "border-gray-300 bg-gray-50/50 text-gray-900 focus:border-[#FF6A00] focus:bg-white"
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Error Message */}
+                  {codOtpError && (
+                    <p className="text-xs text-red-600 text-center font-medium flex items-center justify-center gap-1.5 mb-4 animate-shake">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{codOtpError}</span>
+                    </p>
+                  )}
+
+                  {/* Resend OTP Timer / Button */}
+                  <div className="flex items-center justify-center text-xs text-gray-500 mb-5">
+                    {otpTimer > 0 ? (
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
+                        <span>
+                          Resend OTP in <strong className="text-gray-800 font-bold">{otpTimer}s</strong>
+                        </span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={otpSending}
+                        onClick={handleResendCodOtp}
+                        className="font-bold text-[#FF6A00] hover:text-[#E05500] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                      >
+                        <RotateCw className={`w-3.5 h-3.5 ${otpSending ? "animate-spin" : ""}`} />
+                        <span>Resend OTP</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Confirm & Verify Button */}
+                  <button
+                    type="button"
+                    disabled={otpVerifying || codOtpDigits.join("").length !== 4}
+                    onClick={() => handleVerifyCodOtpAndBook()}
+                    className="w-full py-3.5 bg-[#FF6A00] hover:bg-[#E05500] active:scale-[0.99] text-white font-extrabold rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {otpVerifying ? (
+                      <span>Verifying &amp; Confirming...</span>
+                    ) : (
+                      <span>Verify &amp; Confirm Booking</span>
+                    )}
+                  </button>
+
+                  <p className="text-[11px] text-gray-400 text-center mt-3 flex items-center justify-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
+                    <span>Secure OTP confirmation • Pay cash upon service delivery</span>
+                  </p>
+                </div>
+              </div>
+            )}
 
           </main>
         </div>

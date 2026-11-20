@@ -108,3 +108,196 @@
     @apply max-w-7xl mx-auto px-4;
   }
 }
+
+/* CKEditor / Rich Text / Service Description Content Styling */
+.ck-content,
+.service-rich-text,
+.prose {
+  --tw-prose-bullets: #111827 !important;
+  --tw-prose-counters: #111827 !important;
+  --tw-prose-body: #1f2937 !important;
+  --tw-prose-headings: #111827 !important;
+  --tw-prose-bold: #111827 !important;
+  color: #1f2937 !important;
+  line-height: 1.75;
+}
+
+.dark .ck-content,
+.dark .service-rich-text,
+.dark .prose {
+  --tw-prose-bullets: #f9fafb !important;
+  --tw-prose-counters: #f9fafb !important;
+  --tw-prose-body: #f3f4f6 !important;
+  --tw-prose-headings: #ffffff !important;
+  --tw-prose-bold: #ffffff !important;
+  color: #f3f4f6 !important;
+}
+
+.ck-content h1,
+.service-rich-text h1,
+.ck-content h2,
+.service-rich-text h2,
+.ck-content h3,
+.service-rich-text h3,
+.ck-content h4,
+.service-rich-text h4,
+.ck-content h5,
+.service-rich-text h5,
+.ck-content h6,
+.service-rich-text h6 {
+  color: #111827 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.015em;
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.625rem !important;
+  line-height: 1.35 !important;
+}
+
+.dark .ck-content h1,
+.dark .service-rich-text h1,
+.dark .ck-content h2,
+.dark .service-rich-text h2,
+.dark .ck-content h3,
+.dark .service-rich-text h3,
+.dark .ck-content h4,
+.dark .service-rich-text h4,
+.dark .ck-content h5,
+.dark .service-rich-text h5,
+.dark .ck-content h6,
+.dark .service-rich-text h6 {
+  color: #f9fafb !important;
+}
+
+.ck-content h1,
+.service-rich-text h1 {
+  font-size: 1.625rem !important;
+}
+
+.ck-content h2,
+.service-rich-text h2 {
+  font-size: 1.375rem !important;
+}
+
+.ck-content h3,
+.service-rich-text h3 {
+  font-size: 1.25rem !important;
+}
+
+.ck-content h4,
+.service-rich-text h4 {
+  font-size: 1.1rem !important;
+}
+
+.ck-content p,
+.service-rich-text p {
+  margin-top: 0.625rem !important;
+  margin-bottom: 0.625rem !important;
+}
+
+.ck-content strong,
+.service-rich-text strong,
+.ck-content b,
+.service-rich-text b {
+  font-weight: 700 !important;
+  color: #111827 !important;
+}
+
+.dark .ck-content strong,
+.dark .service-rich-text strong,
+.dark .ck-content b,
+.dark .service-rich-text b {
+  color: #f9fafb !important;
+}
+
+.ck-content ul,
+.service-rich-text ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.625rem !important;
+  margin-bottom: 0.875rem !important;
+}
+
+.ck-content ol,
+.service-rich-text ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.625rem !important;
+  margin-bottom: 0.875rem !important;
+}
+
+.ck-content li,
+.service-rich-text li {
+  color: #1f2937 !important;
+  font-weight: 450 !important;
+  margin-top: 0.35rem !important;
+  margin-bottom: 0.35rem !important;
+  display: list-item !important;
+  list-style-position: outside !important;
+  line-height: 1.65 !important;
+}
+
+.dark .ck-content li,
+.dark .service-rich-text li {
+  color: #e5e7eb !important;
+}
+
+.ck-content li::marker,
+.service-rich-text li::marker,
+.ck-content ul > li::marker,
+.service-rich-text ul > li::marker,
+.prose ul > li::marker {
+  color: #111827 !important;
+  font-size: 1.2em !important;
+  font-weight: 900 !important;
+}
+
+.dark .ck-content li::marker,
+.dark .service-rich-text li::marker,
+.dark .ck-content ul > li::marker,
+.dark .service-rich-text ul > li::marker,
+.dark .prose ul > li::marker {
+  color: #f9fafb !important;
+}
+
+.ck-content ol > li::marker,
+.service-rich-text ol > li::marker,
+.prose ol > li::marker {
+  color: #111827 !important;
+  font-weight: 700 !important;
+}
+
+.dark .ck-content ol > li::marker,
+.dark .service-rich-text ol > li::marker,
+.dark .prose ol > li::marker {
+  color: #f9fafb !important;
+}
+
+.ck-content blockquote,
+.service-rich-text blockquote {
+  border-left: 4px solid #f97316 !important;
+  padding-left: 1rem !important;
+  font-style: italic !important;
+  margin: 1rem 0 !important;
+  color: #4b5563 !important;
+}
+
+.ck-content table,
+.service-rich-text table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 1rem 0 !important;
+}
+
+.ck-content th,
+.service-rich-text th,
+.ck-content td,
+.service-rich-text td {
+  border: 1px solid #e5e7eb !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
+.ck-content th,
+.service-rich-text th {
+  background-color: #f9fafb !important;
+  font-weight: 600 !important;
+}

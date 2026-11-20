@@ -1,10 +1,19 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://app.tasprocompany.in/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://127.0.0.1:8000/api"
+    : "https://app.tasprocompany.in/api");
 
 export const API_HOST_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 export const LIVE_MEDIA_BASE_URL = API_HOST_URL;
 
 export const BASE_URL = API_BASE_URL;
+
+export const GOOGLE_MAPS_API_KEY =
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+  process.env.NEXT_PUBLIC_GOOGLE_MAP_KEY ||
+  "AIzaSyDxK5yY7_jlOZt_JthC-NtNZW-kvV_TnUc";
 
 /**
  * Format any image URL returned from API to use valid media storage URL.
@@ -59,6 +68,12 @@ export const getImageUrl = (src?: string | null, fallback = "/tas.logo.png"): st
     ) {
       return src.replace(/^http:\/\/(?:127\.0\.0\.1|localhost):8000/, API_HOST_URL);
     }
+    if (
+      (API_HOST_URL.includes("127.0.0.1") || API_HOST_URL.includes("localhost")) &&
+      src.includes("tasprocompany.in/storage/")
+    ) {
+      return src.replace(/https?:\/\/(?:app\.)?tasprocompany\.in/, API_HOST_URL);
+    }
     return src;
   }
 
@@ -66,6 +81,20 @@ export const getImageUrl = (src?: string | null, fallback = "/tas.logo.png"): st
   const cleanPath = src.startsWith("/") ? src : `/${src}`;
   if (cleanPath.startsWith("/storage/")) {
     return `${API_HOST_URL}${cleanPath}`;
+  }
+
+  // If bare filename without folder, resolve to appropriate storage directory
+  if (!src.includes("/")) {
+    const BRAND_FILES = [
+      "voltas.png", "daikin.png", "samsung.png", "blueStar.png", "hitachi.png",
+      "mitsubishi.png", "lg.png", "panasonic.png", "whirlpool.png", "godrej.png",
+      "haier.png", "aquaguard.png", "bosch.png", "faber.png", "havells.png",
+      "hindware.png", "ifb.png", "kent.png", "orient.png", "sony.png"
+    ];
+    if (BRAND_FILES.includes(src)) {
+      return `${API_HOST_URL}/storage/covered-brands/${src}`;
+    }
+    return `${API_HOST_URL}/storage/service-issues/${src}`;
   }
 
   return `${API_HOST_URL}/storage${cleanPath}`;

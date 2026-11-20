@@ -20,6 +20,19 @@ export const metadata: Metadata = {
     shortcut: "/logo.png",
     apple: "/logo.png",
   },
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      "max-video-preview": -1,
+      "max-image-preview": "none",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({
@@ -29,6 +42,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+        <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+      </head>
       <body
         className={`${inter.className} bg-white text-gray-900`}
         suppressHydrationWarning

@@ -65,6 +65,7 @@ export default function CartPage() {
 
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
   const [selectedWarrantyService, setSelectedWarrantyService] = useState<any>(null);
+  const [bookingTerms, setBookingTerms] = useState<any[]>([]);
 
   // Wishlist state & sync
   const inFlightWishlistRef = useRef<Set<number>>(new Set());
@@ -212,10 +213,25 @@ export default function CartPage() {
         );
 
         const subCats = res.data?.data?.sub_categories || res.data?.data?.subServices || [];
+        const subCatMap: Record<string, string> = {};
+        subCats.forEach((sc: any) => {
+          const scId = sc.id ?? sc.sub_category_id;
+          const scName = sc.name ?? sc.sub_category_name;
+          if (scId && scName) {
+            subCatMap[String(scId)] = scName;
+          }
+        });
+
         const issues = res.data?.data?.issues || [];
         const allItems: any[] = [
           ...issues,
-          ...subCats.flatMap((sc: any) => sc.items || []),
+          ...subCats.flatMap((sc: any) =>
+            (sc.items || []).map((it: any) => ({
+              ...it,
+              subCategoryName: sc.name,
+              sub_category_name: sc.name,
+            }))
+          ),
         ];
 
         if (res.data?.status && allItems.length > 0) {
@@ -231,10 +247,22 @@ export default function CartPage() {
               price: itemPrice,
               originalPrice: itemStrike > itemPrice ? itemStrike : Math.round(itemPrice * 1.25),
             };
-            detailsMap[String(item.id)] = item;
+            const scName =
+              item.subCategoryName ||
+              item.sub_category_name ||
+              subCatMap[String(item.service_sub_category_id)] ||
+              item.service_sub_category?.name ||
+              "";
+            detailsMap[String(item.id)] = {
+              ...item,
+              subCategoryName: scName,
+              sub_category_name: scName,
+            };
           });
           setLocationPrices(priceMap);
           setServiceDetailsMap(detailsMap);
+          const tcCats = res.data?.data?.booking_t_c_categories || [];
+          setBookingTerms(tcCats);
         }
       } catch (err) {
         console.log("Cart location price fetch error:", err);
@@ -271,12 +299,32 @@ export default function CartPage() {
       item.short_points ||
       item.issueDescriptions?.short_points;
 
+    const rawSubCat =
+      item.subCategoryName ||
+      item.sub_category_name ||
+      details.subCategoryName ||
+      details.sub_category_name ||
+      details.service_sub_category?.name ||
+      item.service_sub_category?.name ||
+      (item.subService && item.subService !== item.name ? item.subService : "") ||
+      "";
+
+    const baseName = item.baseName || item.name || details.name || item.title || "Service";
+
+    // Format service title as: "Deep Cleaning (Split AC)"
+    let displayName = baseName;
+    if (rawSubCat && !baseName.toLowerCase().includes(rawSubCat.toLowerCase())) {
+      displayName = `${baseName} (${rawSubCat})`;
+    }
+
     return {
       ...item,
       ...details,
       id: item.id,
-      name: item.name || details.name || item.title || "Service",
-      title: item.name || details.name || item.title || "Service",
+      name: displayName,
+      baseName,
+      subCategoryName: rawSubCat,
+      title: displayName,
       price,
       discountedPrice: price,
       originalPrice,
@@ -506,28 +554,49 @@ export default function CartPage() {
 
   const addCustomerAddress = async (token: string, formData: any) => {
     const cleanPhone = (value: string) => {
-      const digits = value
-        .replace(/\D/g, "")
-        .replace(/^91/, "")
-        .replace(/^0/, "");
-      return `+91 ${digits}`;
+      if (!value) return "";
+      const digits = value.replace(/\D/g, "");
+      const last10 = digits.length > 10 ? digits.slice(-10) : digits;
+      return last10 ? `+91 ${last10}` : "";
     };
 
+    const houseNo =
+      formData.houseNo ||
+      formData.house_number ||
+      formData.houseNumber ||
+      formData.flat ||
+      "";
+
+    const street =
+      formData.street ||
+      [formData.roadLandmark, formData.location].filter(Boolean).join(", ") ||
+      formData.roadLandmark ||
+      formData.location ||
+      formData.area ||
+      "";
+
+    const altPhone =
+      formData.alternateNumber ||
+      formData.alt_contact_number ||
+      formData.altPhone ||
+      "";
+
     const payload: any = {
-      full_name: formData.fullName || formData.name || "",
+      full_name: formData.fullName || formData.full_name || formData.name || "",
       contact_number: cleanPhone(
-        formData.contactNumber || formData.phone || "",
+        formData.contactNumber || formData.contact_number || formData.phone || "",
       ),
-      postal_code: formData.postalCode || "",
+      alt_contact_number: altPhone ? cleanPhone(altPhone) : null,
+      postal_code: formData.postalCode || formData.postal_code || formData.pincode || "492001",
       latitude: formData.latitude || 21.2514,
       longitude: formData.longitude || 81.6296,
       state_id: 1,
       city_id: 1,
-      state_name: formData.state_name || formData.state || "",
-      city_name: formData.city_name || formData.city || "",
-      house_number: formData.houseNumber || formData.flat || "",
-      street: formData.street || formData.area || "",
-      landmark: formData.landmark || "",
+      state_name: formData.state_name || formData.state || "Chhattisgarh",
+      city_name: formData.city_name || formData.city || "Raipur",
+      house_number: houseNo,
+      street: street,
+      landmark: formData.landmark || formData.roadLandmark || "",
       type: formData.type || "Home",
       is_default: formData.is_default || 0,
     };
@@ -553,28 +622,49 @@ export default function CartPage() {
     formData: any,
   ) => {
     const cleanPhone = (value: string) => {
-      const digits = value
-        .replace(/\D/g, "")
-        .replace(/^91/, "")
-        .replace(/^0/, "");
-      return `+91 ${digits}`;
+      if (!value) return "";
+      const digits = value.replace(/\D/g, "");
+      const last10 = digits.length > 10 ? digits.slice(-10) : digits;
+      return last10 ? `+91 ${last10}` : "";
     };
 
+    const houseNo =
+      formData.houseNo ||
+      formData.house_number ||
+      formData.houseNumber ||
+      formData.flat ||
+      "";
+
+    const street =
+      formData.street ||
+      [formData.roadLandmark, formData.location].filter(Boolean).join(", ") ||
+      formData.roadLandmark ||
+      formData.location ||
+      formData.area ||
+      "";
+
+    const altPhone =
+      formData.alternateNumber ||
+      formData.alt_contact_number ||
+      formData.altPhone ||
+      "";
+
     const payload: any = {
-      full_name: formData.fullName || formData.name || "",
+      full_name: formData.fullName || formData.full_name || formData.name || "",
       contact_number: cleanPhone(
-        formData.contactNumber || formData.phone || "",
+        formData.contactNumber || formData.contact_number || formData.phone || "",
       ),
-      postal_code: formData.postalCode || "",
+      alt_contact_number: altPhone ? cleanPhone(altPhone) : null,
+      postal_code: formData.postalCode || formData.postal_code || formData.pincode || "492001",
       latitude: formData.latitude || 21.2514,
       longitude: formData.longitude || 81.6296,
       state_id: 1,
       city_id: 1,
-      state_name: formData.state_name || formData.state || "",
-      city_name: formData.city_name || formData.city || "",
-      house_number: formData.houseNumber || formData.flat || "",
-      street: formData.street || formData.area || "",
-      landmark: formData.landmark || "",
+      state_name: formData.state_name || formData.state || "Chhattisgarh",
+      city_name: formData.city_name || formData.city || "Raipur",
+      house_number: houseNo,
+      street: street,
+      landmark: formData.landmark || formData.roadLandmark || "",
       type: formData.type || "Home",
       is_default: formData.is_default || 0,
     };
@@ -749,14 +839,28 @@ export default function CartPage() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
-            <h1 className="hidden md:block text-2xl font-black text-gray-900 dark:text-white">
-              Cart Summary
-            </h1>
+            {/* Desktop Header with Back Button */}
+            <div className="hidden md:flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="p-2 -ml-2 rounded-xl text-gray-700 hover:text-[#ff5500] hover:bg-orange-50 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                aria-label="Go Back"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h1 className="text-2xl font-black text-gray-900 dark:text-white">
+                Cart Summary
+              </h1>
+            </div>
 
+            {/* Mobile Header with Back Button */}
             <div className="relative w-full flex items-center justify-center md:hidden py-1">
               <button
+                type="button"
                 onClick={() => router.back()}
-                className="absolute left-0 text-black dark:text-white hover:text-[#ff5500] transition"
+                className="absolute left-0 p-1 text-black dark:text-white hover:text-[#ff5500] transition cursor-pointer"
+                aria-label="Go Back"
               >
                 <ArrowLeft size={20} />
               </button>
@@ -767,7 +871,33 @@ export default function CartPage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+          {!mounted ? (
+            <div className="min-h-[350px] flex items-center justify-center">
+              <div className="w-8 h-8 border-3 border-[#ff5500] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : cartItems.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-gray-200 p-8 sm:p-14 text-center max-w-lg mx-auto my-8 shadow-xs">
+              <img
+                src="/pana.png"
+                alt="Empty Cart"
+                className="mx-auto mb-4 object-contain max-h-56"
+              />
+              <p className="text-gray-600 font-medium text-lg mb-2">
+                Your Cart is empty
+              </p>
+              <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/")}
+                className="px-7 py-3 rounded-xl bg-[#ff5500] hover:bg-orange-600 text-white font-bold text-sm shadow-md transition active:scale-95 cursor-pointer"
+              >
+                Explore Services
+              </button>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
             
             {/* LEFT COLUMN: Customer Address & Order Summary */}
             <div className="lg:col-span-2 space-y-6 self-start">
@@ -1031,12 +1161,12 @@ export default function CartPage() {
                     })
                   ) : (
                     <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100">
-                      <img src="/tas.logo.png" alt="TASpro" className="w-14 h-14 mx-auto mb-3 opacity-60" />
-                      <h3 className="font-bold text-gray-800 text-base mb-1">Your cart is empty</h3>
-                      <p className="text-xs text-gray-500 mb-4">Add services from our catalog to book your service</p>
+                      <img src="/pana.png" alt="Empty Cart" className="mx-auto mb-4 object-contain max-h-44" />
+                      <p className="text-gray-600 font-medium mb-2">Your Cart is empty</p>
+                      <p className="text-sm text-gray-500 mb-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
                       <button
                         onClick={() => router.push("/")}
-                        className="px-5 py-2 rounded-xl bg-[#ff5500] text-white font-bold text-xs hover:bg-orange-600 transition"
+                        className="px-5 py-2.5 rounded-xl bg-[#ff5500] text-white font-bold text-xs hover:bg-orange-600 transition"
                       >
                         Explore Services
                       </button>
@@ -1362,13 +1492,17 @@ export default function CartPage() {
 
             </div>
           </div>
+        )}
         </main>
 
-        <YouMayLikeServices
-          title="Frequently Added Together"
-          categoryId={cartItems[0]?.service_category_id || cartItems[0]?.serviceCategoryId || 1}
-          serviceId={cartItems[0]?.service_id || cartItems[0]?.serviceId}
-        />
+        {mounted && (
+          <YouMayLikeServices
+            title="Frequently Added Together"
+            categoryId={cartItems[0]?.service_category_id || cartItems[0]?.serviceCategoryId || 1}
+            serviceId={cartItems[0]?.service_id || cartItems[0]?.serviceId}
+            excludeIds={cartItems.map((c: any) => c.id || c.service_issue_id || c.serviceIssueId)}
+          />
+        )}
 
         {/* Address Selection Modal */}
         <SelectAddressModal
@@ -1457,6 +1591,7 @@ export default function CartPage() {
                 text: error?.response?.data?.message || "Failed to save address.",
                 confirmButtonColor: "#ff5500",
               });
+              throw error;
             }
           }}
         />
@@ -1467,6 +1602,7 @@ export default function CartPage() {
           onClose={() => setShowTCModal(false)}
           onConfirm={handleAgreeAndProceed}
           loading={cartLoading}
+          terms={bookingTerms}
         />
 
         {/* Complete Service Review Modal */}

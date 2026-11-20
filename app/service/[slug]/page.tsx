@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronRight,
@@ -13,18 +13,20 @@ import {
   AlertTriangle,
   MapPin,
 } from "lucide-react";
-import { API_BASE_URL, getImageUrl } from "@/config/api";
+import { API_BASE_URL, API_HOST_URL, getImageUrl } from "@/config/api";
 import Link from "next/link";
 import { SERVICES_DATA } from "@/data/services";
 import { useBooking } from "@/context/BookingContext";
 import DynamicCategorySection from "@/components/DynamicCategorySection";
 import ServicesSection from "@/components/ServicesSection";
 import ServiceDetailsModal from "@/components/ServiceDetailsModal";
+import ServiceReviewsModal from "@/components/ServiceReviewsModal";
 import { SelectCapacityModal } from "@/components/booking-flow/SelectCapacityModal";
 import { AMCDurationModal } from "@/components/AMCDurationModal";
 import NoServiceModal from "@/components/NoServiceModal";
 import Image from "next/image";
 import SafeImage from "@/components/SafeImage";
+import ServiceHowToBook from "@/components/ServiceHowToBook";
 
 
 type SubService = {
@@ -122,6 +124,7 @@ const ACRepairLayout = () => {
   );
 
   const [showModal, setShowModal] = useState(false);
+  const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
   const [showCoupons, setShowCoupons] = useState(false);
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
   const [showCapacityModal, setShowCapacityModal] = useState(false);
@@ -146,6 +149,81 @@ const ACRepairLayout = () => {
 
   const apiService = serviceDetails?.data;
 
+  const currentCityName = selectedLoc.city || "Raipur";
+  const formatCityText = (text?: string) => {
+    if (!text || typeof text !== "string") return text || "";
+    if (!currentCityName || currentCityName.toLowerCase() === "raipur") return text;
+    return text.replace(/\bRaipur\b/gi, currentCityName);
+  };
+
+  const getPrimaryHeading = () => {
+    if (apiService?.primary_keyword) {
+      const formatted = formatCityText(apiService.primary_keyword);
+      if (formatted.toLowerCase().includes(currentCityName.toLowerCase())) {
+        return formatted;
+      }
+      return `${formatted} in ${currentCityName}`;
+    }
+    return `${apiService?.name || "AC Repair & Service"} in ${currentCityName}`;
+  };
+
+  const hasHeadingInDescription = (html?: string) => {
+    if (!html) return false;
+    const trimmed = html.trim().toLowerCase();
+    return (
+      trimmed.startsWith("<h1") ||
+      trimmed.startsWith("<h2") ||
+      trimmed.startsWith("<h3") ||
+      trimmed.startsWith("<h4")
+    );
+  };
+
+  // Dynamically inject SEO & Meta tags from DB into head
+  useEffect(() => {
+    if (typeof window === "undefined" || !apiService) return;
+
+    if (apiService.meta_title) {
+      document.title = formatCityText(apiService.meta_title);
+    } else if (apiService.name) {
+      document.title = `${apiService.name} in ${currentCityName} | TASPro Company`;
+    }
+
+    const updateMeta = (name: string, content?: string, isProperty = false) => {
+      if (!content) return;
+      const attr = isProperty ? "property" : "name";
+      let el = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement;
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, name);
+        document.head.appendChild(el);
+      }
+      el.content = content;
+    };
+
+    if (apiService.meta_description) {
+      updateMeta("description", formatCityText(apiService.meta_description));
+      updateMeta("og:description", formatCityText(apiService.og_description || apiService.meta_description), true);
+    }
+    if (apiService.meta_keywords) {
+      updateMeta("keywords", formatCityText(apiService.meta_keywords));
+    }
+    if (apiService.meta_robots) {
+      updateMeta("robots", apiService.meta_robots);
+    }
+    if (apiService.og_title || apiService.meta_title) {
+      updateMeta("og:title", formatCityText(apiService.og_title || apiService.meta_title), true);
+    }
+    if (apiService.canonical_url) {
+      let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "canonical";
+        document.head.appendChild(link);
+      }
+      link.href = apiService.canonical_url;
+    }
+  }, [apiService, selectedLoc.city, currentCityName]);
+
   const [dbFaqs, setDbFaqs] = useState<any[]>([]);
 
   useEffect(() => {
@@ -161,13 +239,28 @@ const ACRepairLayout = () => {
           const allServices = Array.isArray(data) ? data : data?.data || [];
           const currentCatId = apiService?.service_category_id || (service as any)?.category_id;
           const currentServId = apiService?.id || serviceId || (service as any)?.id;
-          const filtered = allServices.filter((s: any) => {
-            const matchCat = Number(s.service_category_id) === Number(currentCatId);
-            const isCurrent =
-              (currentServId && Number(s.id) === Number(currentServId)) ||
-              (slug && s.slug === slug);
-            return matchCat && !isCurrent;
-          });
+          
+          let displayServices: any[] = [];
+          if (Array.isArray(apiService?.related_services_data) && apiService.related_services_data.length > 0) {
+            displayServices = apiService.related_services_data;
+          } else {
+            const isAcPage = (apiService?.name || "").toLowerCase().includes("ac") || (slug || "").toLowerCase().includes("ac");
+            displayServices = allServices.filter((s: any) => {
+              const matchCat = Number(s.service_category_id) === Number(currentCatId);
+              const isCurrent =
+                (currentServId && Number(s.id) === Number(currentServId)) ||
+                (slug && s.slug === slug);
+              if (!matchCat || isCurrent) return false;
+
+              // If current page is AC Repair, only show AC-related services! Never show washing machine, fridge, etc.
+              if (isAcPage) {
+                const sName = (s.name || "").toLowerCase();
+                const sSlug = (s.slug || "").toLowerCase();
+                return sName.includes("ac ") || sName.includes(" ac") || sName.includes("air conditioner") || sSlug.includes("ac-") || sSlug.includes("-ac");
+              }
+              return true;
+            });
+          }
 
           const categoryTitles: Record<number, string> = {
             1: "Appliances Repair & Service",
@@ -182,7 +275,7 @@ const ACRepairLayout = () => {
             setCategorySectionTitle(`${apiService.category_name} Services`);
           }
 
-          setCategoryServices(filtered);
+          setCategoryServices(displayServices);
         }
 
         if (faqRes.status === "fulfilled" && faqRes.value?.status && Array.isArray(faqRes.value.data)) {
@@ -225,14 +318,29 @@ const ACRepairLayout = () => {
     .map((img: string) => getImageUrl(img, "/tas.logo.png"));
 
   const handleAddService = (subService: any) => {
-    const activeTabObj = (tabs || []).find((t: any) => String(t.id) === String(activeTab));
-    const subCatName = activeTabObj?.name || apiService?.name || service?.name || "";
+    const activeTabObj =
+      (tabs || []).find((t: any) => String(t.id) === String(subService.service_sub_category_id)) ||
+      (tabs || []).find((t: any) => String(t.id) === String(activeTab));
+    const subCatName =
+      subService.subCategoryName ||
+      subService.sub_category_name ||
+      subService.service_sub_category?.name ||
+      activeTabObj?.name ||
+      "";
+
+    const baseName = subService.baseName || subService.name || "Service";
+    const displayName =
+      subCatName && !baseName.toLowerCase().includes(subCatName.toLowerCase())
+        ? `${baseName} (${subCatName})`
+        : baseName;
 
     const newItem = {
       id: subService.id,
-      name: subService.name,
+      name: displayName,
+      baseName,
       subService: subService.name,
       subCategoryName: subCatName,
+      sub_category_name: subCatName,
       serviceName: subCatName,
       service_name: subCatName,
       price: subService.discountedPrice,
@@ -241,8 +349,14 @@ const ACRepairLayout = () => {
       quantity: 1,
       service_id: Number(serviceId),
       service_category_id: apiService?.service_category_id || apiService?.id,
-      service_sub_category_id: activeTab,
+      service_sub_category_id: subService.service_sub_category_id || activeTab,
       service_issue_id: subService.id,
+      image: subService.image,
+      warrantyDays: subService.warrantyDays,
+      packageTag: subService.packageTag,
+      duration: subService.duration,
+      rating: subService.rating,
+      reviews: subService.reviews,
     };
 
     console.log(newItem);
@@ -291,7 +405,7 @@ const ACRepairLayout = () => {
       const next = wasWishlisted ? prev.filter((itemId) => itemId !== id) : [...prev, id];
       try {
         localStorage.setItem("wishlistItems", JSON.stringify(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
 
@@ -317,7 +431,7 @@ const ACRepairLayout = () => {
             : prev.filter((itemId) => itemId !== id);
           try {
             localStorage.setItem("wishlistItems", JSON.stringify(next));
-          } catch (e) {}
+          } catch (e) { }
           return next;
         });
       } else {
@@ -337,7 +451,7 @@ const ACRepairLayout = () => {
           : prev.filter((itemId) => itemId !== id);
         try {
           localStorage.setItem("wishlistItems", JSON.stringify(next));
-        } catch (e) {}
+        } catch (e) { }
         return next;
       });
     } finally {
@@ -497,10 +611,10 @@ const ACRepairLayout = () => {
   const isCurrentCityServed =
     availableCitiesList.length > 0
       ? availableCitiesList.some(
-          (c: any) =>
-            (typeof c === "string" ? c : c?.name || "").toLowerCase().trim() ===
-            (selectedLoc.city || "").toLowerCase().trim()
-        )
+        (c: any) =>
+          (typeof c === "string" ? c : c?.name || "").toLowerCase().trim() ===
+          (selectedLoc.city || "").toLowerCase().trim()
+      )
       : (selectedLoc.city || "").toLowerCase().trim() === "raipur";
 
   useEffect(() => {
@@ -586,7 +700,7 @@ const ACRepairLayout = () => {
             if (fallbackData?.status && Array.isArray(fallbackData?.data?.issues) && fallbackData.data.issues.length > 0) {
               data = fallbackData;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         const issues = data?.data?.issues || [];
@@ -628,27 +742,48 @@ const ACRepairLayout = () => {
   }, [serviceId, subCategoryId, slug, selectedLoc]);
 
   const fallbackBrands = [
-    { name: "LG", logo: "/tas.logo.png" },
-    { name: "Samsung", logo: "/sam.png" },
-    { name: "Whirlpool", logo: "/tas.logo.png" },
-    { name: "VOLTAS", logo: "/Volt.png" },
-    { name: "DAIKIN", logo: "/daikin.png" },
-    { name: "Blue Star", logo: "/blueStar.png" },
-    { name: "HITACHI", logo: "/hit.png" },
-    { name: "MITSUBISHI", logo: "/mits.png" },
+    { name: "VOLTAS", logo: "/covered-brands/voltas.png" },
+    { name: "DAIKIN", logo: "/covered-brands/daikin.png" },
+    { name: "SAMSUNG", logo: "/covered-brands/samsung.png" },
+    { name: "BLUE STAR", logo: "/covered-brands/blueStar.png" },
+    { name: "HITACHI", logo: "/covered-brands/hitachi.png" },
+    { name: "MITSUBISHI", logo: "/covered-brands/mitsubishi.png" },
+    { name: "LG", logo: "/covered-brands/lg.png" },
+    { name: "PANASONIC", logo: "/covered-brands/panasonic.png" },
+    { name: "WHIRLPOOL", logo: "/covered-brands/whirlpool.png" },
+    { name: "GODREJ", logo: "/covered-brands/godrej.png" },
+    { name: "HAIER", logo: "/covered-brands/haier.png" },
   ];
 
+  const rawCoveredBrands = apiService?.covered_brands || apiService?.coveredBrands;
   const brands =
-    apiService?.covered_brands?.map((brand: any) => {
-      const matchedFallback = fallbackBrands.find(
-        (item) => item.name?.toLowerCase() === brand.name?.toLowerCase(),
-      );
+    Array.isArray(rawCoveredBrands) && rawCoveredBrands.length > 0
+      ? rawCoveredBrands.map((brand: any) => {
+        const matchedFallback = fallbackBrands.find(
+          (item) => item.name?.toLowerCase() === brand.name?.toLowerCase(),
+        );
 
-      return {
-        ...brand,
-        image: brand.image || matchedFallback?.logo || "/tas.logo.png",
-      };
-    }) || fallbackBrands.map((item) => ({ name: item.name, image: item.logo }));
+        let resolvedImage = brand.image_url;
+        if (!resolvedImage || typeof resolvedImage !== "string" || resolvedImage.trim() === "") {
+          if (brand.image && typeof brand.image === "string") {
+            if (brand.image.startsWith("http://") || brand.image.startsWith("https://") || brand.image.startsWith("/")) {
+              resolvedImage = brand.image;
+            } else {
+              resolvedImage = `${API_HOST_URL}/storage/covered-brands/${brand.image}`;
+            }
+          } else {
+            resolvedImage = matchedFallback?.logo || "/tas.logo.png";
+          }
+        }
+
+        return {
+          ...brand,
+          name: brand.name,
+          image: resolvedImage,
+          fallbackImage: matchedFallback?.logo || "/tas.logo.png",
+        };
+      })
+      : fallbackBrands.map((item) => ({ name: item.name, image: item.logo, fallbackImage: "/tas.logo.png" }));
 
   const subCategories = apiService?.sub_categories || apiService?.subServices || [];
   const issues = apiService?.issues || [];
@@ -659,10 +794,16 @@ const ACRepairLayout = () => {
         const catId = cat.id ?? cat.sub_category_id;
         const catName = cat.name ?? cat.sub_category_name;
         const catIcon = cat.icon_url ?? cat.icon ?? cat.image;
-        const items =
+        const rawItems =
           cat.items && cat.items.length > 0
             ? cat.items
             : issues.filter((issue: any) => Number(issue.service_sub_category_id) === Number(catId));
+        const items = (rawItems || []).map((it: any) => ({
+          ...it,
+          subCategoryName: catName,
+          sub_category_name: catName,
+          service_sub_category_id: catId,
+        }));
 
         return {
           id: String(catId),
@@ -690,9 +831,14 @@ const ACRepairLayout = () => {
     tabs[0];
 
   const mapItemToSubService = (item: any): SubService => ({
+    ...item,
     id: item.id,
     name: item.name,
+    baseName: item.name,
     title: item.name,
+    subCategoryName: item.subCategoryName || item.sub_category_name || item.service_sub_category?.name || "",
+    sub_category_name: item.subCategoryName || item.sub_category_name || item.service_sub_category?.name || "",
+    service_sub_category_id: item.service_sub_category_id,
     image: safeImage(item.icon_url || item.image || item.icon),
     rating: Number(item.rating || 5.0),
     reviews: item.reviews || 0,
@@ -722,8 +868,13 @@ const ACRepairLayout = () => {
       item.warrantyDescription ??
       item.issue_more_details?.warranty_description,
     packageTag: item.package_tag,
-    issueDescriptions: item.issue_descriptions || item.descriptions || [],
-    issueMoreDetails: item.issue_more_details || item.details || [],
+    inclusions: item.issue_more_details?.inclusions || item.details?.inclusions || item.inclusions,
+    exclusions: item.issue_more_details?.exclusions || item.details?.exclusions || item.exclusions,
+    important_notes: item.issue_more_details?.important_notes || item.details?.important_notes || item.important_notes,
+    safety_notes: item.issue_more_details?.safety_notes || item.details?.safety_notes || item.safety_notes,
+    issueDescriptions: item.issue_descriptions || item.descriptions || {},
+    issueMoreDetails: item.issue_more_details || item.details || {},
+    description: item.issue_descriptions?.description || item.descriptions?.description || item.description,
   });
 
   const displayServices: SubService[] =
@@ -903,8 +1054,8 @@ const ACRepairLayout = () => {
               {(() => {
                 const slugTitle = slug
                   ? slug
-                      .replace(/-/g, " ")
-                      .replace(/\b\w/g, (c: string) => c.toUpperCase())
+                    .replace(/-/g, " ")
+                    .replace(/\b\w/g, (c: string) => c.toUpperCase())
                   : "";
                 const name = apiService?.name || service?.name || slugTitle;
                 const hasService = /service$/i.test(name.trim());
@@ -917,12 +1068,16 @@ const ACRepairLayout = () => {
               })()}
 
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-                <div className="flex items-center gap-1">
+                <div
+                  onClick={() => setShowAllReviewsModal(true)}
+                  className="flex items-center gap-1 cursor-pointer hover:text-orange-500 transition-colors"
+                  title="Click to view all reviews"
+                >
                   <Star className="w-4 h-4 fill-orange-500 text-orange-500 shrink-0" />
                   <span className="font-bold text-gray-900 dark:text-white">
                     {displayServices?.[0]?.rating || 0}
                   </span>
-                  <span>
+                  <span className="hover:underline">
                     ({apiService?.reviews?.length ?? (displayServices?.[0]?.reviews || 0)} reviews)
                   </span>
                 </div>
@@ -1390,15 +1545,35 @@ const ACRepairLayout = () => {
                                     </div>
                                   </div>
 
-                                  <ul className="text-xs text-gray-500 mt-2 space-y-1">
-                                    <li>
-                                      • Get 2X deeper dust removal with Foam + PowerJet
-                                      technology
-                                    </li>
-                                    <li>
-                                      • Intense cleaning of both indoor & outdoor units
-                                    </li>
-                                  </ul>
+                                  {(() => {
+                                    const shortText = (subService as any).short_points ||
+                                      (subService as any).issueDescriptions?.short_points ||
+                                      (subService as any).descriptions?.short_points;
+                                    const cleanPoints = shortText
+                                      ? shortText
+                                        .replace(/<[^>]+>/g, "")
+                                        .split(/,|\n/)
+                                        .map((s: string) => s.trim())
+                                        .filter(Boolean)
+                                      : [];
+
+                                    if (cleanPoints.length > 0) {
+                                      return (
+                                        <ul className="text-xs text-gray-500 mt-2 space-y-1">
+                                          {cleanPoints.slice(0, 2).map((point: string, idx: number) => (
+                                            <li key={idx} className="line-clamp-1">• {point}</li>
+                                          ))}
+                                        </ul>
+                                      );
+                                    }
+
+                                    return (
+                                      <ul className="text-xs text-gray-500 mt-2 space-y-1">
+                                        <li>• Verified professional doorstep service</li>
+                                        <li>• Service assurance & 100% genuine parts</li>
+                                      </ul>
+                                    );
+                                  })()}
 
                                   <p
                                     onClick={() => {
@@ -1604,9 +1779,9 @@ const ACRepairLayout = () => {
                 </h2>
 
                 <div
-                  className="text-gray-500 text-sm leading-8 mb-8"
+                  className="text-gray-900 dark:text-gray-100 text-sm leading-relaxed mb-8 service-rich-text ck-content [&_ul>li::marker]:text-gray-900 dark:[&_ul>li::marker]:text-gray-100 [&_ul>li::marker]:font-black [&_ul>li]:text-gray-800 dark:[&_ul>li]:text-gray-100"
                   dangerouslySetInnerHTML={{
-                    __html: apiService?.description || "",
+                    __html: formatCityText(apiService?.description || ""),
                   }}
                 />
 
@@ -1702,40 +1877,57 @@ const ACRepairLayout = () => {
           reviews={reviews}
           displayServices={displayServices}
           apiService={apiService}
+          onOpenReviewsModal={() => setShowAllReviewsModal(true)}
+          cityName={currentCityName}
         />
 
-        <BrandsSection brands={brands} brandsRef={brandsRef} />
+        <BrandsSection
+          brands={brands}
+          brandsRef={brandsRef}
+          serviceName={apiService?.name || service?.name || "AC"}
+        />
 
+        {/* Full Service Description (Shown in BOTH Mobile & Desktop) */}
         {apiService?.description && apiService.description.trim() !== "" && (
-          <div className="sm:flex flex-col gap-1 my-5 hidden">
-            <h2 className="text-2xl font-semibold dark:text-white">
-              {apiService?.name} service in Raipur
-            </h2>
+          <div className="flex flex-col gap-2 my-6 sm:my-8">
+            {!hasHeadingInDescription(apiService.description) && (
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                {getPrimaryHeading()}
+              </h2>
+            )}
 
             <div
-              className="dark:text-gray-300 text-gray-700 leading-relaxed"
+              className="dark:text-gray-100 text-gray-900 leading-relaxed text-sm sm:text-base prose max-w-none service-rich-text ck-content [&_ul>li::marker]:text-gray-900 dark:[&_ul>li::marker]:text-gray-100 [&_ul>li::marker]:font-black [&_ul>li]:text-gray-800 dark:[&_ul>li]:text-gray-100"
               dangerouslySetInnerHTML={{
-                __html: apiService.description,
+                __html: formatCityText(apiService.description),
               }}
             />
           </div>
         )}
 
+        {/* Visual Step-by-Step "How to Book #1 Service" & Post-Service Options */}
+        <ServiceHowToBook
+          serviceName={apiService?.name || "AC Service & Repair"}
+          cityName={currentCityName}
+        />
+
+        {/* Hiring Guide / When Should You Book Inspection (Shown in BOTH Mobile & Desktop) */}
         {apiService?.hiring_guide && apiService.hiring_guide.trim() !== "" && (
-          <div className="sm:flex flex-col gap-1 hidden">
-            <h2 className="text-2xl font-semibold dark:text-white">
-              Hiring guide for {apiService?.name} service in Raipur
+          <div className="flex flex-col gap-2 my-6 sm:my-8">
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+              When Should You Book {apiService?.name || "AC Repair & Service"} in {currentCityName}?
             </h2>
 
             <div
-              className="dark:text-gray-300 text-gray-700 leading-relaxed"
+              className="dark:text-gray-100 text-gray-900 leading-relaxed text-sm sm:text-base prose max-w-none service-rich-text ck-content [&_ul>li::marker]:text-gray-900 dark:[&_ul>li::marker]:text-gray-100 [&_ul>li::marker]:font-black [&_ul>li]:text-gray-800 dark:[&_ul>li]:text-gray-100"
               dangerouslySetInnerHTML={{
-                __html: apiService.hiring_guide,
+                __html: formatCityText(apiService.hiring_guide),
               }}
             />
           </div>
         )}
 
+        {/* Frequently Asked Questions (FAQ) */}
         {faqData && faqData.length > 0 && (
           <FAQSection
             faqData={faqData}
@@ -1745,9 +1937,18 @@ const ACRepairLayout = () => {
         )}
       </div>
 
-      {categoryServices && categoryServices.length > 0 && (
-        <div className=" sm:block hidden overflow-x-auto hide-scrollbar">
-          <DynamicCategorySection title={categorySectionTitle} viewType={2} data={categoryServices} />
+      {/* "You may like our other services" (Shown in BOTH Mobile & Desktop) */}
+      {((apiService?.related_services_data && apiService.related_services_data.length > 0) || (categoryServices && categoryServices.length > 0)) && (
+        <div className="block overflow-x-auto hide-scrollbar my-6 sm:my-10">
+          <DynamicCategorySection
+            title="You may like our other services"
+            viewType={2}
+            data={
+              apiService?.related_services_data && apiService.related_services_data.length > 0
+                ? apiService.related_services_data
+                : categoryServices
+            }
+          />
         </div>
       )}
       <MobilePhotos galleryImages={galleryImages} />
@@ -1844,12 +2045,14 @@ const ACRepairLayout = () => {
         service={
           selectedService
             ? {
-                ...selectedService,
-                reviews_list: apiService?.reviews,
-                ratings_distribution: apiService?.ratings_distribution,
-                rating: apiService?.avg_rating || selectedService?.rating,
-                review_count: apiService?.total_reviews || selectedService?.reviews,
-              }
+              ...selectedService,
+              category_name: apiService?.category?.name || "AC Service",
+              service_name: apiService?.name || "AC Repair",
+              reviews_list: apiService?.reviews,
+              ratings_distribution: apiService?.ratings_distribution,
+              rating: apiService?.avg_rating || selectedService?.rating,
+              review_count: apiService?.total_reviews || selectedService?.reviews,
+            }
             : null
         }
         onAdd={() => {
@@ -1879,14 +2082,52 @@ const ACRepairLayout = () => {
         }}
         availableCities={availableCitiesList.map((c: any) => c.name || c)}
       />
+
+      <ServiceReviewsModal
+        isOpen={showAllReviewsModal}
+        onClose={() => setShowAllReviewsModal(false)}
+        serviceName={
+          apiService?.name ||
+          service?.name ||
+          (slug
+            ? slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+            : "Service")
+        }
+        avgRating={apiService?.avg_rating || displayServices?.[0]?.rating || 5}
+        totalReviews={apiService?.total_reviews || reviews?.length || 0}
+        ratingsDistribution={apiService?.ratings_distribution}
+        reviews={reviews}
+      />
     </>
   );
 };
 
-const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
+const ReviewsSection = ({ reviews, displayServices, apiService, onOpenReviewsModal, cityName }: any) => {
   if (!reviews || !Array.isArray(reviews) || reviews.length === 0) {
     return null;
   }
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Auto-slide when multiple reviews exist
+  useEffect(() => {
+    if (reviews.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % reviews.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [reviews.length]);
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev === 0 ? reviews.length - 1 : prev - 1));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % reviews.length);
+  };
+
+  const currentReview = reviews[currentIndex] || reviews[0];
+
   return (
     <div className="w-full mx-auto mb-2">
       <div className="relative max-w-7xl text-center rounded-2xl p-0 md:p-8 overflow-visible">
@@ -1907,9 +2148,13 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
             What our Customers Say?
           </h2>
 
-          <h2 className="md:hidden block text-left pt-5 pb-2">Reviews</h2>
+          <h2 className="md:hidden block text-left pt-5 pb-2 font-bold text-lg">Reviews</h2>
 
-          <div className="hidden md:flex items-center justify-end gap-2 mb-8">
+          <div
+            onClick={onOpenReviewsModal}
+            className="hidden md:flex items-center justify-end gap-2 mb-8 cursor-pointer hover:opacity-90 transition group"
+            title="Click to view all reviews"
+          >
             <div className="flex text-yellow-400">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className="w-5 h-5 fill-yellow-400" />
@@ -1917,27 +2162,31 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
             </div>
 
             <span className="text-lg font-semibold text-white">
-              {displayServices?.[0]?.rating || 0}
+              {displayServices?.[0]?.rating || apiService?.avg_rating || 0}
             </span>
 
-            <span className="text-sm text-white/80">
-              ({apiService?.reviews?.length || 0} Reviews)
+            <span className="text-sm text-white/80 group-hover:underline">
+              ({apiService?.reviews?.length || reviews?.length || 0} Reviews)
             </span>
           </div>
 
-          <div className="md:hidden bg-[#F7F8FA]">
-            <div className="bg-white rounded-xl mb-6 shadow-lg">
-              <div className="flex items-center gap-6 px-5 py-5">
+          <div className="md:hidden bg-[#F7F8FA] dark:bg-gray-800 p-4 rounded-2xl">
+            <div
+              onClick={onOpenReviewsModal}
+              className="bg-white dark:bg-gray-900 rounded-xl mb-4 shadow-sm p-4 cursor-pointer hover:shadow-md transition"
+              title="Click to view all reviews"
+            >
+              <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    {displayServices?.[0]?.rating || 0}
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {displayServices?.[0]?.rating || apiService?.avg_rating || 0}
                   </h3>
 
-                  <div className="flex justify-center mt-3 text-orange-500">
+                  <div className="flex justify-center mt-2 text-orange-500">
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-5 h-5 ${i < Math.round(displayServices?.[0]?.rating || 0)
+                        className={`w-4 h-4 ${i < Math.round(Number(displayServices?.[0]?.rating || apiService?.avg_rating || 0))
                           ? "fill-orange-500 text-orange-500"
                           : "fill-gray-300 text-gray-300"
                           }`}
@@ -1945,23 +2194,23 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
                     ))}
                   </div>
 
-                  <p className="text-gray-400 text-xs mt-2">
-                    {displayServices?.[0]?.reviews || 0} reviews
+                  <p className="text-gray-400 text-xs mt-1.5">
+                    {apiService?.reviews?.length || reviews?.length || 0} reviews
                   </p>
                 </div>
 
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 space-y-1.5">
                   {[5, 4, 3, 2, 1].map((star) => {
                     const percent =
                       apiService?.ratings_distribution?.find(
                         (item: any) => item.star === star,
-                      )?.percentage || 0;
+                      )?.percentage || (star === 5 ? 100 : 0);
 
                     return (
-                      <div key={star} className="flex gap-2">
-                        <span className="text-sm w-4">{star}</span>
-                        <Star className="w-4 h-4 fill-gray-400 text-gray-400" />
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div key={star} className="flex items-center gap-2 text-xs">
+                        <span className="w-3 text-gray-500 dark:text-gray-400 font-bold">{star}</span>
+                        <Star className="w-3.5 h-3.5 fill-gray-400 text-gray-400" />
+                        <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full ${star >= 4
                               ? "bg-green-500"
@@ -1979,87 +2228,172 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
               </div>
             </div>
 
-            <div className="space-y-5">
-              {reviews.map((review: any, index: number) => (
-                <div key={index} className="bg-white rounded-3xl p-5 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div className="flex gap-2">
-                      <div>
-                        <div className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden">
-                          {review.avtar ? (
-                            <img
-                              src={review.avtar}
-                              alt={review.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : null}
+            {/* Mobile Review Slider - No popup on review card */}
+            <div className="relative">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-xs border border-gray-100 dark:border-gray-700">
+                <div className="flex justify-between items-start">
+                  <div className="flex gap-2.5 items-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden shrink-0">
+                      {currentReview.avtar ? (
+                        <img
+                          src={currentReview.avtar}
+                          alt={currentReview.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-orange-500 text-white font-bold text-xs flex items-center justify-center">
+                          {(currentReview.name || "U")[0]}
                         </div>
-                      </div>
-
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-sm text-left">
-                          {review.name || "Anonymous"}
-                        </h3>
-                        <p className="text-gray-400 text-sm">{review.time}</p>
-                      </div>
+                      )}
                     </div>
 
-                    <div className="bg-orange-500 text-white rounded-full px-3 py-1 text-xs font-semibold flex items-center gap-1">
-                      {review.rating || 0}
-                      <Star className="w-3 h-3 fill-white text-white" />
+                    <div>
+                      <h3 className="font-bold text-gray-900 dark:text-white text-sm text-left">
+                        {currentReview.name || "Anonymous"}
+                      </h3>
+                      <p className="text-gray-400 text-xs text-left">{currentReview.time}</p>
                     </div>
                   </div>
-                  <p className="text-gray-600 text-sm text-left">
-                    {review.text}
-                  </p>
+
+                  <div className="bg-orange-500 text-white rounded-full px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1 shrink-0">
+                    {currentReview.rating || 5}
+                    <Star className="w-3 h-3 fill-white text-white" />
+                  </div>
                 </div>
-              ))}
+                <p className="text-gray-600 dark:text-gray-300 text-xs text-left mt-2 leading-relaxed">
+                  {(currentReview.text || "").replace(/\bRaipur\b/gi, cityName || "Raipur")}
+                </p>
+              </div>
+
+              {/* Mobile controls if multiple reviews */}
+              {reviews.length > 1 && (
+                <div className="flex items-center justify-between mt-3 px-1">
+                  <div className="flex items-center gap-1.5">
+                    {reviews.map((_: any, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all cursor-pointer ${currentIndex === idx
+                          ? "w-4 bg-orange-500"
+                          : "w-1.5 bg-gray-300 dark:bg-gray-600"
+                          }`}
+                        aria-label={`Go to review ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handlePrev}
+                      className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white flex items-center justify-center border border-gray-200 dark:border-gray-600 active:scale-95 cursor-pointer"
+                      aria-label="Previous review"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white flex items-center justify-center border border-gray-200 dark:border-gray-600 active:scale-95 cursor-pointer"
+                      aria-label="Next review"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+
+            <button
+              type="button"
+              onClick={onOpenReviewsModal}
+              className="w-full py-3 mt-4 rounded-xl bg-[#ff5500] hover:bg-orange-600 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition active:scale-98"
+            >
+              <span>View All Customer Reviews</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="hidden md:flex flex-col max-w-4xl mx-auto">
-            <div className="flex md:flex-row w-full mx-auto bg-transparent rounded-2xl gap-8 pb-5 hide-scrollbar">
-              {reviews.map((review: any) => (
-                <div key={review.id} className="min-w-[300px]">
-                  <div className="flex items-start bg-black/60 backdrop-blur-sm border border-white/20 rounded-xl p-4">
-                    <div className="relative w-20 h-20 rounded-full overflow-hidden -top-12 -left-6 shrink-0">
-                      <img
-                        src={review.avtar || "/tiku.png"}
-                        alt={review.name}
-                        className="w-full h-full object-cover object-top"
+            {/* Desktop Review Slider - No popup on review card */}
+            <div className="relative w-full max-w-md mx-auto md:mx-0">
+              <div className="flex items-start bg-black/60 backdrop-blur-sm border border-white/20 rounded-xl p-4 transition-all duration-300">
+                <div className="relative w-20 h-20 rounded-full overflow-hidden -top-12 -left-6 shrink-0 border-2 border-white/20 bg-gray-800">
+                  <img
+                    src={currentReview.avtar || "/tiku.png"}
+                    alt={currentReview.name}
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
+
+                <div className="flex-1 text-left -ml-2">
+                  <h3 className="font-semibold text-white text-base md:text-lg">
+                    {currentReview.name || "Anonymous"}
+                  </h3>
+
+                  <div className="flex text-yellow-400 gap-0.5 mt-1.5">
+                    {[...Array(Number(currentReview.rating || 5))].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-yellow-400" />
+                    ))}
+                  </div>
+
+                  <span className="text-white/80 text-xs font-medium tracking-wide">
+                    {currentReview.time}
+                  </span>
+
+                  <p className="text-white text-left leading-relaxed font-thin text-[15px] mt-3 min-h-[48px]">
+                    {currentReview.text}
+                  </p>
+                </div>
+              </div>
+
+              {/* Slider Controls when multiple reviews exist */}
+              {reviews.length > 1 && (
+                <div className="flex items-center justify-between mt-3 px-1">
+                  {/* Pagination Dots */}
+                  <div className="flex items-center gap-1.5">
+                    {reviews.map((_: any, idx: number) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all cursor-pointer ${currentIndex === idx
+                          ? "w-5 bg-[#FF6A00]"
+                          : "w-1.5 bg-white/40 hover:bg-white/70"
+                          }`}
+                        aria-label={`Go to review ${idx + 1}`}
                       />
-                    </div>
+                    ))}
+                  </div>
 
-                    <div className="flex-1 text-left">
-                      <h3 className="font-semibold text-white text-base md:text-lg">
-                        {review.name || "Anonymous"}
-                      </h3>
-
-                      <div className="flex text-yellow-400 gap-0.5 mt-1.5">
-                        {[...Array(review.rating || 0)].map((_, i) => (
-                          <Star key={i} className="w-4 h-4 fill-yellow-400" />
-                        ))}
-                      </div>
-
-                      <span className="text-white text-xs font-medium tracking-wide">
-                        {review.time}
-                      </span>
-
-                      <p className="text-white text-left leading-relaxed font-thin text-[15px] mt-3">
-                        {review.text}
-                      </p>
-                    </div>
+                  {/* Prev / Next Arrow Buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handlePrev}
+                      className="w-7 h-7 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer active:scale-95"
+                      aria-label="Previous review"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleNext}
+                      className="w-7 h-7 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer active:scale-95"
+                      aria-label="Next review"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
 
-            <div className="my-8 mb-0 md:mb-10 relative md:flex items-start justify-start hidden">
-              <p className="inline-flex items-center text-[#FF6A00] font-medium">
-                View All Reviews
+            {/* View All Reviews Button */}
+            <div className="my-6 mb-0 md:mb-10 relative md:flex items-start justify-start hidden">
+              <button
+                type="button"
+                onClick={onOpenReviewsModal}
+                className="inline-flex items-center gap-1.5 text-[#FF6A00] hover:text-orange-400 font-semibold text-sm transition-all hover:translate-x-1 cursor-pointer bg-black/40 hover:bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 shadow-sm"
+              >
+                <span>View All Reviews</span>
                 <ChevronRight className="w-4 h-4" />
-                <ChevronRight className="w-4 h-4 -ml-2" />
-              </p>
+              </button>
             </div>
           </div>
         </div>
@@ -2068,73 +2402,136 @@ const ReviewsSection = ({ reviews, displayServices, apiService }: any) => {
   );
 };
 
-const BrandsSection = ({ brands, brandsRef }: any) => {
+const BrandsSection = ({ brands, brandsRef, serviceName = "AC" }: any) => {
+  const localRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = brandsRef || localRef;
+
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  }, [scrollRef]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    checkScroll();
+
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    window.addEventListener("resize", checkScroll);
+
+    const t1 = setTimeout(checkScroll, 100);
+    const t2 = setTimeout(checkScroll, 400);
+
+    return () => {
+      el.removeEventListener("scroll", checkScroll);
+      window.removeEventListener("resize", checkScroll);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [brands, checkScroll, scrollRef]);
+
   if (!brands || !Array.isArray(brands) || brands.length === 0) {
     return null;
   }
+
+  const scrollBrands = (direction: "left" | "right") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollAmount = 350;
+    el.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+    setTimeout(checkScroll, 350);
+  };
+
+  const cleanServiceName = (serviceName || "AC")
+    .replace(/service/gi, "")
+    .replace(/repair/gi, "")
+    .trim();
+
   return (
-    <div className="mx-auto relative w-full overflow-hidden sm:mt-10">
-      <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-5 ">
-        We covered AC Brand
+    <div className="mx-auto relative w-full overflow-hidden my-8 sm:my-12">
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-6">
+        We covered {cleanServiceName || "AC"} Brand
       </h2>
 
-      <div className="sm:hidden">
-        <div className="flex gap-8 overflow-x-auto hide-scrollbar pb-3">
-          {brands.map((brand: any, index: number) => (
-            <div key={index} className="min-w-[70px] text-center">
-              <div className="w-16 h-16 rounded-full border bg-white flex items-center justify-center p-2 mx-auto overflow-hidden">
-                <SafeImage
-                  src={brand.image}
-                  alt={brand.name}
-                  width={50}
-                  height={50}
-                  fallbackSrc="/tas.logo.png"
-                  className="w-full h-full object-contain"
-                />
-              </div>
+      <div className="relative group px-1 sm:px-6">
+        {/* Left Arrow Button (hidden if at start) */}
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scrollBrands("left")}
+            className="absolute left-0 top-12 -translate-y-1/2 z-10 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white dark:bg-gray-800 border border-[#ff5500] text-[#ff5500] shadow-md flex items-center justify-center hover:bg-orange-50 dark:hover:bg-gray-700 transition cursor-pointer"
+            aria-label="Previous Brand"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
 
-              <p className="text-xs sm:text-sm font-medium text-gray-600 mt-1 sm:mt-3">
-                {brand.name}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <p className="text-gray-400 text-xs sm:text-sm leading-5 mt-2 sm:mt-4 px-0 sm:px-5">
-          These trademarks and/or logos are used for illustration purposes only
-          and we disclaim any specific connection with the brand in this regard.
-        </p>
-      </div>
-
-      <div className="hidden sm:block">
+        {/* Brand Slider Container */}
         <div
-          ref={brandsRef}
-          className="flex overflow-x-auto hide-scrollbar scroll-smooth gap-4 pb-2"
+          ref={scrollRef}
+          onScroll={checkScroll}
+          className="flex overflow-x-auto hide-scrollbar scroll-smooth gap-4 sm:gap-6 py-2 px-1"
         >
-          {brands.map((brand: any, index: number) => (
-            <div
-              key={index}
-              className="flex-shrink-0 flex flex-col items-center"
-            >
-              <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 flex flex-col items-center justify-center text-center border w-28 h-28">
-                <div className="relative h-[60px] w-full flex items-center justify-center">
-                  <SafeImage
-                    src={brand.image}
-                    alt={brand.name}
-                    width={80}
-                    height={60}
-                    fallbackSrc="/tas.logo.png"
-                    className="object-contain max-h-[60px] w-full"
-                  />
-                </div>
-              </div>
+          {brands.map((brand: any, index: number) => {
+            const displayName =
+              brand.name.toLowerCase().includes("repair") ||
+                brand.name.toLowerCase().includes("service")
+                ? brand.name
+                : `${brand.name} ${cleanServiceName || "AC"} Repair & Service`;
 
-              <p className="text-xs mt-2 text-gray-700 text-center w-full line-clamp-2">
-                {brand.name}
-              </p>
-            </div>
-          ))}
+            return (
+              <div
+                key={index}
+                className="flex-shrink-0 flex flex-col items-center w-36 sm:w-48 select-none"
+              >
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xs hover:shadow-md transition-all p-3 sm:p-4 flex flex-col items-center justify-center text-center border border-gray-200 dark:border-gray-700 w-full h-22 sm:h-26">
+                  <div className="relative h-12 sm:h-14 w-full flex items-center justify-center">
+                    <img
+                      src={brand.image}
+                      alt={brand.name}
+                      onLoad={checkScroll}
+                      className="object-contain max-h-10 sm:max-h-12 max-w-[120px] w-auto"
+                      onError={(e: any) => {
+                        e.target.onerror = null;
+                        if (brand.fallbackImage && e.target.src !== brand.fallbackImage && !e.target.src.endsWith(brand.fallbackImage)) {
+                          e.target.src = brand.fallbackImage;
+                        } else {
+                          e.target.src = "/tas.logo.png";
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 text-center mt-2.5 leading-snug line-clamp-2 px-1">
+                  {displayName}
+                </p>
+              </div>
+            );
+          })}
         </div>
+
+        {/* Right Arrow Button (hidden if at end / last brand) */}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scrollBrands("right")}
+            className="absolute right-0 top-12 -translate-y-1/2 z-10 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white dark:bg-gray-800 border border-[#ff5500] text-[#ff5500] shadow-md flex items-center justify-center hover:bg-orange-50 dark:hover:bg-gray-700 transition cursor-pointer"
+            aria-label="Next Brand"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       <style jsx>{`

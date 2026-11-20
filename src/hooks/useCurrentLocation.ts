@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { GOOGLE_MAPS_API_KEY } from "@/config/api";
 
 export interface LocationData {
   latitude: number;
@@ -28,7 +29,9 @@ export const useCurrentLocation = () => {
           const longitude = position.coords.longitude;
 
           try {
-            const apiKey = process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY;
+            const apiKey =
+              process.env.NEXT_PUBLIC_GOOGLE_GEOCODING_API_KEY ||
+              GOOGLE_MAPS_API_KEY;
 
             const res = await fetch(
               `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`,

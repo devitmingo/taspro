@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
   ArrowLeft,
   Camera,
@@ -9,10 +8,9 @@ import {
   Mail,
   Phone,
   Smartphone,
-  ShieldCheck,
   AlertCircle,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL, API_HOST_URL } from "@/config/api";
@@ -28,97 +26,112 @@ export default function EditProfile({
   fetchProfile: () => void;
 }) {
   const { login, user } = useAuth();
-
-  const getImageUrl = (img?: string) => {
-    if (!img) return "/img/profileimg.png";
-    if (img.startsWith("http") || img.startsWith("/")) {
-      return img;
-    }
-    return `${API_HOST_URL}/${img}`;
-  };
-
-  // Initial values to detect if user changed their phone or email
-  const [initialPhone, setInitialPhone] = useState(
-    profile?.mobile || user?.mobile || user?.phone || ""
-  );
-  const [initialEmail, setInitialEmail] = useState(
-    profile?.email || user?.email || ""
-  );
+  const initializedRef = useRef(false);
 
   // Full Name
   const [fullName, setFullName] = useState(
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
       profile?.name ||
       [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+      (user as any)?.name ||
       ""
   );
 
   // Email
   const [email, setEmail] = useState(profile?.email || user?.email || "");
+  const [initialEmail, setInitialEmail] = useState(
+    profile?.email || user?.email || ""
+  );
+  // Email verification state: ONLY true if explicitly verified by backend
   const [isEmailVerified, setIsEmailVerified] = useState(
-    Boolean(profile?.email || user?.email)
+    Boolean(profile?.is_email_verified || profile?.email_verified_at)
   );
 
   // Phone Number
   const [phone, setPhone] = useState(
-    profile?.mobile || user?.mobile || user?.phone || ""
+    (profile?.mobile || user?.mobile || user?.phone || "").replace(/\D/g, "").slice(-10)
   );
-  const [isPhoneVerified, setIsPhoneVerified] = useState(
-    Boolean(profile?.mobile || user?.mobile || user?.phone)
+  const [initialPhone, setInitialPhone] = useState(
+    (profile?.mobile || user?.mobile || user?.phone || "").replace(/\D/g, "").slice(-10)
   );
+  // Phone is verified by default only if matching logged-in mobile
+  const [isPhoneVerified, setIsPhoneVerified] = useState(true);
 
   // Alternate Phone Number
   const [altPhone, setAltPhone] = useState(
-    profile?.alt_mobile ||
-      profile?.alternateNumber ||
-      user?.alt_mobile ||
-      user?.alternateNumber ||
-      ""
+    (profile?.alt_mobile || profile?.alternateNumber || user?.alt_mobile || user?.alternateNumber || "")
+      .replace(/\D/g, "")
+      .slice(-10)
   );
 
-  // Gender: clean values: "Male" | "Female" | "Other"
+  // Gender
   const [gender, setGender] = useState(
     profile?.gender || user?.gender || "Male"
   );
 
   // Profile image preview
-  const [preview, setPreview] = useState(
-    profile?.profile_url || user?.profileImage || "/img/profileimg.png"
+  const [preview, setPreview] = useState<string | null>(
+    profile?.profile_url || user?.profileImage || null
   );
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const currentCustomerId = profile?.id || user?.id;
+  const prevCustomerIdRef = useRef<any>(currentCustomerId);
+
   useEffect(() => {
-    if (profile) {
+    if (currentCustomerId && prevCustomerIdRef.current !== currentCustomerId) {
+      prevCustomerIdRef.current = currentCustomerId;
+      initializedRef.current = false;
+    }
+  }, [currentCustomerId]);
+
+  useEffect(() => {
+    if (profile && !initializedRef.current) {
+      initializedRef.current = true;
+
       const name =
         [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
         profile?.name ||
         "";
-      if (name) setFullName(name);
+      setFullName(name);
 
       if (profile.email) {
         setEmail(profile.email);
         setInitialEmail(profile.email);
-        setIsEmailVerified(true);
+        setIsEmailVerified(Boolean(profile.is_email_verified || profile.email_verified_at));
+      } else {
+        setEmail("");
+        setInitialEmail("");
+        setIsEmailVerified(false);
       }
+
       if (profile.mobile) {
-        setPhone(profile.mobile);
-        setInitialPhone(profile.mobile);
+        const cleanMob = profile.mobile.replace(/\D/g, "").slice(-10);
+        setPhone(cleanMob);
+        setInitialPhone(cleanMob);
         setIsPhoneVerified(true);
       }
+
       if (profile.alt_mobile) {
-        setAltPhone(profile.alt_mobile);
+        setAltPhone(profile.alt_mobile.replace(/\D/g, "").slice(-10));
+      } else {
+        setAltPhone("");
       }
+
       if (profile.gender) {
         setGender(profile.gender);
       }
+
       if (profile.profile_url) {
         setPreview(profile.profile_url);
+      } else {
+        setPreview(null);
       }
     }
   }, [profile]);
 
-  // Verify Email Handler
+  // Verify Email Handler with OTP
   const handleVerifyEmail = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
@@ -142,6 +155,15 @@ export default function EditProfile({
       return false;
     }
 
+    try {
+      // Trigger sending email OTP
+      await axios.post(`${API_BASE_URL}/customers/send-email-otp`, {
+        email: trimmedEmail,
+      });
+    } catch (e) {
+      console.log("Send email OTP response:", e);
+    }
+
     const { value: code } = await Swal.fire({
       title: "Verify Email Address",
       html: `
@@ -154,7 +176,7 @@ export default function EditProfile({
       input: "text",
       inputPlaceholder: "••••",
       inputAttributes: {
-        maxlength: "6",
+        maxlength: "4",
         style: "text-align: center; letter-spacing: 6px; font-size: 20px; font-weight: bold;",
       },
       showCancelButton: true,
@@ -163,7 +185,7 @@ export default function EditProfile({
       confirmButtonColor: "#ff6a00",
       cancelButtonColor: "#9CA3AF",
       preConfirm: (val) => {
-        if (!val || val.trim().length < 4) {
+        if (!val || val.trim().length !== 4) {
           Swal.showValidationMessage("Please enter the 4-digit verification code");
           return false;
         }
@@ -172,15 +194,49 @@ export default function EditProfile({
     });
 
     if (code) {
-      setIsEmailVerified(true);
-      await Swal.fire({
-        icon: "success",
-        title: "Email Verified!",
-        text: "Your email address has been successfully verified.",
-        timer: 1800,
-        showConfirmButton: false,
-      });
-      return true;
+      try {
+        const token = localStorage.getItem("token");
+        const headers = token
+          ? { Authorization: `Bearer ${token}`, Accept: "application/json" }
+          : { Accept: "application/json" };
+
+        const res = await axios.post(
+          `${API_BASE_URL}/customers/verify-email-otp`,
+          {
+            email: trimmedEmail,
+            otp: code,
+          },
+          { headers }
+        );
+
+        if (res.data?.status) {
+          setIsEmailVerified(true);
+          await Swal.fire({
+            icon: "success",
+            title: "Email Verified!",
+            text: "Your email address has been verified successfully.",
+            timer: 1800,
+            showConfirmButton: false,
+          });
+          return true;
+        } else {
+          Swal.fire({
+            icon: "error",
+            title: "Verification Failed",
+            text: res.data?.message || "Invalid verification code.",
+            confirmButtonColor: "#ff6a00",
+          });
+          return false;
+        }
+      } catch (err: any) {
+        Swal.fire({
+          icon: "error",
+          title: "Verification Failed",
+          text: err.response?.data?.message || "Invalid OTP entered.",
+          confirmButtonColor: "#ff6a00",
+        });
+        return false;
+      }
     }
     return false;
   };
@@ -302,18 +358,14 @@ export default function EditProfile({
       }
     }
 
-    // Verification required if email changed
-    if (
-      email.trim() &&
-      email.trim().toLowerCase() !== initialEmail.trim().toLowerCase() &&
-      !isEmailVerified
-    ) {
+    // Verification required if email changed or not verified
+    if (email.trim() && !isEmailVerified) {
       const result = await Swal.fire({
         icon: "info",
         title: "Email Verification Required",
-        text: `You have changed your email to ${email.trim()}. Please verify it before saving.`,
+        text: `Your email (${email.trim()}) is not yet verified. Please verify it with OTP before saving.`,
         showCancelButton: true,
-        confirmButtonText: "Verify Email",
+        confirmButtonText: "Verify via OTP",
         cancelButtonText: "Cancel",
         confirmButtonColor: "#ff6a00",
       });
@@ -329,19 +381,22 @@ export default function EditProfile({
       setLoading(true);
 
       const token = localStorage.getItem("token");
-      const customerId = localStorage.getItem("customer_id");
+      const customerId = localStorage.getItem("customer_id") || profile?.id || user?.id || "";
 
       const nameParts = fullName.trim().split(" ");
       const firstName = nameParts[0] || "";
       const lastName = nameParts.slice(1).join(" ") || "";
 
       const formData = new FormData();
-      formData.append("customer_id", customerId || "");
+      formData.append("customer_id", String(customerId));
       formData.append("first_name", firstName);
       formData.append("last_name", lastName);
+      formData.append("name", fullName.trim());
+      formData.append("fullName", fullName.trim());
       formData.append("email", email.trim());
-      formData.append("mobile", phone.trim());
-      formData.append("alt_mobile", altPhone.trim());
+      formData.append("is_email_verified", isEmailVerified ? "1" : "0");
+      formData.append("mobile", phone.trim().replace(/\D/g, "").slice(-10));
+      formData.append("alt_mobile", altPhone.trim().replace(/\D/g, "").slice(-10));
       formData.append("gender", gender);
 
       if (profileFile) {
@@ -375,14 +430,16 @@ export default function EditProfile({
         const updated = profileRes.data.data;
 
         login({
+          id: updated.id,
           phone: updated.mobile,
           firstName: updated.first_name,
           lastName: updated.last_name,
           email: updated.email,
-          alternateNumber: updated.alt_mobile,
+          mobile: updated.mobile,
           alt_mobile: updated.alt_mobile,
+          alternateNumber: updated.alt_mobile,
           gender: updated.gender,
-          profileImage: updated.profile_url,
+          profileImage: updated.profile_url || updated.profile || null,
           profileCompleted: true,
           contactVerified: true,
         });
@@ -409,11 +466,11 @@ export default function EditProfile({
 
       await Swal.fire({
         icon: "error",
-        title: "Oops!",
+        title: "Error",
         text:
           error?.response?.data?.message ||
           error?.response?.data?.error ||
-          "Something went wrong",
+          "Something went wrong while saving your profile.",
         confirmButtonColor: "#ff6a00",
       });
     } finally {
@@ -459,21 +516,25 @@ export default function EditProfile({
           }}
         />
 
-        {/* Profile Photo Edit (Square with curved corners) */}
+        {/* Profile Photo Edit */}
         <div className="p-4 sm:p-5 rounded-2xl bg-orange-50/30 border border-orange-100 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5">
           <div
             onClick={() => document.getElementById("profileUpload")?.click()}
             className="relative group cursor-pointer shrink-0"
             title="Click to change profile photo"
           >
-            <img
-              src={preview}
-              alt="Profile"
-              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover aspect-square shadow-sm border-2 border-orange-200 ring-4 ring-white group-hover:opacity-90 transition-all"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = "/img/profileimg.png";
-              }}
-            />
+            {preview ? (
+              <img
+                src={preview}
+                alt="Profile"
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover aspect-square shadow-sm border-2 border-orange-200 ring-4 ring-white group-hover:opacity-90 transition-all"
+                onError={() => setPreview(null)}
+              />
+            ) : (
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-orange-100/90 text-[#FF6A00] flex items-center justify-center border-2 border-orange-200 ring-4 ring-white shadow-sm group-hover:bg-orange-200/70 transition-all">
+                <User className="w-10 h-10 sm:w-12 sm:h-12 text-[#FF6A00]" />
+              </div>
+            )}
             <div className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-xl bg-[#FF6A00] hover:bg-[#F05A00] text-white flex items-center justify-center shadow-md border-2 border-white transition-transform group-hover:scale-105">
               <Camera className="w-3.5 h-3.5" />
             </div>
@@ -504,7 +565,7 @@ export default function EditProfile({
                   type="button"
                   onClick={() => {
                     setProfileFile(null);
-                    setPreview(profile?.profile_url || user?.profileImage || "/img/profileimg.png");
+                    setPreview(profile?.profile_url || user?.profileImage || null);
                   }}
                   className="px-2.5 py-1.5 text-xs text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
                 >
@@ -556,12 +617,10 @@ export default function EditProfile({
                 setEmail(val);
                 if (val.trim().toLowerCase() !== initialEmail.trim().toLowerCase()) {
                   setIsEmailVerified(false);
-                } else {
-                  setIsEmailVerified(true);
                 }
               }}
               placeholder="e.g. name@example.com"
-              className="w-full pl-10 pr-28 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all placeholder:text-gray-400"
+              className="w-full pl-10 pr-32 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all placeholder:text-gray-400"
             />
             <div className="absolute right-2.5">
               {isEmailVerified && email.trim() ? (
@@ -572,13 +631,19 @@ export default function EditProfile({
                 <button
                   type="button"
                   onClick={handleVerifyEmail}
-                  className="text-xs font-bold text-white bg-[#FF6A00] hover:bg-[#F05A00] px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer"
+                  className="text-xs font-bold text-white bg-[#FF6A00] hover:bg-[#F05A00] px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1"
                 >
-                  Verify
+                  <span>Verify</span>
                 </button>
               )}
             </div>
           </div>
+          {email.trim() && !isEmailVerified && (
+            <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1 mt-1">
+              <AlertCircle className="w-3 h-3" />
+              Email is not verified. Click &quot;Verify&quot; to receive a 4-digit verification code.
+            </p>
+          )}
         </div>
 
         {/* 3. Gender (Clean Segmented Selector: Male, Female, Other) */}
@@ -635,7 +700,7 @@ export default function EditProfile({
               maxLength={10}
               value={phone}
               onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "");
+                const val = e.target.value.replace(/\D/g, "").slice(0, 10);
                 setPhone(val);
                 if (val !== initialPhone) {
                   setIsPhoneVerified(false);
@@ -644,7 +709,7 @@ export default function EditProfile({
                 }
               }}
               placeholder="9876543210"
-              className="w-full pl-20 pr-32 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all font-mono placeholder:text-gray-400"
+              className="w-full pl-20 pr-36 py-3 bg-gray-50/70 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 outline-none focus:bg-white focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 transition-all font-mono placeholder:text-gray-400"
             />
             <div className="absolute right-2.5">
               {isPhoneVerified && phone.trim() ? (
@@ -665,7 +730,7 @@ export default function EditProfile({
           {phone !== initialPhone && !isPhoneVerified && (
             <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1 mt-1">
               <AlertCircle className="w-3 h-3" />
-              Phone number changed. Click "Verify via OTP" to verify with OTP before saving.
+              Phone number changed. Click &quot;Verify via OTP&quot; to verify with OTP before saving.
             </p>
           )}
         </div>
@@ -690,7 +755,7 @@ export default function EditProfile({
               maxLength={10}
               value={altPhone}
               onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "");
+                const val = e.target.value.replace(/\D/g, "").slice(0, 10);
                 setAltPhone(val);
               }}
               placeholder="Secondary mobile number"

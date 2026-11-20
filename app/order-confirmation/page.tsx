@@ -97,19 +97,31 @@ function OrderConfirmationContent() {
     const sp = apiData.service_provider || {};
     const tracking = apiData.tracking_info?.tracking_steps || [];
 
-    // Parse items
+    const itemDiscount = Number(ps.item_discount) || 36;
+    const specialDiscount = Number(ps.special_discount) || 0;
+    const totalAmount = Number(ps.total) || 200;
+    const convenienceFee = Number(ps.visit_charge) || 0;
+    const couponDiscount = Number(b.coupon_discount_amt) || 0;
+    const grossTotal = Number(ps.item_total) || (totalAmount + itemDiscount + couponDiscount) || 236;
+
+    // Parse items with exact original MRP and discounted price
     const rawItems = sd.items && sd.items.length > 0 ? sd.items : [];
     const items = rawItems.map((it: any, idx: number) => {
-      const price = Number(it.price) || 200;
+      const discountedPrice = Number(it.discounted_price || it.price) || 200;
+      const originalPrice = Number(it.price || it.unit_price) > discountedPrice 
+        ? Number(it.price || it.unit_price) 
+        : (discountedPrice + Math.round(itemDiscount / (rawItems.length || 1)));
       const qty = Number(it.qty) || 1;
       return {
         id: it.detail_id || idx + 1,
         name: it.subtitle || it.name || "Gas Filling",
         subService: sd.title || "Split AC",
         quantity: qty,
-        unitPrice: price,
-        amount: price * qty,
-        warranty: it.warranty || "30 Days",
+        unitPrice: originalPrice,
+        originalPrice,
+        discountedPrice,
+        amount: originalPrice * qty,
+        warranty: it.warranty || (it.warranty_days ? `${it.warranty_days} Days` : "30 Days"),
         image: getImageUrl(it.image, "/tas.logo.png"),
       };
     });
@@ -137,24 +149,26 @@ function OrderConfirmationContent() {
         ? `${orderCreatedTime}, ${b.slot_time}`
         : `${orderCreatedTime}, 09:00 AM`);
 
-    const itemDiscount = Number(ps.item_discount) || 36;
-    const specialDiscount = Number(ps.special_discount) || 0;
-    const totalAmount = Number(ps.total) || 200;
-    const convenienceFee = Number(ps.visit_charge) || 0;
+    const altMobile = cd.alt_mobile || b.alt_mobile 
+      ? `+91 ${(cd.alt_mobile || b.alt_mobile).replace(/\D/g, "").slice(-10)}` 
+      : "";
 
     setBookingData({
       orderId: b.booking_no || apiData.delivery_status?.order_id || `ENQ-00${b.booking_id || 33}`,
+      bookingId: b.booking_id || b.id || bookingIdFromUrl,
       orderDate: orderCreatedTime,
       serviceName: sd.title || "AC Repair",
-      serviceImage: getImageUrl(items[0]?.image, "/tas.logo.png"),
+      serviceImage: getImageUrl(sd.image || b.service?.home_icon_image_url, "/ac.png"),
       items: items.length > 0 ? items : [
         {
           id: 1,
           name: "Gas Filling",
           subService: "Split AC",
           quantity: 1,
-          unitPrice: 200,
-          amount: 200,
+          unitPrice: 236,
+          originalPrice: 236,
+          discountedPrice: 200,
+          amount: 236,
           warranty: "30 Days",
           image: "/tas.logo.png",
         },
@@ -163,19 +177,23 @@ function OrderConfirmationContent() {
       scheduledTime,
       customerName: cd.name || "Amit Jaiswal",
       customerPhone: cd.phone ? `+91 ${cd.phone.replace(/\D/g, "").slice(-10)}` : "+91 7812991993",
+      altPhone: altMobile,
       customerAddress: cd.address || "259, hirapur, Raipur, Chhattisgarh, 492099",
       otp: sp.otp || sp.service_otp || b.otp || "4826",
       convenienceFee,
+      totalMRP: grossTotal,
       itemDiscount,
-      couponDiscount: 0,
+      couponDiscount,
+      couponCode: b.coupon_code || "",
       totalAmount,
-      savings: itemDiscount + specialDiscount,
+      savings: itemDiscount + specialDiscount + couponDiscount,
       paymentMethod: apiData.payment_method || "COD",
     });
 
     setActiveAddress({
       full_name: cd.name || "Amit Jaiswal",
       contact_number: cd.phone || "7812991993",
+      alt_contact_number: altMobile,
       street: cd.address || "259, hirapur, Raipur, Chhattisgarh, 492099",
     });
   };
@@ -196,24 +214,28 @@ function OrderConfirmationContent() {
         try {
           const parsed = JSON.parse(savedBooking);
           const rawItems = parsed.items && parsed.items.length > 0 ? parsed.items : [];
-          const items = rawItems.map((it: any, idx: number) => ({
-            id: it.id || idx + 1,
-            name: it.name || it.serviceName || "Gas Filling",
-            subService: it.subService || it.sub_category_name || "Split AC",
-            quantity: it.quantity || 1,
-            unitPrice: it.price || it.discountedPrice || 200,
-            amount: (it.price || it.discountedPrice || 200) * (it.quantity || 1),
-            warranty: it.warrantyDays ? `${it.warrantyDays} Days` : "30 Days",
-            image: getImageUrl(it.image || it.icon, "/tas.logo.png"),
-          }));
-
-          const subtotal = items.reduce(
-            (sum: number, it: any) => sum + (it.amount || 0),
-            0,
-          );
-          const discount = parsed.totalDiscount || 36;
+          const discount = parsed.totalDiscount ?? 36;
           const couponDisc = parsed.couponDiscount || 0;
-          const finalTot = parsed.finalAmount || Math.max(subtotal - discount - couponDisc, 0) || 200;
+          const totalMRP = parsed.totalMRP || (parsed.finalAmount ? parsed.finalAmount + discount + couponDisc : 236);
+          const finalTot = parsed.finalAmount || Math.max(totalMRP - discount - couponDisc, 0) || 200;
+
+          const items = rawItems.map((it: any, idx: number) => {
+            const qty = it.quantity || 1;
+            const originalPrice = it.originalPrice || it.strike_price || (it.price ? it.price + Math.round(discount / (rawItems.length || 1)) : 236);
+            const discountedPrice = it.price || it.discountedPrice || 200;
+            return {
+              id: it.id || idx + 1,
+              name: it.name || it.serviceName || "Gas Filling",
+              subService: it.subService || it.sub_category_name || "Split AC",
+              quantity: qty,
+              unitPrice: originalPrice,
+              originalPrice,
+              discountedPrice,
+              amount: originalPrice * qty,
+              warranty: it.warrantyDays ? `${it.warrantyDays} Days` : "30 Days",
+              image: getImageUrl(it.image || it.icon, "/tas.logo.png"),
+            };
+          });
 
           const dt = parsed.bookingDateTime || {};
           const dateStr = dt.date || new Date().toLocaleDateString("en-US", {
@@ -240,19 +262,24 @@ function OrderConfirmationContent() {
             .filter(Boolean)
             .join(", ");
 
+          const altPhoneVal = parsed.altPhone || custAddr.alt_contact_number || parsedUser.alt_mobile || "";
+
           setBookingData({
             orderId: parsed.orderId || "ENQ-0033",
+            bookingId: parsed.bookingId || bookingIdFromUrl,
             orderDate: parsed.orderDate || dateStr,
-            serviceName: parsed.serviceName || items[0]?.name || "AC Repair",
-            serviceImage: getImageUrl(items[0]?.image, "/tas.logo.png"),
+            serviceName: parsed.serviceName || "AC Repair",
+            serviceImage: getImageUrl(parsed.serviceImage || parsed.service_image, "/ac.png"),
             items: items.length > 0 ? items : [
               {
                 id: 1,
                 name: "Gas Filling",
                 subService: "Split AC",
                 quantity: 1,
-                unitPrice: 200,
-                amount: 200,
+                unitPrice: 236,
+                originalPrice: 236,
+                discountedPrice: 200,
+                amount: 236,
                 warranty: "30 Days",
                 image: "/tas.logo.png",
               },
@@ -268,19 +295,26 @@ function OrderConfirmationContent() {
               custAddr.contact_number ||
               custAddr.phone ||
               (parsedUser.phone ? `+91 ${parsedUser.phone}` : "+91 7812991993"),
+            altPhone: altPhoneVal ? `+91 ${altPhoneVal.replace(/\D/g, "").slice(-10)}` : "",
             customerAddress:
               fullAddr || "259, hirapur, Raipur, Chhattisgarh, 492099",
             otp: "4826",
             convenienceFee: 0,
+            totalMRP,
             itemDiscount: discount,
             couponDiscount: couponDisc,
+            couponCode: parsed.couponCode || "",
             totalAmount: finalTot,
+            gstAmount: parsed.gstAmount || Math.max(finalTot - Math.round(finalTot / 1.18), 0),
             savings: discount + couponDisc,
             paymentMethod: parsed.paymentMethod || "COD",
           });
 
           if (custAddr && Object.keys(custAddr).length > 0) {
-            setActiveAddress(custAddr);
+            setActiveAddress({
+              ...custAddr,
+              alt_contact_number: altPhoneVal ? `+91 ${altPhoneVal.replace(/\D/g, "").slice(-10)}` : "",
+            });
           }
         } catch (e) {
           console.error("Error parsing local booking:", e);
@@ -457,12 +491,104 @@ function OrderConfirmationContent() {
     };
   }, [cityName, stateName]);
 
+  const handleOpenAltPhonePrompt = async () => {
+    const currentAlt =
+      bookingData?.altPhone?.replace(/^\+91\s*/, "") ||
+      activeAddress?.alt_contact_number?.replace(/^\+91\s*/, "") ||
+      "";
+
+    const { value: newNumber } = await Swal.fire({
+      title: currentAlt ? "Update Alternate Number" : "Add Alternate Number",
+      input: "tel",
+      inputLabel: "10-Digit Mobile Number",
+      inputValue: currentAlt,
+      inputPlaceholder: "Enter 10-digit mobile number",
+      showCancelButton: true,
+      confirmButtonText: "Save",
+      confirmButtonColor: "#ff5500",
+      cancelButtonColor: "#6b7280",
+      customClass: {
+        popup: "rounded-2xl",
+        confirmButton: "rounded-xl font-bold px-5 py-2.5",
+        cancelButton: "rounded-xl font-bold px-5 py-2.5",
+      },
+      inputValidator: (val) => {
+        const cleaned = (val || "").replace(/\D/g, "");
+        if (!cleaned) {
+          return "Please enter a mobile number";
+        }
+        if (cleaned.length !== 10) {
+          return "Please enter a valid 10-digit mobile number";
+        }
+        return null;
+      },
+    });
+
+    if (newNumber) {
+      const cleaned = newNumber.replace(/\D/g, "").slice(-10);
+      const formatted = `+91 ${cleaned}`;
+
+      // 1. Update active booking state
+      setBookingData((prev: any) => ({
+        ...prev,
+        altPhone: formatted,
+      }));
+
+      // 2. Update active address state
+      setActiveAddress((prev: any) => ({
+        ...(prev || {}),
+        alt_contact_number: formatted,
+      }));
+
+      // 3. Update localStorage lastConfirmedBooking
+      try {
+        const saved = localStorage.getItem("lastConfirmedBooking");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          parsed.altPhone = cleaned;
+          if (parsed.selectedAddress) {
+            parsed.selectedAddress.alt_contact_number = cleaned;
+          }
+          localStorage.setItem("lastConfirmedBooking", JSON.stringify(parsed));
+        }
+      } catch (e) {}
+
+      // 4. Update backend if booking ID available
+      const bId = bookingData?.bookingId || bookingIdFromUrl;
+      if (bId && token) {
+        try {
+          await axios.put(
+            `${API_BASE_URL}/customers/customer-bookings/${bId}`,
+            { alt_mobile: cleaned },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            }
+          );
+        } catch (err) {
+          console.error("Failed to sync alt_mobile with backend:", err);
+        }
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Alternate number saved!",
+        timer: 1500,
+        showConfirmButton: false,
+        customClass: { popup: "rounded-2xl" },
+      });
+    }
+  };
+
   const items = bookingData?.items || [];
   const displayAddress =
     activeAddress ||
     addresses[0] || {
       full_name: bookingData?.customerName || "Amit Jaiswal",
       contact_number: bookingData?.customerPhone || "+91 7812991993",
+      alt_contact_number: bookingData?.altPhone || "",
       street: bookingData?.customerAddress || "259, hirapur, Raipur, Chhattisgarh, 492099",
     };
 
@@ -631,11 +757,18 @@ function OrderConfirmationContent() {
                             {it.quantity}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-right font-semibold text-gray-800">
-                          ₹{it.unitPrice}
+                        <td className="py-3 px-3 text-right">
+                          <span className="font-bold text-gray-900 block">
+                            ₹{it.discountedPrice || it.unitPrice}
+                          </span>
+                          {it.originalPrice > (it.discountedPrice || it.unitPrice) && (
+                            <span className="text-[10px] text-gray-400 line-through block">
+                              ₹{it.originalPrice}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-3 px-3 text-right font-bold text-gray-900">
-                          ₹{it.amount}
+                        <td className="py-3 px-3 text-right font-extrabold text-gray-900">
+                          ₹{(it.discountedPrice || it.unitPrice) * it.quantity}
                         </td>
                         <td className="py-3 px-3 text-right font-semibold text-gray-600">
                           {it.warranty || "30 Days"}
@@ -680,21 +813,11 @@ function OrderConfirmationContent() {
 
             {/* 4. CUSTOMER DETAILS CARD */}
             <div className="bg-white border border-gray-200/90 rounded-2xl p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <User className="w-5 h-5 text-[#ff5500]" />
-                  <h3 className="text-base font-bold text-gray-900">
-                    Customer Details
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAddressModal(true)}
-                  className="border border-[#ff5500] text-[#ff5500] hover:bg-orange-50 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Pencil className="w-3 h-3" />
-                  <span>Edit</span>
-                </button>
+              <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+                <User className="w-5 h-5 text-[#ff5500]" />
+                <h3 className="text-base font-bold text-gray-900">
+                  Customer Details
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs sm:text-sm">
@@ -726,6 +849,44 @@ function OrderConfirmationContent() {
                           bookingData?.customerPhone ||
                           "+91 7812991993"}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Alternate Phone Number */}
+                  <div className="flex items-start gap-3">
+                    <Phone className="w-4 h-4 text-[#ff5500] mt-0.5 shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] text-gray-400 font-medium">
+                          Alternate Number
+                        </p>
+                        {(bookingData?.altPhone || displayAddress.alt_contact_number || displayAddress.altPhone) && (
+                          <button
+                            type="button"
+                            onClick={handleOpenAltPhonePrompt}
+                            className="text-[#ff5500] hover:text-[#e64d00] hover:underline text-[10px] font-bold cursor-pointer inline-flex items-center gap-0.5"
+                          >
+                            <Pencil className="w-2.5 h-2.5" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                      </div>
+                      {bookingData?.altPhone || displayAddress.alt_contact_number || displayAddress.altPhone ? (
+                        <p className="font-bold text-gray-900">
+                          {bookingData?.altPhone || displayAddress.alt_contact_number || displayAddress.altPhone}
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleOpenAltPhonePrompt}
+                          className="mt-1 text-xs font-bold text-[#ff5500] hover:text-[#e64d00] flex items-center gap-1 cursor-pointer transition-colors group"
+                        >
+                          <span className="w-4 h-4 rounded-full bg-orange-100 text-[#ff5500] flex items-center justify-center text-xs font-black group-hover:bg-[#ff5500] group-hover:text-white transition-colors">
+                            +
+                          </span>
+                          <span className="group-hover:underline">Add Alternate Number</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -822,16 +983,19 @@ function OrderConfirmationContent() {
 
               {/* Items list breakdown */}
               <div className="space-y-2.5 text-xs sm:text-sm">
-                {items.map((it: any, i: number) => (
-                  <div key={i} className="flex justify-between text-gray-600">
-                    <span className="truncate pr-2">
-                      {it.name} ({it.quantity} × ₹{it.unitPrice})
-                    </span>
-                    <span className="font-semibold text-gray-800">
-                      ₹{it.amount}
-                    </span>
-                  </div>
-                ))}
+                {items.map((it: any, i: number) => {
+                  const lineMRP = (it.originalPrice || it.unitPrice || 236) * (it.quantity || 1);
+                  return (
+                    <div key={i} className="flex justify-between text-gray-600">
+                      <span className="truncate pr-2">
+                        {it.name} ({it.quantity || 1} × ₹{it.originalPrice || it.unitPrice})
+                      </span>
+                      <span className="font-semibold text-gray-800">
+                        ₹{lineMRP}
+                      </span>
+                    </div>
+                  );
+                })}
 
                 {bookingData?.convenienceFee > 0 && (
                   <div className="flex justify-between text-gray-600 pt-1">
@@ -851,43 +1015,65 @@ function OrderConfirmationContent() {
 
                 {bookingData?.couponDiscount > 0 && (
                   <div className="flex justify-between text-green-600 font-semibold">
-                    <span>Coupon Discount</span>
+                    <span>
+                      Coupon Discount{" "}
+                      {bookingData?.couponCode ? `(${bookingData.couponCode})` : ""}
+                    </span>
                     <span>- ₹{bookingData?.couponDiscount}</span>
                   </div>
                 )}
 
-                <div className="border-t border-gray-100 pt-3 flex justify-between items-center text-sm font-extrabold text-gray-900">
-                  <span>
-                    Total Amount{" "}
-                    <span className="text-[11px] font-normal text-gray-400 block">
-                      (Inclusive of all taxes)
-                    </span>
+                {/* Taxes (18% GST) line */}
+                <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
+                  <span className="flex items-center gap-1">
+                    <span>Taxes (18% GST)</span>
+                    <span className="text-[10px] text-gray-400">Included</span>
                   </span>
-                  <span className="text-base text-gray-900 font-extrabold">
+                  <span className="font-semibold text-gray-800">
+                    ₹{bookingData?.gstAmount || Math.round((bookingData?.totalAmount || 200) * 0.18 / 1.18)} (Included)
+                  </span>
+                </div>
+
+                <div className="border-t border-gray-100 pt-3 flex justify-between items-baseline">
+                  <div>
+                    <span className="font-extrabold text-sm sm:text-base text-gray-900">
+                      Total Amount
+                    </span>
+                    <p className="text-[11px] text-green-700 font-medium mt-0.5">
+                      (Inclusive of all taxes &amp; GST)
+                    </p>
+                  </div>
+                  <span className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
                     ₹{bookingData?.totalAmount?.toLocaleString("en-IN") || "200"}
                   </span>
                 </div>
               </div>
 
               {/* Green Savings Pill */}
-              <div className="bg-emerald-50 border border-emerald-200/70 rounded-xl p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                    <Percent className="w-3.5 h-3.5" />
+              {(Number(bookingData?.savings || bookingData?.itemDiscount || 0) > 0) && (
+                <div className="bg-emerald-50 border border-emerald-200/70 rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                      <Percent className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-emerald-600 font-medium uppercase">
+                        You saved
+                      </p>
+                      <p className="text-xs font-bold text-emerald-800">
+                        ₹{bookingData?.savings || bookingData?.itemDiscount} on this order
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-emerald-600 font-medium uppercase">
-                      You saved
-                    </p>
-                    <p className="text-xs font-bold text-emerald-800">
-                      ₹{bookingData?.savings || 36} on this order
-                    </p>
-                  </div>
+                  <span className="bg-emerald-600 text-white font-extrabold text-[11px] px-2 py-0.5 rounded-md">
+                    {Math.round(
+                      ((bookingData?.savings || bookingData?.itemDiscount || 36) /
+                        (bookingData?.totalMRP || 236)) *
+                        100
+                    )}% OFF
+                  </span>
                 </div>
-                <span className="bg-emerald-600 text-white font-extrabold text-[11px] px-2 py-0.5 rounded-md">
-                  15% OFF
-                </span>
-              </div>
+              )}
             </div>
 
             {/* CARD 2: Important Information */}

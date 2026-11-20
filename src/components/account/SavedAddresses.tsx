@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Phone,
   Navigation,
+  Check,
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
@@ -25,6 +26,7 @@ export default function SavedAddresses({ setActiveView }: Props) {
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [defaultAddressId, setDefaultAddressId] = useState<number | string | null>(null);
 
   const fetchAddresses = async () => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -44,12 +46,66 @@ export default function SavedAddresses({ setActiveView }: Props) {
           },
         }
       );
-      setAddresses(res.data?.data || []);
+      const list = res.data?.data || [];
+      const savedDefaultId = typeof window !== "undefined" ? localStorage.getItem("default_address_id") : null;
+      const defaultAddr = list.find((a: any) => a.is_default == 1 || a.is_default === true);
+
+      if (defaultAddr) {
+        setDefaultAddressId(defaultAddr.id);
+      } else if (savedDefaultId && list.some((a: any) => String(a.id) === String(savedDefaultId))) {
+        setDefaultAddressId(Number(savedDefaultId));
+      } else if (list.length > 0) {
+        setDefaultAddressId(list[0].id);
+      }
+
+      setAddresses(list);
     } catch (error) {
       console.log("Error fetching addresses:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSetDefault = async (addressId: number | string) => {
+    setDefaultAddressId(addressId);
+    setAddresses((prev) =>
+      prev.map((a) => ({
+        ...a,
+        is_default: a.id === addressId ? 1 : 0,
+      }))
+    );
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("default_address_id", String(addressId));
+    }
+
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (token) {
+      try {
+        await axios.post(
+          `${API_BASE_URL}/customers/customer-addresses/${addressId}/default`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+      } catch (err) {
+        console.warn("Set default API error:", err);
+      }
+    }
+
+    Swal.fire({
+      icon: "success",
+      title: "Default Address Updated",
+      text: "This address has been set as your default service address.",
+      timer: 1500,
+      showConfirmButton: false,
+      toast: true,
+      position: "top-end",
+    });
   };
 
   useEffect(() => {
@@ -61,16 +117,22 @@ export default function SavedAddresses({ setActiveView }: Props) {
     if (!token) return;
 
     const cleanPhone = (val: string) => {
-      const digits = val.replace(/\D/g, "").replace(/^91/, "").replace(/^0/, "");
-      return `+91 ${digits}`;
+      if (!val) return "";
+      const digits = val.replace(/\D/g, "");
+      const last10 = digits.length > 10 ? digits.slice(-10) : digits;
+      return last10 ? `+91 ${last10}` : "";
     };
+
+    const altPhone =
+      formData.alternateNumber ||
+      formData.alt_contact_number ||
+      formData.altPhone ||
+      "";
 
     const payload = {
       full_name: formData.fullName || formData.name || "Customer",
       contact_number: cleanPhone(formData.contactNumber || formData.phone || ""),
-      alt_contact_number: cleanPhone(
-        formData.alternateNumber || formData.altPhone || formData.phone || ""
-      ),
+      alt_contact_number: altPhone ? cleanPhone(altPhone) : null,
       postal_code: formData.postalCode || formData.pincode || "492001",
       latitude: formData.latitude || 21.2514,
       longitude: formData.longitude || 81.6296,
@@ -111,6 +173,7 @@ export default function SavedAddresses({ setActiveView }: Props) {
         text: err.response?.data?.message || "Could not save address. Please try again.",
         confirmButtonColor: "#FF6A00",
       });
+      throw err;
     }
   };
 
@@ -250,15 +313,21 @@ export default function SavedAddresses({ setActiveView }: Props) {
                 : addr.state_name || addr.state || "Chhattisgarh";
             const pin = addr.postal_code || addr.pincode || addr.pin || "";
 
-            const isDefault = index === 0;
+            const isDefault = defaultAddressId
+              ? String(addr.id) === String(defaultAddressId)
+              : (addr.is_default == 1 || addr.is_default === true || index === 0);
 
             return (
               <div
                 key={addr.id || index}
-                className="p-5 sm:p-6 rounded-2xl border border-gray-200/90 hover:border-orange-200 bg-white hover:bg-orange-50/10 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between space-y-4 relative group"
+                className={`p-5 sm:p-6 rounded-2xl border transition-all flex flex-col justify-between space-y-4 relative group ${
+                  isDefault
+                    ? "border-green-300/80 bg-white shadow-xs ring-1 ring-green-100"
+                    : "border-gray-200/90 hover:border-orange-200 bg-white hover:bg-orange-50/10 shadow-2xs hover:shadow-xs"
+                }`}
               >
                 <div>
-                  {/* Top Bar: Icon + Name + Badge */}
+                  {/* Top Bar: Icon + Name + Badge / Make Default Button */}
                   <div className="flex items-start justify-between gap-3 mb-2.5">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/60 text-blue-600 flex items-center justify-center shrink-0">
@@ -288,11 +357,21 @@ export default function SavedAddresses({ setActiveView }: Props) {
                       </div>
                     </div>
 
-                    {isDefault && (
-                      <span className="text-[10px] font-extrabold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-green-600" />
+                    {isDefault ? (
+                      <span className="text-[10px] sm:text-xs font-extrabold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full flex items-center gap-1 shadow-2xs shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
                         Default
                       </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefault(addr.id)}
+                        className="text-[10px] sm:text-xs font-bold text-gray-600 hover:text-[#FF6A00] bg-gray-50 hover:bg-orange-50 border border-gray-200 hover:border-orange-300 px-3 py-1 rounded-full transition-all cursor-pointer shadow-2xs flex items-center gap-1 shrink-0 active:scale-95"
+                        title="Set as Default Address"
+                      >
+                        <Check className="w-3 h-3 text-gray-400 group-hover:text-[#FF6A00]" />
+                        <span>Make Default</span>
+                      </button>
                     )}
                   </div>
 
@@ -315,14 +394,26 @@ export default function SavedAddresses({ setActiveView }: Props) {
                     Verified Location
                   </span>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(addr.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                    title="Delete Address"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {!isDefault && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefault(addr.id)}
+                        className="text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer flex items-center gap-1 transition-colors"
+                      >
+                        <Check className="w-3 h-3" />
+                        <span>Make Default</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(addr.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      title="Delete Address"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

@@ -105,19 +105,18 @@ export default function ServiceSection({
   const displayedCategories = hasMore ? categoriesList.slice(0, 5) : categoriesList.slice(0, 6);
 
   return (
-    <section className="w-full sm:pb-10 sm:px-5">
+    <section className="w-full pt-[10px] sm:pb-10 sm:px-5">
       <LayoutContainer className="relative">
-        <div className="flex flex-col lg:flex-row justify-between items-start">
-          {/* Left Side - Service Cards */}
-          <div className="w-full lg:w-[40%] xl:w-[35%] flex flex-col">
-            <h2 className="text-lg lg:text-2xl font-semibold text-gray-600 dark:text-gray-300 mb-5 leading-[1.2] text-left max-w-[580px]">
-              How can we serve you
-              <br />
-              today?
+        <div className="flex flex-col lg:flex-row justify-between items-start gap-5 lg:gap-8">
+          {/* Service Cards (Categories) - order-2 on mobile (under banner), order-1 on desktop (left side) */}
+          <div className="w-full lg:w-[40%] xl:w-[35%] flex flex-col order-2 lg:order-1 mt-4 sm:mt-0">
+            <h2 className="text-sm sm:text-base lg:text-2xl font-black text-gray-900 dark:text-gray-100 mb-3 sm:mb-5 leading-tight text-left">
+              <span className="hidden sm:inline">How can we serve you<br />today?</span>
+              <span className="sm:hidden font-extrabold text-base text-gray-900">How can we serve you today?</span>
             </h2>
 
             {/* Grid of Categories (max 6 items including >> button if hasMore) */}
-            <div className="grid grid-cols-3 gap-x-3 gap-y-4 xl:pb-0 sm:pb-10">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-x-3 sm:gap-y-4 xl:pb-0 sm:pb-10">
               {displayedCategories.map((service, index) => {
                 const imageUrl = getCategoryImageUrl(service);
 
@@ -127,19 +126,19 @@ export default function ServiceSection({
                     className="flex flex-col items-center cursor-pointer group"
                     onClick={() => handleCategoryClick(service)}
                   >
-                    <div className="w-full h-20 sm:h-28 bg-gray-50 rounded-2xl flex items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-gray-100 relative">
+                    <div className="w-full h-[74px] sm:h-28 bg-white sm:bg-gray-50 rounded-2xl flex items-center justify-center p-2.5 sm:p-4 shadow-2xs sm:shadow-sm border border-gray-100 group-hover:scale-105 transition-all duration-300 overflow-hidden relative">
                       <SafeImage
                         src={imageUrl}
                         alt={service.name || service.title || "Category"}
                         width={64}
                         height={64}
                         fallbackSrc="/tas.logo.png"
-                        className="w-12 h-12 sm:w-16 sm:h-16 object-contain group-hover:scale-105 transition-transform duration-300"
+                        className="w-10 h-10 sm:w-16 sm:h-16 object-contain group-hover:scale-105 transition-transform duration-300"
                         style={{ objectFit: "contain" }}
                       />
                     </div>
 
-                    <p className="mt-2 text-[12px] sm:text-sm font-medium text-gray-800 dark:text-gray-300 text-center leading-tight line-clamp-2">
+                    <p className="mt-1.5 text-[11px] sm:text-sm font-semibold text-gray-800 dark:text-gray-300 text-center leading-tight line-clamp-2">
                       {service.name || service.title}
                     </p>
                   </div>
@@ -152,13 +151,13 @@ export default function ServiceSection({
                   className="flex flex-col items-center cursor-pointer group"
                   onClick={() => setShowAllCategoriesModal(true)}
                 >
-                  <div className="w-full h-20 sm:h-28 bg-gray-50 rounded-2xl flex items-center justify-center p-3 sm:p-4 shadow-sm group-hover:scale-105 transition-all duration-300 overflow-hidden border border-gray-100 relative">
-                    <span className="text-xl sm:text-2xl font-black text-primary select-none group-hover:scale-110 transition-transform duration-300">
+                  <div className="w-full h-[74px] sm:h-28 bg-white sm:bg-gray-50 rounded-2xl flex items-center justify-center p-2.5 sm:p-4 shadow-2xs sm:shadow-sm border border-gray-100 group-hover:scale-105 transition-all duration-300 overflow-hidden relative">
+                    <span className="text-lg sm:text-2xl font-black text-primary select-none group-hover:scale-110 transition-transform duration-300">
                       &gt;&gt;
                     </span>
                   </div>
 
-                  <p className="mt-2 text-[12px] sm:text-sm font-bold text-primary dark:text-orange-400 text-center leading-tight">
+                  <p className="mt-1.5 text-[11px] sm:text-sm font-bold text-primary dark:text-orange-400 text-center leading-tight">
                     All Categories
                   </p>
                 </div>
@@ -166,9 +165,10 @@ export default function ServiceSection({
             </div>
           </div>
 
-          {/* Right Side - Hero Image Slider Banner */}
-          <div className="w-full sm:block hidden lg:w-[60%] relative h-[300px] lg:h-[450px] rounded-3xl overflow-hidden shadow-xl group lg:ml-8 bg-gray-900">
-            {sliderList.map((slide: any, index: number) => (
+          {/* Hero Image Slider Banner - order-1 on mobile (at the very TOP), order-2 on desktop (right side) */}
+          <div className="w-full block lg:w-[60%] lg:ml-8 order-1 lg:order-2">
+            <div className="relative h-[145px] xs:h-[165px] sm:h-[260px] lg:h-[450px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-md sm:shadow-xl group bg-gray-900 border border-gray-100/10">
+              {sliderList.map((slide: any, index: number) => (
               <div
                 key={slide.id || index}
                 className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${index === activeSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
@@ -179,25 +179,28 @@ export default function ServiceSection({
                   alt={slide.title || "Home Services"}
                   fill
                   fallbackSrc="/heroimage.jpg"
-                  className="object-fill w-full h-full rounded-3xl"
+                  className="object-cover w-full h-full rounded-2xl sm:rounded-3xl"
                   style={{
                     objectFit:
                       (slide.image || slide.image_url) &&
                       !String(slide.image || slide.image_url).endsWith("/tas.logo.png")
-                        ? "fill"
+                        ? "cover"
                         : "contain",
                   }}
                   priority={index === 0}
                 />
                 {/* Overlay gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent rounded-3xl" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent rounded-2xl sm:rounded-3xl" />
                 {slide.title && (
-                  <div className="absolute bottom-8 left-8 right-8 text-white z-20">
-                    <h3 className="text-xl sm:text-2xl font-bold drop-shadow-md">
+                  <div className="absolute bottom-2.5 left-3 sm:bottom-8 sm:left-8 sm:right-8 text-white z-20 max-w-[75%] sm:max-w-lg pointer-events-none">
+                    <div className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded bg-orange-500/90 text-white font-extrabold text-[8px] sm:text-[10px] uppercase tracking-wider mb-1 shadow-2xs">
+                      <span>★ TASPRO VERIFIED</span>
+                    </div>
+                    <h3 className="text-sm xs:text-base sm:text-2xl font-black text-white leading-tight drop-shadow-md">
                       {slide.title}
                     </h3>
                     {slide.description && (
-                      <p className="text-xs sm:text-sm text-gray-200 mt-1 drop-shadow-sm max-w-lg">
+                      <p className="text-[10px] sm:text-sm text-gray-200 mt-0.5 drop-shadow-xs line-clamp-1 hidden xs:block">
                         {slide.description}
                       </p>
                     )}
@@ -208,15 +211,16 @@ export default function ServiceSection({
 
             {/* Slide Dots */}
             {sliderList.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+              <div className="absolute bottom-2.5 right-3 sm:bottom-6 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto flex items-center gap-1.5 z-20 bg-black/45 backdrop-blur-sm px-2 py-1 rounded-full">
                 {sliderList.map((_: any, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => setActiveSlide(idx)}
-                    className={`h-2.5 rounded-full transition-all duration-300 ${idx === activeSlide
-                        ? "w-7 bg-orange-500"
-                        : "w-2.5 bg-white/70 hover:bg-white"
-                      }`}
+                    className={`h-1.5 sm:h-2.5 rounded-full transition-all duration-300 ${
+                      idx === activeSlide
+                        ? "w-4 sm:w-7 bg-orange-500"
+                        : "w-1.5 sm:w-2.5 bg-white/60 hover:bg-white"
+                    }`}
                     aria-label={`Go to slide ${idx + 1}`}
                   />
                 ))}
@@ -232,7 +236,7 @@ export default function ServiceSection({
                       (prev) => (prev - 1 + sliderList.length) % sliderList.length
                     )
                   }
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 backdrop-blur-sm"
+                  className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 backdrop-blur-sm"
                   aria-label="Previous Slide"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -242,13 +246,14 @@ export default function ServiceSection({
                   onClick={() =>
                     setActiveSlide((prev) => (prev + 1) % sliderList.length)
                   }
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 backdrop-blur-sm"
+                  className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-20 backdrop-blur-sm"
                   aria-label="Next Slide"
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </>
             )}
+            </div>
           </div>
         </div>
         <ApplianceModal

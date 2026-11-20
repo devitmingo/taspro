@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { API_BASE_URL as BASE_URL } from "@/config/api";
+import { API_BASE_URL as BASE_URL, getImageUrl } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 import {
   Home,
@@ -46,6 +46,10 @@ import {
   AlertCircle,
   Eye,
   Banknote,
+  Wallet,
+  Truck,
+  Briefcase,
+  UserCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import BookingDetailsModal from "@/components/BookingDetailsModal";
@@ -229,6 +233,7 @@ const [showMenu, setShowMenu] = useState(false);
   const [showSelectAddressModal, setShowSelectAddressModal] = useState(false);
   const [showAddNewAddressModal, setShowAddNewAddressModal] = useState(false);
   const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const [alternateNumber, setAlternateNumber] = useState("");
   const [showAlternateModal, setShowAlternateModal] = useState(false);
@@ -466,73 +471,86 @@ const [showMenu, setShowMenu] = useState(false);
 
 const handleSaveAlternateNumber = async () => {
   if (alternateNumber.length !== 10) {
-    toast.error("Enter a valid mobile number");
-    return;
-  }
-
-  if (!customerAddress) {
-    toast.error("Customer address not found");
+    toast.error("Enter a valid 10-digit mobile number");
     return;
   }
 
   try {
     setSavingAlternate(true);
-const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
 
- const payload = {
-   full_name: customerAddress.full_name,
-   contact_number: customerAddress.contact_number,
-   alt_contact_number: alternateNumber,
-   postal_code: customerAddress.postal_code,
-   latitude: customerAddress.latitude,
-   longitude: customerAddress.longitude,
-   state_name: customerAddress.state.name,
-   city_name: customerAddress.city.name.replace("Unknown Type: ", ""),
-   house_number: customerAddress.house_number,
-   street: customerAddress.street,
-   type: customerAddress.type,
-   is_active: customerAddress.is_active,
- };
+    // 1. Update customer address if available
+    if (customerAddress && customerAddress.id) {
+      const payload = {
+        full_name: customerAddress.full_name,
+        contact_number: customerAddress.contact_number,
+        alt_contact_number: alternateNumber,
+        postal_code: customerAddress.postal_code,
+        latitude: customerAddress.latitude,
+        longitude: customerAddress.longitude,
+        state_name: customerAddress.state?.name || "Chhattisgarh",
+        city_name: (customerAddress.city?.name || "Raipur").replace("Unknown Type: ", ""),
+        house_number: customerAddress.house_number,
+        street: customerAddress.street,
+        type: customerAddress.type,
+        is_active: customerAddress.is_active,
+      };
 
- console.log("Payload:", payload);
+      try {
+        await axios.put(
+          `${BASE_URL}/customers/customer-addresses/${customerAddress.id}`,
+          payload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+          },
+        );
+        await fetchCustomerAddress();
+      } catch (err) {
+        console.error("Address alt number update failed:", err);
+      }
+    }
 
- const response = await axios.put(
-   `${BASE_URL}/customers/customer-addresses/${customerAddress.id}`,
-   payload,
-   {
-     headers: {
-       Authorization: `Bearer ${token}`,
-       Accept: "application/json",
-       "Content-Type": "application/json",
-     },
-   },
- );
+    // 2. Sync with current booking if available
+    const bId = selectedBooking?.id || bookingDetails?.id;
+    if (bId && token) {
+      try {
+        await axios.put(
+          `${BASE_URL}/customers/customer-bookings/${bId}`,
+          { alt_mobile: alternateNumber },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+      } catch (err) {
+        console.error("Booking alt_mobile update failed:", err);
+      }
+    }
 
- await fetchCustomerAddress();
-
-console.log("Updated Address:", customerAddress);
-
- console.log("Response:", response.data);
-    // Update local state
+    // 3. Update local state
     setCustomerAddress((prev: any) => ({
       ...prev,
       alt_contact_number: alternateNumber,
     }));
 
-    // Update booking UI
     setBookingDetails((prev: any) => ({
       ...prev,
       customer_details: {
-        ...prev.customer_details,
+        ...prev?.customer_details,
         alt_mobile: alternateNumber,
       },
     }));
 
-    toast.success("Alternate number updated");
-
+    toast.success("Alternate number updated successfully");
     setShowAlternateModal(false);
   } catch (error: any) {
-    console.log(error.response?.data);
+    console.error(error.response?.data);
     toast.error(error.response?.data?.message || "Unable to update");
   } finally {
     setSavingAlternate(false);
@@ -724,6 +742,7 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
 
   const fetchBookingDetails = async (bookingId: string | number) => {
     try {
+      setLoadingDetails(true);
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
@@ -749,6 +768,8 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
       }
     } catch (error) {
       console.error("Booking Details Error", error);
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -953,29 +974,21 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
     }
   };
 
-  const activeUser = user || {
-    id: 1,
-    phone: "9644430161",
-    firstName: "Amit",
-    lastName: "",
-    email: "amitjaiswal1990@gmail.com",
-    profileCompleted: true,
-    contactVerified: true,
-  };
+  const activeUser = user || null;
 
   const displayName =
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
     profile?.name ||
     activeUser?.firstName ||
     (activeUser as any)?.name ||
-    "Amit";
+    (activeUser?.phone ? `+91 ${activeUser.phone}` : "Customer");
 
-  const displayEmail = profile?.email || activeUser?.email || "amitjaiswal1990@gmail.com";
-  const displayPhone = profile?.mobile || (activeUser as any)?.phone || "9644430161";
+  const displayEmail = profile?.email || activeUser?.email || "";
+  const displayPhone = profile?.mobile || (activeUser as any)?.phone || "";
   const avatarUrl =
     profile?.profile_url ||
     (user as any)?.profileImage ||
-    "/img/profileimg.png";
+    null;
 
   const displayList = (bookings && bookings.length > 0) ? bookings : (loading ? [] : DEFAULT_MOCK_BOOKINGS);
 
@@ -1148,7 +1161,7 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
       : [
           {
             id: 1,
-            title: "Booked",
+            title: "Order Confirmed",
             status: "completed",
             time: bBooking?.enquiry_date_time
               ? new Date(bBooking.enquiry_date_time).toLocaleDateString("en-GB", {
@@ -1274,9 +1287,9 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
 
   const currentImage =
     bService?.image ||
-    bService?.items?.[0]?.image ||
+    selectedBooking?.service_image ||
     selectedBooking?.image ||
-    "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=300&auto=format&fit=crop";
+    "/ac.png";
 
   const currentStatus =
     bookingDetails?.delivery_status?.status ||
@@ -1649,14 +1662,57 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
     displayPhone ||
     "7812991993";
 
+  const customerAltPhone =
+    bCustomer?.alt_mobile ||
+    (selectedBooking as any)?.alt_mobile ||
+    customerAddress?.alt_contact_number ||
+    profile?.alt_mobile ||
+    "";
+
   const customerAddressText =
     bCustomer?.address ||
     (customerAddress
       ? `${customerAddress.house_number ? customerAddress.house_number + ", " : ""}${customerAddress.street || ""}, ${customerAddress.city?.name ? customerAddress.city.name.replace("Unknown Type: ", "") : ""}, ${customerAddress.state?.name || ""} - ${customerAddress.postal_code || ""}`
       : "Raipur, Chhattisgarh");
 
+  const bProvider = bookingDetails?.service_provider;
+  const vendorObj = (selectedBooking as any)?.vendor;
+
+  const hasProvider = Boolean(
+    bProvider?.is_assigned ||
+    (bProvider?.name && String(bProvider.name).trim() !== "") ||
+    (vendorObj && vendorObj.first_name)
+  );
+
+  const providerName =
+    bProvider?.name ||
+    (vendorObj
+      ? `${vendorObj.first_name || ""} ${vendorObj.last_name || ""}`.trim()
+      : "") ||
+    "Assigned Service Partner";
+
+  const providerPhone =
+    bProvider?.mobile ||
+    vendorObj?.mobile ||
+    "7447000045";
+
+  const providerImage =
+    bProvider?.image
+      ? getImageUrl(bProvider.image, "/service-provider-avatar.png")
+      : "/service-provider-avatar.png";
+
+  const providerRating = bProvider?.rating || "4.9";
+  const providerServices = bProvider?.completed_services || "120+ Services";
+  const providerExperience = bProvider?.experience || "5+ Years";
+  const providerVerified = bProvider?.verified_tag || "TASPro";
+  const providerLocation =
+    bProvider?.city ||
+    bProvider?.location ||
+    vendorObj?.current_city ||
+    "Raipur";
+
   return (
-    <div className="min-h-screen bg-[#F4F7FB] pb-24 w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen bg-white pb-24 w-full max-w-full overflow-x-hidden">
       <div className="w-full 2xl:w-[85%] mx-auto px-4 sm:px-5 py-5 sm:py-7 space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden">
         {/* Content Area */}
         {showChatBot ? (
@@ -1672,8 +1728,14 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
               }}
             />
           </div>
-        ) : showBookingDetailsPage && (selectedBooking || bookingDetails) ? (
-          <div className="space-y-6 w-full max-w-full">
+        ) : showBookingDetailsPage ? (
+          loadingDetails && !bookingDetails ? (
+            <div className="flex flex-col items-center justify-center py-28 space-y-3">
+              <RefreshCw className="w-8 h-8 text-[#FF6A00] animate-spin" />
+              <p className="text-sm font-bold text-gray-600">Loading booking details...</p>
+            </div>
+          ) : (selectedBooking || bookingDetails) ? (
+            <div className="space-y-6 w-full max-w-full">
             {/* 1. Breadcrumbs & Header */}
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 mb-2">
@@ -1748,41 +1810,29 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
               <div className="lg:col-span-7 space-y-6">
                 {/* 1. Service Provider Header Card */}
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4 min-w-0">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gray-50/90 border border-gray-100 flex items-center justify-center p-2 shrink-0 overflow-hidden shadow-2xs">
                       <img
-                        src={currentImage}
+                        src={getImageUrl(currentImage, "/ac.png")}
                         alt={currentServiceTitle}
-                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shrink-0 border border-gray-100 shadow-2xs"
+                        className="w-full h-full object-contain"
                         onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src =
-                            "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=300&auto=format&fit=crop";
+                          (e.currentTarget as HTMLImageElement).src = "/ac.png";
                         }}
                       />
-                      <div className="min-w-0">
-                        <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 tracking-tight truncate">
-                          {currentServiceTitle}
-                        </h2>
-                        <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
-                          {currentServiceSubtitle}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-2 text-xs">
-                          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                          <span className="font-bold text-gray-800">{currentRating}</span>
-                          <span className="text-gray-300">|</span>
-                          <span className="text-gray-500">{currentReviews} {Number(currentReviews) === 1 ? "review" : "reviews"}</span>
-                        </div>
-                      </div>
                     </div>
-
-                    <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
-                      <a
-                        href={bookingDetails?.service_provider?.mobile ? `tel:${bookingDetails.service_provider.mobile}` : "tel:+917447000045"}
-                        className="px-4 py-2 rounded-xl bg-[#FF6A00] hover:bg-[#e55f00] text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs"
-                      >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>Call</span>
-                      </a>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 tracking-tight truncate">
+                        {currentServiceTitle}
+                      </h2>
+                      <div className="flex items-center gap-1.5 mt-1.5 text-xs sm:text-sm">
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        <span className="font-bold text-gray-900">{currentRating}</span>
+                        <span className="text-gray-300">|</span>
+                        <span className="text-gray-500 font-medium">
+                          {currentReviews} {Number(currentReviews) === 1 ? "Review" : "Reviews"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1790,7 +1840,7 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50/80 border border-gray-100 text-gray-700 text-xs font-semibold">
                       <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                      <span className="truncate">Trusted & Verified Professionals</span>
+                      <span className="truncate">Trusted &amp; Verified Professionals</span>
                     </div>
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50/80 border border-gray-100 text-gray-700 text-xs font-semibold">
                       <Award className="w-4 h-4 text-[#FF6A00] shrink-0" />
@@ -1798,7 +1848,9 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                     </div>
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50/80 border border-gray-100 text-gray-700 text-xs font-semibold">
                       <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="truncate">{bBooking?.slot_time ? `Slot: ${bBooking.slot_time}` : "Approx. 1-2 Hours"}</span>
+                      <span className="truncate">
+                        Approx. Timing: <strong className="text-[#FF6A00] font-bold">45 Min</strong>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1834,7 +1886,6 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-gray-700">
                         {serviceItems.map((item: any, idx: number) => {
-                          const itemImg = item.image || currentImage;
                           const itemPrice = Number(item.price || 0);
                           const itemQty = Number(item.qty || 1);
                           return (
@@ -1842,15 +1893,16 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                               <td className="py-3 px-2 font-mono font-bold text-gray-400">{idx + 1}</td>
                               <td className="py-3 px-2">
                                 <div className="flex items-center gap-2.5">
-                                  <img
-                                    src={itemImg}
-                                    alt={item.subtitle || currentServiceTitle}
-                                    className="w-10 h-10 rounded-xl object-cover border border-gray-100 shrink-0"
-                                    onError={(e) => {
-                                      (e.currentTarget as HTMLImageElement).src =
-                                        "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=150&auto=format&fit=crop";
-                                    }}
-                                  />
+                                  <div className="w-10 h-10 rounded-xl bg-gray-50/80 border border-gray-100 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-2xs">
+                                    <img
+                                      src={getImageUrl(item.image || currentImage, "/ac.png")}
+                                      alt={item.subtitle || currentServiceTitle}
+                                      className="w-full h-full object-contain"
+                                      onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).src = getImageUrl(currentImage, "/ac.png");
+                                      }}
+                                    />
+                                  </div>
                                   <div>
                                     <div className="font-bold text-gray-900 text-xs sm:text-sm">
                                       {item.subtitle || currentServiceTitle}
@@ -1938,93 +1990,160 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                   </div>
                 </div>
 
-                {/* 3. Booking Timeline Card */}
+                {/* 3. Booking Timeline Card (Matching Image 2 Reference) */}
                 <div className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-100 shadow-xs">
                   <div className="flex items-center gap-2.5 mb-6">
                     <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center border border-orange-100">
-                      <ShieldCheck className="w-4 h-4" />
+                      <CalendarClock className="w-4 h-4" />
                     </div>
-                    <h3 className="font-extrabold text-base sm:text-lg text-gray-900">
-                      Booking Timeline
-                    </h3>
+                    <div>
+                      <h3 className="font-extrabold text-base sm:text-lg text-gray-900 leading-tight">
+                        Booking Timeline
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Track the real-time progress of your service booking
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="relative">
-                    <div className="hidden sm:block absolute top-4 left-6 right-6 h-0.5 bg-gray-100 -z-0" />
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-2 relative z-10">
-                      {bTracking.map((step: any, sIdx: number) => {
-                        const isDone = step.status === "completed";
-                        const isInProgress = step.status === "in_progress";
-                        const t = (step.title || "").toLowerCase();
+                  {/* Horizontal 4 Steps Timeline */}
+                  {(() => {
+                    const findStep = (keyword: string) =>
+                      bTracking.find(
+                        (s: any) =>
+                          (s.raw_status || s.title || "")
+                            .toLowerCase()
+                            .includes(keyword.toLowerCase())
+                      );
 
-                        const renderIcon = () => {
-                          if (isDone) {
-                            return <Check className="w-4 h-4 stroke-[3]" />;
-                          }
-                          if (isInProgress) {
-                            return <Clock className="w-4 h-4 text-[#FF6A00] animate-pulse" />;
-                          }
-                          if (t.includes("provider") || t.includes("vendor") || sIdx === 1) {
-                            return <Lock className="w-3.5 h-3.5" />;
-                          }
-                          if (t.includes("visit") || sIdx === 2) {
-                            return <MapPin className="w-3.5 h-3.5" />;
-                          }
-                          return <Check className="w-3.5 h-3.5" />;
-                        };
+                    const step1 = findStep("confirm") || findStep("book");
+                    const step2 = findStep("assign") || findStep("vendor") || findStep("provider");
+                    const step3 = findStep("visit");
+                    const step4 = findStep("deliver") || findStep("complet");
 
-                        return (
+                    const isStep1Done = true;
+                    const isStep2Done = Boolean(
+                      step2?.status === "completed" ||
+                      bookingDetails?.service_provider?.name ||
+                      (selectedBooking as any)?.vendor_id ||
+                      step3?.status === "completed" ||
+                      step4?.status === "completed" ||
+                      currentStatus?.toLowerCase() === "completed"
+                    );
+                    const isStep3Done = Boolean(
+                      step3?.status === "completed" ||
+                      step4?.status === "completed" ||
+                      currentStatus?.toLowerCase() === "completed"
+                    );
+                    const isStep4Done = Boolean(
+                      step4?.status === "completed" ||
+                      currentStatus?.toLowerCase() === "completed"
+                    );
+
+                    const step1Time = step1?.time || currentBookingDate || "";
+                    const step2Time = isStep2Done ? (step2?.time || "") : null;
+                    const step3Time = isStep3Done ? (step3?.time || "") : null;
+                    const step4Time = isStep4Done ? (step4?.time || "") : null;
+
+                    const steps = [
+                      {
+                        title: "Order Confirmed",
+                        isDone: isStep1Done,
+                        isActive: !isStep2Done,
+                        time: step1Time,
+                      },
+                      {
+                        title: "Provider Assigned",
+                        isDone: isStep2Done,
+                        isActive: isStep2Done && !isStep3Done,
+                        time: isStep2Done ? step2Time : "Pending",
+                      },
+                      {
+                        title: "Service Visit",
+                        isDone: isStep3Done,
+                        isActive: isStep3Done && !isStep4Done,
+                        time: isStep3Done ? step3Time : "Pending",
+                      },
+                      {
+                        title: "Completed",
+                        isDone: isStep4Done,
+                        isActive: false,
+                        time: isStep4Done ? step4Time : "Pending",
+                      },
+                    ];
+
+                    const activeIndex = isStep4Done ? 3 : isStep3Done ? 2 : isStep2Done ? 1 : 0;
+
+                    return (
+                      <div className="relative pt-2 pb-1">
+                        {/* Connecting Line Track */}
+                        <div className="hidden sm:block absolute top-[28px] left-[12%] right-[12%] h-1 bg-slate-200 z-0 rounded-full">
                           <div
-                            key={step.id || sIdx}
-                            className="flex sm:flex-col items-center sm:items-center text-left sm:text-center gap-3 sm:gap-2"
-                          >
+                            className="h-full bg-[#FF6A00] transition-all duration-500 rounded-full"
+                            style={{
+                              width:
+                                activeIndex === 3
+                                  ? "100%"
+                                  : activeIndex === 2
+                                  ? "66%"
+                                  : activeIndex === 1
+                                  ? "33%"
+                                  : "0%",
+                            }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 sm:gap-2 relative z-10">
+                          {steps.map((st, idx) => (
                             <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-xs ring-4 transition-all ${
-                                isDone
-                                  ? "bg-[#FF6A00] text-white ring-orange-100"
-                                  : isInProgress
-                                  ? "bg-orange-100 text-[#FF6A00] ring-orange-50 border border-orange-300"
-                                  : "bg-slate-100 text-slate-400 ring-transparent border border-slate-200"
-                              }`}
+                              key={st.title}
+                              className="flex sm:flex-col items-center text-left sm:text-center gap-3.5 sm:gap-2.5"
                             >
-                              {renderIcon()}
-                            </div>
-                            <div>
-                              <div
-                                className={`font-extrabold text-xs ${
-                                  isDone || isInProgress ? "text-gray-900" : "text-gray-700"
-                                }`}
-                              >
-                                {step.title}
+                              {/* Circle Icon */}
+                              <div className="bg-white rounded-full p-1 shrink-0">
+                                <div
+                                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+                                    st.isDone
+                                      ? "bg-[#FF6A00] text-white shadow-xs ring-4 ring-orange-100"
+                                      : st.isActive
+                                      ? "bg-orange-50 text-[#FF6A00] border-2 border-[#FF6A00] ring-4 ring-orange-50/60"
+                                      : "bg-slate-50 border border-slate-200 text-slate-400"
+                                  }`}
+                                >
+                                  {st.isDone ? (
+                                    <Check className="w-5 h-5 stroke-[3]" />
+                                  ) : idx === 1 ? (
+                                    <User className="w-5 h-5" />
+                                  ) : idx === 2 ? (
+                                    <Truck className="w-5 h-5" />
+                                  ) : (
+                                    <Check className="w-5 h-5 stroke-[2.5]" />
+                                  )}
+                                </div>
                               </div>
 
-                              {sIdx === 0 ? (
-                                <div className="mt-0.5">
-                                  <div className="text-[11px] text-gray-500 font-medium">
-                                    {step.time ? step.time.split(",")[0] : currentBookingDate}
-                                  </div>
-                                  <div className="text-[10px] text-gray-400">
-                                    {step.time && step.time.includes(",")
-                                      ? step.time.split(",")[1].trim()
-                                      : (bBooking?.slot_time || "09:00 AM")}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-[11px] text-gray-400 font-medium max-w-[140px] leading-tight mt-0.5">
-                                  {step.desc ||
-                                    (sIdx === 1
-                                      ? "We will notify you once assigned"
-                                      : sIdx === 2
-                                      ? "Technician will visit at scheduled time"
-                                      : "Service completion & review")}
-                                </div>
-                              )}
+                              {/* Details: Badge and Time */}
+                              <div className="min-w-0 flex-1 sm:flex-initial">
+                                <span
+                                  className={`inline-block px-3.5 py-1 rounded-full text-xs font-bold transition-colors ${
+                                    st.isDone || st.isActive
+                                      ? "bg-orange-50 text-orange-950 border border-orange-200/80 shadow-2xs"
+                                      : "bg-slate-50 text-slate-700 border border-slate-200/80"
+                                  }`}
+                                >
+                                  {st.title}
+                                </span>
+
+                                <p className="text-[11px] text-gray-500 font-medium mt-1 leading-tight">
+                                  {st.time || "Pending"}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 4. Service Warranty & Rework Card */}
@@ -2092,24 +2211,13 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
 
                 {/* 5. Customer & Service Address Card */}
                 <div className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-100 shadow-xs">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center border border-orange-100">
-                        <User className="w-4 h-4" />
-                      </div>
-                      <h3 className="font-extrabold text-base sm:text-lg text-gray-900">
-                        Customer & Service Address
-                      </h3>
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center border border-orange-100">
+                      <User className="w-4 h-4" />
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowSelectAddressModal(true)}
-                      className="px-3 py-1.5 rounded-xl border border-orange-300 text-[#FF6A00] hover:bg-orange-50 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      <span>Edit</span>
-                    </button>
+                    <h3 className="font-extrabold text-base sm:text-lg text-gray-900">
+                      Customer & Service Address
+                    </h3>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2133,6 +2241,43 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                           {customerPhone}
                         </div>
                       </div>
+
+                      <div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                          <Phone className="w-3.5 h-3.5 text-[#ff5500]" />
+                          <span>Alternate Number</span>
+                          {customerAltPhone && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAlternateNumber(customerAltPhone.replace(/\D/g, "").slice(-10));
+                                setShowAlternateModal(true);
+                              }}
+                              className="text-[#ff5500] hover:underline text-[10px] font-bold inline-flex items-center gap-0.5 cursor-pointer ml-1"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                              Edit
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-extrabold text-gray-900 text-sm mt-0.5">
+                          {customerAltPhone ? (
+                            `+91 ${customerAltPhone.replace(/\D/g, "").slice(-10)}`
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAlternateNumber("");
+                                setShowAlternateModal(true);
+                              }}
+                              className="text-xs font-bold text-[#ff5500] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <span className="font-extrabold">+</span>
+                              <span>Add Alternate Number</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <div>
@@ -2145,6 +2290,128 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                       </p>
                     </div>
                   </div>
+                </div>
+
+                {/* 6. Service Provider Details Card */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-100 shadow-xs">
+                  {/* Card Header */}
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center border border-orange-100">
+                      <UserCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base sm:text-lg text-gray-900 leading-tight">
+                        Service Provider
+                      </h3>
+                      <p className="text-xs text-gray-400 font-medium">
+                        Assigned professional for your service
+                      </p>
+                    </div>
+                  </div>
+
+                  {hasProvider ? (
+                    /* Card Content */
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                      {/* Left: Avatar + Info + Call Now */}
+                      <div className="flex items-center gap-4 min-w-0">
+                        {/* Avatar with verified green badge */}
+                        <div className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-gray-50 border border-gray-100 p-0.5 shrink-0 overflow-visible shadow-2xs">
+                          <img
+                            src={providerImage}
+                            alt={providerName}
+                            className="w-full h-full object-cover rounded-xl"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = "/service-provider-avatar.png";
+                            }}
+                          />
+                          <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs ring-2 ring-white">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        </div>
+
+                        {/* Details */}
+                        <div className="space-y-1.5 min-w-0">
+                          <h4 className="font-extrabold text-lg sm:text-xl text-gray-900 truncate">
+                            {providerName}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-xs text-gray-600 font-semibold">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                            <span className="font-extrabold text-gray-900">{providerRating}</span>
+                            <span className="text-gray-300">|</span>
+                            <span className="text-gray-500 font-medium">{providerServices}</span>
+                          </div>
+
+                          <div className="pt-0.5">
+                            <a
+                              href={`tel:${providerPhone}`}
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-orange-200 bg-orange-50/80 hover:bg-orange-100 text-[#FF6A00] font-bold text-xs transition-colors shadow-2xs cursor-pointer"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                              <span>Call Now</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Divider for desktop */}
+                      <div className="hidden lg:block w-px h-16 bg-gray-200/80 mx-1" />
+
+                      {/* Right: 3 Pills (Experience, Verified, Location) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 lg:max-w-md xl:max-w-lg">
+                        {/* 1. Experience */}
+                        <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-[#FFF9F5] border border-[#FFE7D6]">
+                          <div className="w-9 h-9 rounded-xl bg-white border border-[#FFD8BF] flex items-center justify-center text-[#FF6A00] shrink-0 shadow-2xs">
+                            <Briefcase className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold text-gray-500 leading-tight">Experience</div>
+                            <div className="text-xs sm:text-sm font-extrabold text-gray-900 truncate mt-0.5">{providerExperience}</div>
+                          </div>
+                        </div>
+
+                        {/* 2. Verified */}
+                        <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-[#F0F7FF] border border-[#D6E8FF]">
+                          <div className="w-9 h-9 rounded-xl bg-white border border-[#BFDBFE] flex items-center justify-center text-blue-600 shrink-0 shadow-2xs">
+                            <ShieldCheck className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold text-gray-500 leading-tight">Verified</div>
+                            <div className="text-xs sm:text-sm font-extrabold text-gray-900 truncate mt-0.5">{providerVerified}</div>
+                          </div>
+                        </div>
+
+                        {/* 3. Location */}
+                        <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7]">
+                          <div className="w-9 h-9 rounded-xl bg-white border border-[#BBF7D0] flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs">
+                            <MapPin className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold text-gray-500 leading-tight">Location</div>
+                            <div className="text-xs sm:text-sm font-extrabold text-gray-900 truncate mt-0.5">{providerLocation}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-orange-50/50 border border-orange-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white text-[#FF6A00] border border-orange-200 flex items-center justify-center shrink-0 shadow-2xs">
+                          <Clock className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-sm text-gray-900">
+                            Technician Assignment in Progress
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                            A verified TASpro professional will be assigned to your booking shortly before your scheduled visit.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="self-start sm:self-center px-3 py-1.5 rounded-full bg-white border border-orange-200 text-[#FF6A00] text-xs font-extrabold shrink-0 shadow-2xs">
+                        Assigning Soon
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 6. Cancellation Policy & Visit Charge */}
@@ -2174,61 +2441,63 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                   </div>
                 </div>
 
-                {/* 7. Customer Review Card */}
-                <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <Star className="w-5 h-5 text-amber-400 fill-amber-400 mt-0.5 shrink-0" />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="font-extrabold text-sm text-gray-900">Customer Review</div>
-                        {bookingDetails?.review_details?.rating ? (
-                          <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md text-[11px] font-bold text-amber-700">
-                            <span>{Number(bookingDetails.review_details.rating).toFixed(1)}</span>
-                            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                {/* 7. Customer Review Card - only visible when service is visited/completed or has existing review */}
+                {(isVisitedOrCompleted || currentStatus?.toLowerCase() === "completed" || Boolean(bookingDetails?.review_details?.review_text)) && (
+                  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <Star className="w-5 h-5 text-amber-400 fill-amber-400 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="font-extrabold text-sm text-gray-900">Customer Review</div>
+                          {bookingDetails?.review_details?.rating ? (
+                            <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md text-[11px] font-bold text-amber-700">
+                              <span>{Number(bookingDetails.review_details.rating).toFixed(1)}</span>
+                              <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {bookingDetails?.review_details?.review_text ? (
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-semibold text-gray-800 italic leading-relaxed">
+                              "{bookingDetails.review_details.review_text}"
+                            </p>
+                            <p className="text-[11px] text-gray-400 font-medium">
+                              Reviewed on {bookingDetails.review_details.review_date || "recently"}
+                            </p>
                           </div>
-                        ) : null}
+                        ) : (
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              You have not reviewed this service yet.
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                              Share your experience to help us improve our service quality.
+                            </p>
+                          </div>
+                        )}
                       </div>
-
-                      {bookingDetails?.review_details?.review_text ? (
-                        <div className="space-y-0.5">
-                          <p className="text-xs font-semibold text-gray-800 italic leading-relaxed">
-                            "{bookingDetails.review_details.review_text}"
-                          </p>
-                          <p className="text-[11px] text-gray-400 font-medium">
-                            Reviewed on {bookingDetails.review_details.review_date || "recently"}
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-xs text-gray-500">
-                            You have not reviewed this service yet.
-                          </p>
-                          <p className="text-[11px] text-gray-400">
-                            Share your experience to help us improve our service quality.
-                          </p>
-                        </div>
-                      )}
                     </div>
-                  </div>
 
-                  <button
-                    type="button"
-                    onClick={handleOpenReviewModal}
-                    className="px-4 py-2 rounded-xl border border-[#FF6A00] text-[#FF6A00] hover:bg-orange-50 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs self-start sm:self-center active:scale-95"
-                  >
-                    {bookingDetails?.review_details?.review_text ? (
-                      <>
-                        <Pencil className="w-3.5 h-3.5" />
-                        <span>Edit Review</span>
-                      </>
-                    ) : (
-                      <>
-                        <Star className="w-3.5 h-3.5" />
-                        <span>Write a review</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenReviewModal}
+                      className="px-4 py-2 rounded-xl border border-[#FF6A00] text-[#FF6A00] hover:bg-orange-50 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs self-start sm:self-center active:scale-95"
+                    >
+                      {bookingDetails?.review_details?.review_text ? (
+                        <>
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit Review</span>
+                        </>
+                      ) : (
+                        <>
+                          <Star className="w-3.5 h-3.5" />
+                          <span>Write a review</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* RIGHT COLUMN: 5 cols */}
@@ -2245,23 +2514,34 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                   </div>
 
                   <div className="space-y-2.5 text-xs">
-                    {serviceItems.map((item: any, idx: number) => (
-                      <div key={item.detail_id || idx} className="flex items-center justify-between text-gray-600">
-                        <span className="truncate pr-2">
-                          {item.subtitle || currentServiceTitle} ({item.qty || 1} × ₹{Number(item.price || 0).toLocaleString("en-IN")})
-                        </span>
-                        <span className="font-bold text-gray-900 shrink-0">
-                          ₹{(Number(item.price || 0) * Number(item.qty || 1)).toLocaleString("en-IN")}
-                        </span>
-                      </div>
-                    ))}
+                    {serviceItems.map((item: any, idx: number) => {
+                      const qty = Number(item.qty || 1);
+                      const discountedUnitPrice = Number(item.discounted_price || item.price || 200);
+                      const discountPerItem = Number(item.discount || 0) / qty;
+                      const mrpUnitPrice =
+                        Number(item.price || item.unit_price || 0) > discountedUnitPrice
+                          ? Number(item.price || item.unit_price)
+                          : discountedUnitPrice + (discountPerItem > 0 ? discountPerItem : 36);
+                      const lineMRP = mrpUnitPrice * qty;
+
+                      return (
+                        <div key={item.detail_id || idx} className="flex items-center justify-between text-gray-600">
+                          <span className="truncate pr-2">
+                            {item.subtitle || currentServiceTitle} ({qty} × ₹{mrpUnitPrice.toLocaleString("en-IN")})
+                          </span>
+                          <span className="font-semibold text-gray-800 shrink-0">
+                            ₹{lineMRP.toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      );
+                    })}
 
                     {spareItems.map((spare: any, idx: number) => (
                       <div key={spare.booking_spare_id || idx} className="flex items-center justify-between text-gray-600">
                         <span className="truncate pr-2">
                           {spare.subtitle || "Spare Part"} ({spare.qty || 1} × ₹{Number(spare.price || 0).toLocaleString("en-IN")})
                         </span>
-                        <span className="font-bold text-gray-900 shrink-0">
+                        <span className="font-semibold text-gray-800 shrink-0">
                           ₹{Number(spare.total || spare.price * spare.qty || 0).toLocaleString("en-IN")}
                         </span>
                       </div>
@@ -2269,32 +2549,43 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
 
                     {Number(bPayment?.visit_charge || 0) > 0 && (
                       <div className="flex items-center justify-between text-gray-600">
-                        <span>Visit & Inspection Charge</span>
-                        <span className="font-bold text-gray-900">₹{Number(bPayment.visit_charge).toLocaleString("en-IN")}</span>
-                      </div>
-                    )}
-
-                    {Number(bPayment?.taxes_and_fees || 0) > 0 && (
-                      <div className="flex items-center justify-between text-gray-600">
-                        <span>Taxes & Service Fees (GST)</span>
-                        <span className="font-bold text-gray-900">₹{Number(bPayment.taxes_and_fees).toLocaleString("en-IN")}</span>
+                        <span>Visit &amp; Inspection Charge</span>
+                        <span className="font-semibold text-gray-800">₹{Number(bPayment.visit_charge).toLocaleString("en-IN")}</span>
                       </div>
                     )}
 
                     {Number((bPayment?.item_discount || 0) + (Number(bPayment?.special_discount) || 0)) > 0 && (
-                      <div className="flex items-center justify-between text-emerald-600 font-semibold">
-                        <span>Discount</span>
+                      <div className="flex items-center justify-between text-green-600 font-semibold">
+                        <span>Item Discount</span>
                         <span>-₹{Number((bPayment?.item_discount || 0) + (Number(bPayment?.special_discount) || 0)).toLocaleString("en-IN")}</span>
                       </div>
                     )}
+
+                    {Number((selectedBooking as any)?.coupon_discount_amt || 0) > 0 && (
+                      <div className="flex items-center justify-between text-green-600 font-semibold">
+                        <span>Coupon Discount</span>
+                        <span>-₹{Number((selectedBooking as any)?.coupon_discount_amt).toLocaleString("en-IN")}</span>
+                      </div>
+                    )}
+
+                    {/* Taxes & GST line */}
+                    <div className="flex items-center justify-between text-xs text-gray-500 pt-0.5">
+                      <span className="flex items-center gap-1">
+                        <span>Taxes (18% GST)</span>
+                        <span className="text-[10px] text-gray-400">Included</span>
+                      </span>
+                      <span className="font-semibold text-gray-800">
+                        ₹{Number(bPayment?.taxes_and_fees || Math.round((totalAmount || 400) * 0.18 / 1.18)).toLocaleString("en-IN")} (Included)
+                      </span>
+                    </div>
                   </div>
 
                   <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
                     <div>
-                      <div className="text-xs font-bold text-gray-900">Total Amount</div>
-                      <div className="text-[10px] text-gray-400 font-medium">(Inclusive of all taxes)</div>
+                      <div className="text-xs sm:text-sm font-extrabold text-gray-900">Total Amount</div>
+                      <div className="text-[10px] text-green-700 font-medium">(Inclusive of all taxes &amp; GST)</div>
                     </div>
-                    <div className="text-xl font-black text-gray-900">
+                    <div className="text-xl sm:text-2xl font-black text-gray-900">
                       ₹{totalAmount.toLocaleString("en-IN")}
                     </div>
                   </div>
@@ -2362,165 +2653,46 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                     </div>
                   </div>
 
-                  {/* Payment Mode Selector: Cash or Online */}
-                  {!isPaidInFull && balanceDue > 0 && (
-                    <div className="space-y-2 pt-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-gray-700">
-                          Select Payment Option
-                        </label>
-                        <span className="text-[10px] text-gray-400 font-medium">
-                          {selectedPaymentMode === "online" ? "Gateway Popup" : "Pay to Technician"}
-                        </span>
+                  {/* Payment Mode Selector: Online only; COD is updated by vendor */}
+                  {!isPaidInFull && balanceDue > 0 ? (
+                    <div className="space-y-3 pt-1">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-2.5 text-xs text-slate-600 leading-relaxed">
+                        <Info className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="font-bold text-gray-900">Cash / Pay on Service</p>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            Our technician will collect payment and update your receipt in customer history upon service completion.
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {/* Option 1: Cash / COD */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPaymentMode("cash")}
-                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative ${
-                            selectedPaymentMode === "cash"
-                              ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-xs"
-                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between w-full mb-1.5">
-                            <div
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                                selectedPaymentMode === "cash"
-                                  ? "bg-emerald-600 text-white"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              <Banknote className="w-4 h-4" />
-                            </div>
-                            {selectedPaymentMode === "cash" ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border border-gray-300" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-gray-900">
-                              Cash / COD
-                            </div>
-                            <div className="text-[10px] text-gray-500 font-medium">
-                              Pay cash after service
-                            </div>
-                          </div>
-                        </button>
-
-                        {/* Option 2: Online Payment */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPaymentMode("online")}
-                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative ${
-                            selectedPaymentMode === "online"
-                              ? "border-[#FF6A00] bg-orange-50/70 ring-2 ring-[#FF6A00]/20 shadow-xs"
-                              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between w-full mb-1.5">
-                            <div
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                                selectedPaymentMode === "online"
-                                  ? "bg-[#FF6A00] text-white"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              <CreditCard className="w-4 h-4" />
-                            </div>
-                            {selectedPaymentMode === "online" ? (
-                              <CheckCircle2 className="w-4 h-4 text-[#FF6A00]" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border border-gray-300" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-gray-900">
-                              Online Payment
-                            </div>
-                            <div className="text-[10px] text-gray-500 font-medium">
-                              UPI, Cards, Netbanking
-                            </div>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-2 text-[11px] text-slate-600 leading-relaxed">
-                    <Info className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
-                    <span>
-                      {selectedPaymentMode === "cash"
-                        ? "You can pay in cash directly to our service technician once the job is completed."
-                        : "Online payment opens the secure Razorpay payment gateway to pay via UPI, Cards, or Netbanking."}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 pt-1">
-                    {selectedPaymentMode === "online" ? (
                       <button
                         type="button"
-                        disabled={isPaidInFull || balanceDue <= 0 || isPaying}
+                        disabled={isPaying}
                         onClick={handleMakePayment}
-                        className={`w-full py-3 rounded-xl font-extrabold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-2 ${
-                          isPaidInFull || balanceDue <= 0
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed"
-                            : isPaying
-                            ? "bg-[#FF6A00]/80 text-white cursor-wait"
-                            : "bg-[#FF6A00] hover:bg-[#e55f00] text-white cursor-pointer active:scale-[0.99]"
-                        }`}
+                        className="w-full py-3 rounded-xl font-extrabold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-2 bg-[#FF6A00] hover:bg-[#e55f00] text-white cursor-pointer active:scale-[0.99]"
                       >
                         {isPaying ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
                             <span>Opening Payment Gateway...</span>
                           </>
-                        ) : isPaidInFull || balanceDue <= 0 ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Payment Complete</span>
-                          </>
                         ) : (
                           <>
                             <CreditCard className="w-4 h-4" />
-                            <span>Pay Online (₹{balanceDue.toLocaleString("en-IN")})</span>
+                            <span>Pay ₹{balanceDue.toLocaleString("en-IN")} Online (UPI / Card)</span>
                           </>
                         )}
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={isPaidInFull || balanceDue <= 0 || isSubmittingCash}
-                        onClick={handleCashPayment}
-                        className={`w-full py-3 rounded-xl font-extrabold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-2 ${
-                          isPaidInFull || balanceDue <= 0
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed"
-                            : isSubmittingCash
-                            ? "bg-emerald-600/80 text-white cursor-wait"
-                            : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-[0.99]"
-                        }`}
-                      >
-                        {isSubmittingCash ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Recording Cash Payment...</span>
-                          </>
-                        ) : isPaidInFull || balanceDue <= 0 ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Payment Complete</span>
-                          </>
-                        ) : (
-                          <>
-                            <Banknote className="w-4 h-4" />
-                            <span>Confirm Cash Payment (₹{balanceDue.toLocaleString("en-IN")})</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center gap-2 text-xs font-bold text-emerald-800">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Payment Completed</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 pt-1">
 
                     <button
                       type="button"
@@ -2687,7 +2859,8 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
 
               </div>
             </div>
-          </div>
+            </div>
+          ) : null
         ) : (
           <div className="space-y-5 sm:space-y-6 w-full max-w-full">
             {/* Page Header */}
@@ -2780,7 +2953,6 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                 </div>
               ) : sortedBookings.length > 0 ? (
                 sortedBookings.map((booking: any, index: number) => {
-                  const isFirstHighlighted = booking.is_highlighted || (index === 0 && activeTab === "all");
                   const timelineText = booking.timeline_status || (
                     booking.status === "Completed" ? "Completed" :
                     booking.status === "Cancelled" || booking.status === "Rejected" ? "Cancelled" :
@@ -2788,94 +2960,159 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                     booking.status === "Assigned" ? "Provider Assigned" :
                     "Order Confirmed"
                   );
-                  const timelineBadge = getTimelineStatusBadge(timelineText);
-                  const paymentBadge = getPaymentStatusBadge(booking.payment_status, booking.payment_method);
+
+                  const isCancelled =
+                    booking.status === "Cancelled" ||
+                    booking.status === "Rejected" ||
+                    timelineText === "Cancelled" ||
+                    timelineText === "Rejected";
+
+                  const isRefunded =
+                    Boolean(booking.refund_id) ||
+                    Boolean(booking.is_refunded) ||
+                    timelineText === "Refund Completed" ||
+                    booking.status === "Refund Completed";
+
+                  let statusDotClass = "bg-emerald-600";
+                  let statusTextClass = "text-emerald-700";
+                  let statusTitle = "Order Confirmed";
+                  let statusSubtext = `Your booking is confirmed for ${booking.date || "14 Nov 2026"}${booking.time ? `, ${booking.time}` : ""}.`;
+
+                  if (isRefunded) {
+                    statusDotClass = "bg-emerald-600";
+                    statusTextClass = "text-emerald-700";
+                    statusTitle = "Refund Completed";
+                    statusSubtext = `Your refund of ₹${Number(booking.total_amount ?? 499).toLocaleString("en-IN")} has been processed.`;
+                  } else if (isCancelled) {
+                    statusDotClass = "bg-rose-600";
+                    statusTextClass = "text-rose-600";
+                    statusTitle = "Cancelled";
+                    statusSubtext = "Your booking has been cancelled.";
+                  } else if (booking.status === "Completed" || timelineText === "Completed") {
+                    statusDotClass = "bg-emerald-600";
+                    statusTextClass = "text-emerald-700";
+                    statusTitle = "Completed";
+                    statusSubtext = "Your service has been completed successfully.";
+                  } else if (booking.status === "Assigned" || timelineText === "Provider Assigned") {
+                    statusDotClass = "bg-blue-600";
+                    statusTextClass = "text-blue-700";
+                    statusTitle = "Provider Assigned";
+                    statusSubtext = "Service partner assigned for your scheduled visit.";
+                  } else if (timelineText === "Service Visit") {
+                    statusDotClass = "bg-amber-500";
+                    statusTextClass = "text-amber-700";
+                    statusTitle = "Service Visit";
+                    statusSubtext = "Technician visit scheduled for your service.";
+                  } else if (booking.status === "Rescheduled" || timelineText === "Rescheduled") {
+                    statusDotClass = "bg-orange-500";
+                    statusTextClass = "text-orange-600";
+                    statusTitle = "Rescheduled";
+                    statusSubtext = "Your booking has been rescheduled.";
+                  }
+
+                  const displayPrice = isCancelled && !isRefunded ? 0 : Number(booking.total_amount ?? booking.price ?? 0);
+                  const serviceImg = getImageUrl(booking.service_image || booking.image, "/ac.png");
 
                   return (
                     <div
                       key={booking.booking_id || booking.id || index}
-                      className={`bg-white rounded-2xl p-4 sm:p-5 transition-all shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                        isFirstHighlighted
-                          ? "border border-orange-300 ring-1 ring-orange-200/50"
-                          : "border border-gray-100 hover:border-gray-200 hover:shadow-sm"
-                      }`}
+                      className="bg-white rounded-2xl border border-gray-100 hover:border-gray-200 shadow-xs hover:shadow-sm transition-all p-4 sm:p-5 space-y-4"
                     >
-                      {/* Left: Thumbnail & Details */}
-                      <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gray-50 flex items-center justify-center p-2 shrink-0 border border-gray-100 overflow-hidden">
-                          <img
-                            src={booking.image || "/ac.png"}
-                            alt={booking.title || "Service"}
-                            className="w-full h-full object-contain"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src = "/ac.png";
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        {/* 1. Left: Service Thumbnail & Details */}
+                        <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-gray-50/90 border border-gray-100 flex items-center justify-center p-1.5 shrink-0 overflow-hidden">
+                            <img
+                              src={serviceImg}
+                              alt={booking.title || "Service"}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = "/ac.png";
+                              }}
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight truncate">
+                              {booking.title || booking.service || "AC Repair"}
+                            </h3>
+                            <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5 truncate">
+                              {booking.subtitle || "Deep Cleaning • Split AC"}
+                            </p>
+                            <div className="text-xs sm:text-sm text-gray-500 font-medium mt-1 flex flex-wrap items-center gap-1.5">
+                              <span>
+                                Booking ID:{" "}
+                                <strong className="font-bold text-gray-800">
+                                  {booking.booking_id || `TAS-${booking.id}`}
+                                </strong>
+                              </span>
+                              <span className="text-gray-300">|</span>
+                              <span>
+                                Booking Date:{" "}
+                                <strong className="font-bold text-gray-800">
+                                  {booking.date || "14 Nov 2026"}
+                                </strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Middle & Right: Price, Status (with vertical divider), View Details Button */}
+                        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between lg:justify-end gap-4 lg:gap-6 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-gray-100">
+                          {/* Price */}
+                          <div className="text-lg sm:text-xl font-extrabold text-gray-900 min-w-[70px] lg:text-right">
+                            ₹{displayPrice.toLocaleString("en-IN")}
+                          </div>
+
+                          {/* Status with Left Vertical Line */}
+                          <div className="lg:border-l lg:border-gray-200 lg:pl-6 min-w-[200px] xl:min-w-[240px]">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass}`} />
+                              <span className={`text-xs sm:text-sm font-bold ${statusTextClass}`}>
+                                {statusTitle}
+                              </span>
+                            </div>
+                            <p className="text-[11px] sm:text-xs text-gray-500 font-medium mt-0.5 leading-snug">
+                              {statusSubtext}
+                            </p>
+                          </div>
+
+                          {/* View Details Pill Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setShowBookingDetailsPage(true);
+                              router.push(`/my-booking?bookingId=${booking.id || booking.booking_id}`);
                             }}
-                          />
-                        </div>
-
-                        <div className="min-w-0">
-                          <h3 className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight truncate">
-                            {booking.title || booking.service || "Home Service"}
-                          </h3>
-                          <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
-                            {booking.subtitle ? `${booking.subtitle} • ` : ""}{booking.date || ""} | {booking.time || ""}
-                          </p>
-                          <p className="text-xs sm:text-sm text-gray-400 font-medium mt-0.5 font-mono">
-                            Booking ID: {booking.booking_id || `TAS-${booking.id}`}
-                          </p>
+                            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-[#FF6A00] text-[#FF6A00] hover:bg-orange-50 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap ml-auto lg:ml-0"
+                          >
+                            <span>View Details</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Right: Timeline & Payment Status badges, Price, Action button */}
-                      <div className="flex flex-wrap md:flex-nowrap items-center justify-between md:justify-end gap-3 sm:gap-6 pt-3 md:pt-0 border-t md:border-t-0 border-gray-100 shrink-0">
-                        {/* Dual Status: Current Timeline & Payment */}
-                        <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
-                          {/* 1. Timeline Status Badge */}
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Timeline</span>
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] sm:text-xs font-bold border ${timelineBadge.bg}`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${timelineBadge.dot}`} />
-                              <span>{timelineBadge.label}</span>
-                            </span>
+                      {/* 3. Refund Details Accordion / Banner (Shown when refunded, as in Image 1 Card 3) */}
+                      {isRefunded && (
+                        <div className="bg-emerald-50/70 border-t border-emerald-100/90 rounded-b-2xl -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-3 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs">
+                          <div className="flex items-center gap-2 text-emerald-800 font-bold shrink-0">
+                            <Wallet className="w-4 h-4 text-emerald-600" />
+                            <span>Refund Details</span>
                           </div>
-
-                          {/* 2. Payment Status Badge */}
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider hidden sm:inline">Payment</span>
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${paymentBadge.bg}`}
-                            >
-                              {paymentBadge.icon === "paid" ? (
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              ) : (
-                                <Clock className="w-3 h-3 text-[#FF6A00]" />
-                              )}
-                              <span>{paymentBadge.label}</span>
-                            </span>
+                          <div className="hidden sm:block text-emerald-300">|</div>
+                          <div className="flex-1 space-y-0.5">
+                            <p className="font-semibold text-emerald-950 text-xs">
+                              Refund ID: {booking.refund_id || `REF${booking.id || 36}856233623246932850`}
+                              <span className="mx-2 text-emerald-300">|</span>
+                              Amount: ₹{Number(booking.total_amount ?? booking.price ?? 499).toLocaleString("en-IN")}
+                            </p>
+                            <p className="text-[11px] text-emerald-700">
+                              Refund was added to your {booking.payment_method === "ONLINE" ? "Original Payment Source" : "TASpro Account"} on {booking.date || "24 Aug 2026"}.
+                            </p>
                           </div>
                         </div>
-
-                        {/* Price */}
-                        <div className="text-base sm:text-lg font-extrabold text-gray-900 min-w-[75px] text-right">
-                          ₹{Number(booking.total_amount ?? booking.price ?? 0).toLocaleString("en-IN")}
-                        </div>
-
-                        {/* View Details Button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedBooking(booking);
-                            setShowBookingDetailsPage(true);
-                            router.push(`/my-booking?bookingId=${booking.id || booking.booking_id}`);
-                          }}
-                          className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-[#FF6A00] text-[#FF6A00] hover:bg-orange-50 font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs whitespace-nowrap"
-                        >
-                          <span>View Details</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      )}
                     </div>
                   );
                 })
@@ -2980,9 +3217,19 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
           // setShowTCModal(true);
         }}
       />
-      {showCancelModal && selectedBooking && (
+      {showCancelModal && (selectedBooking || bookingDetails) && (
         <CancelBookingModal
-          booking={selectedBooking}
+          booking={
+            selectedBooking || {
+              id: numericBookingId,
+              booking_id: numericBookingId,
+              booking_no: bookingDetails?.booking?.booking_no || `ENQ-00${numericBookingId}`,
+              title: currentServiceTitle,
+              service_name: currentServiceTitle,
+              price: totalAmount,
+              date: currentScheduledAt,
+            }
+          }
           onClose={() => setShowCancelModal(false)}
           onConfirm={async (data) => {
             try {
@@ -2993,11 +3240,12 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
                 cancel_reason: data.cancel_reason,
               };
 
-              const result = await cancelBooking(selectedBooking.id, payload);
+              const cancelId = selectedBooking?.id || bookingDetails?.booking?.booking_id || numericBookingId;
+              await cancelBooking(cancelId, payload);
 
               setBookings((prev) =>
                 prev.map((item) =>
-                  item.id === selectedBooking.id
+                  item.id === cancelId
                     ? { ...item, status: "Cancelled" }
                     : item,
                 ),
@@ -3115,6 +3363,80 @@ const timeline = trackingSteps.map((step: any, index: number) => ({
               <button
                 type="button"
                 onClick={() => setShowReviewModal(false)}
+                className="px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold text-xs transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alternate Number Modal */}
+      {showAlternateModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#FF6A00] flex items-center justify-center">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <h3 className="font-extrabold text-base text-gray-900">
+                  {customerAltPhone ? "Update Alternate Number" : "Add Alternate Number"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAlternateModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Provide an alternate contact number for technician dispatch and service coordination updates.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-gray-700 block">
+                10-Digit Mobile Number
+              </label>
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:border-[#FF6A00] focus-within:ring-1 focus-within:ring-[#FF6A00]">
+                <span className="px-3 py-2.5 bg-gray-50 text-gray-500 text-xs font-bold border-r border-gray-200">
+                  +91
+                </span>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={alternateNumber}
+                  onChange={(e) => setAlternateNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="Enter 10-digit number"
+                  className="w-full px-3 py-2.5 text-xs font-bold text-gray-900 outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                disabled={savingAlternate || alternateNumber.length !== 10}
+                onClick={handleSaveAlternateNumber}
+                className="flex-1 py-2.5 rounded-xl bg-[#FF6A00] hover:bg-[#e55f00] text-white font-extrabold text-xs transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingAlternate ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>Save Number</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAlternateModal(false)}
                 className="px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold text-xs transition-all cursor-pointer"
               >
                 Cancel

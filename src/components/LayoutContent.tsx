@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import FloatingContactButton from "@/components/FloatingContactButton";
 import { Suspense } from "react";
 
 export default function LayoutContent({
@@ -25,6 +26,9 @@ export default function LayoutContent({
 
       {/* FOOTER */}
       <Footer />
+
+      {/* FLOATING DIRECT CONTACT / REACH BUTTON */}
+      <FloatingContactButton />
     </>
   );
 }

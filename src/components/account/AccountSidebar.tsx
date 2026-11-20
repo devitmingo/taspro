@@ -77,7 +77,7 @@ import axios from "axios";
 import { API_BASE_URL } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 import GradientButton from "@/components/ui/GradientButton";
-import { Camera } from "lucide-react";
+import { Camera, User } from "lucide-react";
 
 type MenuItem = {
   icon: string;
@@ -134,7 +134,7 @@ export default function AccountSidebar({
   const avatarUrl =
     activeProfile?.profile_url ||
     user?.profileImage ||
-    "/img/profileimg.png";
+    null;
 
   const firstName = activeProfile?.first_name || user?.firstName || "";
   const lastName = activeProfile?.last_name || user?.lastName || "";
@@ -173,14 +173,29 @@ export default function AccountSidebar({
           title="Edit Profile"
         >
           <div className="w-[84px] h-[84px] rounded-full p-0.5 bg-gradient-to-tr from-[#FEC12D] to-[#FF552C] shadow-xs transition-transform duration-200 group-hover:scale-105">
-            <img
-              src={avatarUrl}
-              alt="Profile"
-              className="w-full h-full rounded-full object-cover bg-white"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = "/img/profileimg.png";
-              }}
-            />
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Profile"
+                className="w-full h-full rounded-full object-cover bg-white"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = "none";
+                  const fallback = e.currentTarget.parentElement?.querySelector(".sidebar-avatar-fallback");
+                  if (fallback) (fallback as HTMLElement).classList.remove("hidden");
+                }}
+              />
+            ) : null}
+            <div
+              className={`w-full h-full rounded-full bg-orange-100 text-[#FF6A00] flex items-center justify-center font-bold text-2xl sidebar-avatar-fallback ${
+                avatarUrl ? "hidden" : ""
+              }`}
+            >
+              {displayName && displayName !== "User" && !displayName.startsWith("+91") ? (
+                <span>{displayName.charAt(0).toUpperCase()}</span>
+              ) : (
+                <User className="w-10 h-10 text-[#FF6A00]" />
+              )}
+            </div>
           </div>
           <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-[#FF6A00] text-white flex items-center justify-center shadow-md border-2 border-white group-hover:bg-[#E55F00] transition-colors">
             <Camera className="w-3 h-3" />
@@ -221,14 +236,29 @@ export default function AccountSidebar({
           className="relative group cursor-pointer"
           title={`${displayName} (${displayEmail})`}
         >
-          <img
-            src={avatarUrl}
-            alt="Profile"
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-orange-200"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = "/img/profileimg.png";
-            }}
-          />
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Profile"
+              className="w-10 h-10 rounded-full object-cover ring-2 ring-orange-200"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = "none";
+                const fallback = e.currentTarget.parentElement?.querySelector(".mobile-sidebar-fallback");
+                if (fallback) (fallback as HTMLElement).classList.remove("hidden");
+              }}
+            />
+          ) : null}
+          <div
+            className={`w-10 h-10 rounded-full bg-orange-100 text-[#FF6A00] flex items-center justify-center font-bold text-sm ring-2 ring-orange-200 mobile-sidebar-fallback ${
+              avatarUrl ? "hidden" : ""
+            }`}
+          >
+            {displayName && displayName !== "User" && !displayName.startsWith("+91") ? (
+              <span>{displayName.charAt(0).toUpperCase()}</span>
+            ) : (
+              <User className="w-5 h-5 text-[#FF6A00]" />
+            )}
+          </div>
         </Link>
       </div>
 

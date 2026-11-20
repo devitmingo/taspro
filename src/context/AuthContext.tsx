@@ -24,6 +24,7 @@ interface User {
   phone: string;
   firstName?: string;
   lastName?: string;
+  name?: string;
   email?: string;
   mobile?: string;
   alt_mobile?: string;
@@ -96,22 +97,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (err?.response?.status === 401) {
               console.warn("Session token invalid or rejected by API (401). Clearing stale session.");
               localStorage.removeItem("token");
+              localStorage.removeItem("customer_id");
               localStorage.removeItem("user");
               setUser(null);
             }
           });
       }
+
+      const handleUserLoggedInEvent = (event: any) => {
+        const u = event?.detail;
+        if (u) {
+          const freshUser: User = {
+            id: u.id,
+            phone: u.mobile,
+            firstName: u.first_name || '',
+            lastName: u.last_name || '',
+            email: u.email || '',
+            mobile: u.mobile,
+            alt_mobile: u.alt_mobile || '',
+            alternateNumber: u.alt_mobile || '',
+            gender: u.gender || 'Male',
+            profileImage: u.profile_url || u.profile || null,
+            profileCompleted: Boolean(u.first_name && u.first_name.trim() !== ''),
+            contactVerified: true,
+          };
+          setUser(freshUser);
+          localStorage.setItem('user', JSON.stringify(freshUser));
+        }
+      };
+
+      window.addEventListener('user-logged-in', handleUserLoggedInEvent);
+      return () => {
+        window.removeEventListener('user-logged-in', handleUserLoggedInEvent);
+      };
     }
   }, []);
 
   const login = (userData: User) => {
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
+    if (userData.id) {
+      localStorage.setItem('customer_id', String(userData.id));
+    }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('customer_id');
   };
 
   const updateUserProfile = (profileData: Partial<User>) => {
