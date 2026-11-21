@@ -105,11 +105,11 @@ export default function ServiceSection({
   const displayedCategories = hasMore ? categoriesList.slice(0, 5) : categoriesList.slice(0, 6);
 
   return (
-    <section className="w-full pt-[10px] sm:pb-10 sm:px-5">
+    <section className="w-full pt-[10px] px-4 sm:px-5 sm:pb-10">
       <LayoutContainer className="relative">
         <div className="flex flex-col lg:flex-row justify-between items-start gap-5 lg:gap-8">
-          {/* Service Cards (Categories) - order-2 on mobile (under banner), order-1 on desktop (left side) */}
-          <div className="w-full lg:w-[40%] xl:w-[35%] flex flex-col order-2 lg:order-1 mt-4 sm:mt-0">
+          {/* Service Cards (Categories) - order-1 on mobile (above slider), order-1 on desktop (left side) */}
+          <div className="w-full lg:w-[40%] xl:w-[35%] flex flex-col order-1 lg:order-1 mt-0">
             <h2 className="text-sm sm:text-base lg:text-2xl font-black text-gray-900 dark:text-gray-100 mb-3 sm:mb-5 leading-tight text-left">
               <span className="hidden sm:inline">How can we serve you<br />today?</span>
               <span className="sm:hidden font-extrabold text-base text-gray-900">How can we serve you today?</span>
@@ -165,8 +165,8 @@ export default function ServiceSection({
             </div>
           </div>
 
-          {/* Hero Image Slider Banner - order-1 on mobile (at the very TOP), order-2 on desktop (right side) */}
-          <div className="w-full block lg:w-[60%] lg:ml-8 order-1 lg:order-2">
+          {/* Hero Image Slider Banner - order-2 on mobile (under categories), order-2 on desktop (right side) */}
+          <div className="w-full block lg:w-[60%] lg:ml-8 order-2 lg:order-2">
             <div className="relative h-[145px] xs:h-[165px] sm:h-[260px] lg:h-[450px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-md sm:shadow-xl group bg-gray-900 border border-gray-100/10">
               {sliderList.map((slide: any, index: number) => (
               <div
