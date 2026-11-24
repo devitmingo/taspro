@@ -1661,7 +1661,7 @@ const ACRepairLayout = () => {
                       Your Cart is empty
                     </p>
                     <p className="text-sm text-gray-500 mb-6">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                      Explore our range of professional services and add items to your cart to get started.
                     </p>
                   </div>
                 ) : (

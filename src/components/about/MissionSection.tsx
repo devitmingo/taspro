@@ -9,13 +9,8 @@ export default function MissionSection() {
           <h2 className="text-2xl sm:text-3xl md:text-4xl dark:text-white font-semibold mb-6 leading-tight">
             Our Mission
           </h2>
-          <p className="text-gray-600">
-            There are many variations of passages of Lorem Ipsum available, but
-            the majority have suffered alteration in some form, by injected
-            humour, or randomized words which don't look even slightly
-            believable.but the majority have suffered alteration in some form,
-            by injected humour, or randomized words which don't look even
-            slightly believable.
+          <p className="text-gray-600 leading-relaxed">
+            At TASpro, our mission is to empower homeowners with hassle-free, trusted, and top-tier doorstep services. We combine verified expertise, transparent pricing, and standardized service procedures to make home maintenance effortless and reliable.
           </p>
         </div>
 

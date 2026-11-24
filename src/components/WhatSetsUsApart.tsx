@@ -3,28 +3,28 @@
 const features = [
   {
     id: 1,
-    title: "Lorem Ipsum Dolor",
-    desc: "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    title: "Verified & Trained Technicians",
+    desc: "Every service professional undergoes comprehensive background checks and rigorous technical training.",
   },
   {
     id: 2,
-    title: "Lorem Ipsum Dolor",
-    desc: "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    title: "Upfront & Transparent Pricing",
+    desc: "Clear standard rate cards with upfront quotes. No hidden charges or unexpected surprises.",
   },
   {
     id: 3,
-    title: "Lorem Ipsum Dolor",
-    desc: "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    title: "Service Warranty Guaranteed",
+    desc: "Peace of mind with 30 to 90 days warranty coverage on services and genuine replacement parts.",
   },
   {
     id: 4,
-    title: "Lorem Ipsum Dolor",
-    desc: "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    title: "On-Time Doorstep Service",
+    desc: "Punctual arrivals equipped with modern diagnostic tools and genuine spares for same-day resolution.",
   },
   {
     id: 5,
-    title: "Lorem Ipsum Dolor",
-    desc: "Consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    title: "100% Satisfaction or Free Rework",
+    desc: "Complete customer satisfaction guaranteed. Hassle-free revisits and reworks at zero extra cost.",
   },
 ];
 
@@ -38,7 +38,7 @@ export default function WhatSetsUsApart() {
         </h2>
 
         <p className="text-gray-500 mb-6 md:mb-10 max-w-[500px]">
-          There are many variations of passages of Lorem Ipsum
+          Dedicated to delivering exceptional home repair and maintenance services with complete trust and transparency.
         </p>
 
         <div className="space-y-6">

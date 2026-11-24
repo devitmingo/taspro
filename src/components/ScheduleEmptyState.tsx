@@ -55,7 +55,7 @@ const ScheduleEmptyState = ({ onServiceClick }: ScheduleEmptyStateProps) => {
 
           {/* Description */}
           <p className="text-base text-[#888] leading-relaxed max-w-2xl mx-auto">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. In iaculis mauris pharetra, tincidunt odio non, sodales libero. Aliquam a risus vel lectus lobortis ultricies at a enim.
+            Explore our range of professional services and add items to your cart to get started.
           </p>
         </div>
       </div>

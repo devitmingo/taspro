@@ -11,7 +11,7 @@ type BlogSliderProps = {
 
 export default function BlogSlider({
   title = "Related Blogs",
-  subtitle = "There are many variations of passages of Lorem Ipsum",
+  subtitle = "Insights, expert maintenance tips, and latest updates from TASpro",
 }: BlogSliderProps) {
   const sliderRef = useRef<HTMLDivElement>(null);
 
@@ -31,26 +31,26 @@ export default function BlogSlider({
 
   const blogData = [
     {
-      category: "Education",
-      title: "What is Salary Range?",
+      category: "AC Maintenance",
+      title: "How Often Should You Service Your AC?",
       description:
-        "There are many variations of passages of Lorem Ipsum available...",
+        "Regular servicing enhances cooling performance, reduces electricity consumption, and extends lifespan.",
       date: "27, Oct, 2024",
       image: "/img/officeview.png",
     },
     {
-      category: "Education",
-      title: "What is Salary Range?",
+      category: "Home Care",
+      title: "Essential Electrical Safety Tips for Home",
       description:
-        "There are many variations of passages of Lorem Ipsum available...",
+        "Protect your appliances from power surges and keep your family safe with these proven electrical tips.",
       date: "27, Oct, 2024",
       image: "/img/officeview.png",
     },
     {
-      category: "Edu",
-      title: "What is Salary Range?",
+      category: "Appliances",
+      title: "Signs Your Washing Machine Needs Repair",
       description:
-        "There are many variations of passages of Lorem Ipsum available...",
+        "Learn how to recognize unusual noises, drainage problems, and drum issues before they cause costly breakdowns.",
       date: "27, Oct, 2024",
       image: "/img/officeview.png",
     },

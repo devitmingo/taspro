@@ -213,8 +213,7 @@ const handleVerify = () => {
           OTP Verification!
         </h2>
         <p className="text-gray-500 text-center mb-8 text-sm leading-relaxed">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-          eiusmod tempor incididunt ut labore
+          Please enter the 4-digit verification code sent to your registered mobile number.
         </p>
 
         <div className="flex gap-4 mb-8 justify-center">

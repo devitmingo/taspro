@@ -34,7 +34,7 @@ export default function FeatureSection() {
     <section className="py-4">
       <LayoutContainer>
         {/* Centered 4 feature icons with low gaps */}
-        <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-10 lg:gap-12 mx-auto max-w-4xl px-2 sm:px-0">
+        <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-10 lg:gap-12 mx-auto max-w-4xl sm:px-0">
           {features.map((feature) => (
             <div
               key={feature.id}

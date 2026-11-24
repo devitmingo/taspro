@@ -420,20 +420,23 @@ export default function AuthModal({
           if (data && data.results && data.results[0]) {
             const result = data.results[0];
             const fullAddr = result.formatted_address;
-            let city = "Raipur";
-            let state = "Chhattisgarh";
-            let country = "India";
+            let city = "";
+            let state = "";
+            let country = "";
 
             if (result.address_components) {
               for (const comp of result.address_components) {
                 if (comp.types.includes("locality")) city = comp.long_name;
-                else if (!city && comp.types.includes("administrative_area_level_2")) city = comp.long_name;
+                else if (!city && comp.types.includes("administrative_area_level_2")) city = comp.long_name.replace(/\s+District$/i, "");
                 if (comp.types.includes("administrative_area_level_1")) state = comp.long_name;
                 if (comp.types.includes("country")) country = comp.long_name;
               }
             }
 
-            setSelectedLocation(`${city}, ${state}, ${country}`);
+            const finalCity = city || "Raipur";
+            const finalState = state || "Chhattisgarh";
+            const finalCountry = country || "India";
+            setSelectedLocation(`${finalCity}, ${finalState}, ${finalCountry}`);
             setServiceAddress(fullAddr);
             if (signupErrors.serviceAddress) {
               setSignupErrors((prev) => ({ ...prev, serviceAddress: "" }));

@@ -205,17 +205,7 @@ const MySchedulePage = () => {
   };
 
   const ResponsiveContainer = ({ children }: { children: React.ReactNode }) => {
-    return (
-      <>
-        {/* Mobile */}
-        <div className="block sm:hidden w-full">{children}</div>
-
-        {/* sm and above */}
-        <div className="hidden sm:block">
-          <LayoutContainer>{children}</LayoutContainer>
-        </div>
-      </>
-    );
+    return <LayoutContainer>{children}</LayoutContainer>;
   };
 
   if (!user) {

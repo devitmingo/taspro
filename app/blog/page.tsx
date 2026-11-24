@@ -279,7 +279,7 @@ const totalPages = 1;
                   <div className="md:mt-10">
                     <BlogSlider
                       title="Related Blogs"
-                      subtitle="There are many variations of passages of Lorem Ipsum"
+                      subtitle="Insights, expert maintenance tips, and latest updates from TASpro"
                     />
                   </div>
                 </>

@@ -9,7 +9,7 @@ const TestimonialSection: React.FC = () => {
       name: "Tikesh Dewangan",
       time: "1m ago",
       rating: 5,
-      review: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis id nunc diam. Vestibulum ante ipsum primis in faucibus orci luctus.",
+      review: "Prompt and professional service! The technician arrived right on time, diagnosed the AC issue quickly, and fixed it with genuine spare parts. Highly recommended!",
       image: "/api/placeholder/60/60"
     },
     {
@@ -17,7 +17,7 @@ const TestimonialSection: React.FC = () => {
       name: "Tikesh Dewangan",
       time: "1m ago",
       rating: 5,
-      review: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis id nunc diam. Vestibulum ante ipsum primis in faucibus orci luctus.",
+      review: "Excellent home service experience. Transparent pricing, skilled technicians, and very polite customer support throughout the process.",
       image: "/api/placeholder/60/60"
     }
   ];

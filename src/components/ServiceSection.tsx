@@ -105,7 +105,7 @@ export default function ServiceSection({
   const displayedCategories = hasMore ? categoriesList.slice(0, 5) : categoriesList.slice(0, 6);
 
   return (
-    <section className="w-full pt-[10px] px-4 sm:px-5 sm:pb-10">
+    <section className="w-full pt-[10px] sm:pb-10 sm:px-5">
       <LayoutContainer className="relative">
         <div className="flex flex-col lg:flex-row justify-between items-start gap-5 lg:gap-8">
           {/* Service Cards (Categories) - order-1 on mobile (above slider), order-1 on desktop (left side) */}

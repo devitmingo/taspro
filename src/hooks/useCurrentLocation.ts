@@ -46,6 +46,8 @@ export const useCurrentLocation = () => {
             result?.address_components?.forEach((component: any) => {
               if (component.types.includes("locality")) {
                 city = component.long_name;
+              } else if (!city && component.types.includes("administrative_area_level_2")) {
+                city = component.long_name.replace(/\s+District$/i, "");
               }
 
               if (component.types.includes("administrative_area_level_1")) {

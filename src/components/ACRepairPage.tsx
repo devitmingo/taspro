@@ -478,9 +478,7 @@ const handleAddToCart = async (service: ServiceItem) => {
                         </div>
                       </div>
                       <p className="text-sm leading-relaxed opacity-90 italic">
-                        "Lorem ipsum dolor sit amet, consectetur adipiscing
-                        elit. In ut id elit dunc. Vestibulum ante ipsum primis
-                        in faucibus orci luctus."
+                        "Prompt service and great technicians! They diagnosed the cooling issue quickly, refilled the gas, and cleaned the filters thoroughly. My AC is cooling like brand new."
                       </p>
                     </div>
                   ))}
@@ -525,19 +523,10 @@ const handleAddToCart = async (service: ServiceItem) => {
               </h2>
               <div className="text-gray-600 leading-relaxed space-y-4">
                 <p>
-                  There are many variations of passages of Lorem Ipsum
-                  available, but the majority have suffered alteration in some
-                  form, by injected humour, or randomised words which don't look
-                  even slightly believable. If you are going to use a passage of
-                  Lorem Ipsum, you need to be sure there isn't anything
-                  embarrassing hidden in the middle of text.
+                  TASpro offers comprehensive and certified doorstep AC repair, maintenance, and installation services across Raipur. From deep jet-pump foam cleaning to compressor diagnostics and refrigerant gas charging, our certified technicians ensure maximum cooling efficiency.
                 </p>
                 <p>
-                  All the Lorem Ipsum generators on the Internet tend to repeat
-                  predefined chunks as necessary, making this the first true
-                  generator on the Internet. It uses a dictionary of over 200
-                  Latin words, combined with a handful of model sentence
-                  structures, to generate Lorem Ipsum which looks reasonable.
+                  Every service is backed by genuine spare parts, transparent rate cards, and a comprehensive 30-day service warranty for your complete peace of mind.
                 </p>
               </div>
             </section>
@@ -549,10 +538,7 @@ const handleAddToCart = async (service: ServiceItem) => {
               </h2>
               <div className="text-gray-600 leading-relaxed">
                 <p>
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
-                  do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                  Ut enim ad minim veniam, quis nostrud exercitation ullamco
-                  laboris nisi ut aliquip ex ea commodo consequat.
+                  Simply select your AC service requirement, pick a date and time slot that fits your schedule, and our background-verified technician will arrive on time with specialized tools to get your AC running at peak performance.
                 </p>
               </div>
             </section>

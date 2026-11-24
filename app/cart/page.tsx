@@ -886,7 +886,7 @@ export default function CartPage() {
                 Your Cart is empty
               </p>
               <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                Explore our range of professional services and add items to your cart to get started.
               </p>
               <button
                 type="button"
@@ -1163,7 +1163,7 @@ export default function CartPage() {
                     <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100">
                       <img src="/pana.png" alt="Empty Cart" className="mx-auto mb-4 object-contain max-h-44" />
                       <p className="text-gray-600 font-medium mb-2">Your Cart is empty</p>
-                      <p className="text-sm text-gray-500 mb-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                      <p className="text-sm text-gray-500 mb-6">Explore our range of professional services and add items to your cart to get started.</p>
                       <button
                         onClick={() => router.push("/")}
                         className="px-5 py-2.5 rounded-xl bg-[#ff5500] text-white font-bold text-xs hover:bg-orange-600 transition"

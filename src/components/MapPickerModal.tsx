@@ -134,18 +134,16 @@ export default function MapPickerModal({
 
   const parseAndSetAddress = (result: any) => {
     const formatted = result.formatted_address || "";
-    let detectedCity = "Raipur";
-    let detectedState = "Chhattisgarh";
-    let detectedPostal = "492001";
+    let detectedCity = "";
+    let detectedState = "";
+    let detectedPostal = "";
 
     if (result.address_components) {
       for (const comp of result.address_components) {
         if (comp.types.includes("locality")) {
           detectedCity = comp.long_name;
         } else if (!detectedCity && comp.types.includes("administrative_area_level_2")) {
-          detectedCity = comp.long_name;
-        } else if (!detectedCity && comp.types.includes("sublocality_level_1")) {
-          detectedCity = comp.long_name;
+          detectedCity = comp.long_name.replace(/\s+District$/i, "");
         }
 
         if (comp.types.includes("administrative_area_level_1")) {
@@ -159,9 +157,9 @@ export default function MapPickerModal({
     }
 
     setAddress(formatted);
-    setCity(detectedCity);
-    setState(detectedState);
-    setPostalCode(detectedPostal);
+    setCity(detectedCity || "Raipur");
+    setState(detectedState || "Chhattisgarh");
+    setPostalCode(detectedPostal || "492001");
   };
 
   // Initialize Google Map & Autocomplete

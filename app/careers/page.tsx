@@ -211,7 +211,7 @@ export default function CareersPage() {
       <div className="w-full">
         <BlogSlider
           title="Our Blogs"
-          subtitle="There are many variations of passages of Lorem Ipsum"
+          subtitle="Insights, expert maintenance tips, and latest updates from TASpro"
         />
       </div>
 

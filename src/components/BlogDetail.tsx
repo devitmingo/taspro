@@ -47,56 +47,25 @@ export default function BlogDetail({ blog, onBack }: BlogDetailProps) {
         </span>
       </div>
 
-      <div className="mt-6 space-y-4 text-[16px]">
+      <div className="mt-6 space-y-4 text-[16px] text-gray-700 leading-relaxed">
         <p>
-          There are many variations of passages of Lorem Ipsum available, but
-          the majority have suffered alteration in some form variations of
-          passages of Lorem Ipsum available There are many variations of
-          passages of Lorem Ipsum available...
+          Keeping your home appliances in peak operating condition requires regular maintenance and timely inspections. Preventative care not only helps avoid costly emergency repairs, but also reduces monthly electricity costs and ensures your equipment lasts for years to come.
         </p>
 
         <Image
           src="/img/girlworking.png"
-          alt="Woman working on a laptop"
+          alt="Technician maintaining appliances"
           width={700}
           height={400}
           className="w-full h-auto rounded-md"
         />
 
         <p>
-          There are many variations of passages of Lorem Ipsum available, but
-          the majority have suffered alteration in some form variations of
-          passages of Lorem Ipsum available There are many variations of
-          passages of Lorem Ipsum available...
+          From periodic AC filter washing and refrigerant level checks to cleaning washing machine lint traps and inspecting refrigerator condenser coils, simple seasonal checkups keep your household running smoothly without unexpected breakdowns.
         </p>
 
         <p>
-          There are many variations of passages of Lorem Ipsum available, but
-          the majority have suffered alteration in some form variations of
-          passages of Lorem Ipsum available There are many variations of
-          passages of Lorem Ipsum available There are many variations of
-          passages of Lorem Ipsum available, but the majority have suffered
-          alteration in some form variations of passages of Lorem Ipsum
-          available There are many variations of passages of Lorem Ipsum
-          available...
-        </p>
-
-        <p>
-          There are many variations of passages of Lorem Ipsum available, but
-          the majority have suffered alteration in some form variations of
-          passages of Lorem Ipsum available There are many variations of
-          passages of Lorem Ipsum available...
-        </p>
-
-        <p>
-          There are many variations of passages of Lorem Ipsum available, but
-          the majority have suffered alteration in some form variations of
-          passages of Lorem Ipsum available There are many variations of
-          passages of Lorem Ipsum available There are many variations of
-          passages of Lorem Ipsum available, but the majority have suffered
-          alteration in some form variations of passages of Lorem Ipsum
-          available There are many variations of passages of Lorem Ipsum
-          available...
+          When you book certified professionals through TASpro, you receive background-verified technicians who use genuine spare parts, transparent standard rate cards, and comprehensive warranty coverage on all completed services.
         </p>
       </div>
 

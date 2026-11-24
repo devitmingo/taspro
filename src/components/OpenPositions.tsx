@@ -17,9 +17,7 @@ export default function OpenPositions() {
         </h2>
 
         <p className="text-gray-500 max-w-2xl mx-auto mb-12">
-          There are many variations of passages of Lorem Ipsum available, but
-          the majority have suffered alteration in some form, by injected
-          humour, or randomized words which don't look even slightly believable.
+          Join our growing team of skilled technicians and service professionals. We offer competitive compensation, comprehensive training, and continuous growth opportunities.
         </p>
 
         {/* Grid */}

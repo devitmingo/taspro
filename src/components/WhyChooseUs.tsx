@@ -266,9 +266,7 @@ const WhyChooseUs = ({ data }: { data?: any[] }) => {
               Why Choose Us
             </h2>
             <p className="text-gray-500 text-xs sm:text-sm max-w-3xl mx-auto leading-relaxed">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent
-              egestas id erat a ornare. Donec bibendum venenatis mollis. Aliquam
-              id libero at mi bibendum venenatis at ac purus.
+              Experience reliable, prompt, and high-quality doorstep home services delivered by verified professionals with transparent pricing and complete warranty support.
             </p>
           </div>
 

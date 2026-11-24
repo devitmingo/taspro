@@ -6,27 +6,27 @@ import GradientButton2 from "../ui/GradientButton2";
 const values = [
   {
     title: "Transparency",
-    desc: "There are many variations of passages of Lorem Ipsum available, but the majority have suffered alteration in some form",
+    desc: "Clear communication and upfront pricing with no hidden charges across all our home services.",
     icon: "/icons/transparency.png",
   },
   {
     title: "Accountability",
-    desc: "There are many variations of passages of Lorem Ipsum available, but the majority have suffered alteration in some form",
+    desc: "We take full ownership of our workmanship from initial inspection to final warranty coverage.",
     icon: "/icons/accountability.png",
   },
   {
     title: "Professionalism",
-    desc: "There are many variations of passages of Lorem Ipsum available, but the majority have suffered alteration in some form",
+    desc: "Trained, background-verified technicians who treat your home with utmost care and respect.",
     icon: "/icons/professionalism.png",
   },
   {
     title: "Quality Excellence",
-    desc: "There are many variations of passages of Lorem Ipsum available, but the majority have suffered alteration in some form",
+    desc: "High industry standards, modern diagnostic tools, and 100% genuine replacement parts.",
     icon: "/icons/quality.png",
   },
   {
     title: "One Stop Solution",
-    desc: "There are many variations of passages of Lorem Ipsum available, but the majority have suffered alteration in some form.",
+    desc: "Comprehensive home maintenance and appliance care all available under one trusted platform.",
     icon: "/icons/solution.png",
   },
 ];
@@ -88,7 +88,7 @@ export default function CoreValues() {
             Our Core Values
           </h2>
           <p className="text-gray-500 mb-4 lg:mb-20">
-            There are many variations of passages of Lorem Ipsum
+            Principles that define our commitment to quality, trust, and exceptional service.
           </p>
           <div className="flex flex-col lg:flex-row justify-center gap-8 lg:gap-y-28 relative z-10">
             {/* TOP ROW */}

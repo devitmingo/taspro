@@ -155,8 +155,8 @@ const Header = () => {
     if (!force && savedLocation) {
       try {
         const parsed = JSON.parse(savedLocation);
-        if (parsed.isManual || parsed.city) return;
-      } catch (e) {}
+        if (parsed.isManual || (parsed.city && parsed.city.toLowerCase() !== "mowa")) return;
+      } catch (e) { }
     }
 
     setIsDetectingLocation(true);
@@ -177,31 +177,46 @@ const Header = () => {
           const data = await res.json();
 
           if (data?.status === "OK" && Array.isArray(data.results) && data.results.length > 0) {
-            const addressComponents = data.results[0].address_components || [];
-            let detectedCity = "";
+            let detectedLocality = "";
+            let detectedPostalTown = "";
+            let detectedAdmin2 = "";
             let detectedState = "";
 
-            for (const comp of addressComponents) {
-              const types = comp.types || [];
-              if (types.includes("locality") || types.includes("sublocality_level_1")) {
-                if (!detectedCity) detectedCity = comp.long_name;
-              } else if (types.includes("administrative_area_level_2") && !detectedCity) {
-                detectedCity = comp.long_name;
-              } else if (types.includes("administrative_area_level_1")) {
-                detectedState = comp.long_name;
+            // Prioritize actual City: locality > postal_town > administrative_area_level_2 (never sublocality/area)
+            for (const resultItem of data.results) {
+              const components = resultItem.address_components || [];
+              for (const comp of components) {
+                const types = comp.types || [];
+                if (!detectedLocality && types.includes("locality")) {
+                  detectedLocality = comp.long_name;
+                }
+                if (!detectedPostalTown && types.includes("postal_town")) {
+                  detectedPostalTown = comp.long_name;
+                }
+                if (!detectedAdmin2 && types.includes("administrative_area_level_2")) {
+                  detectedAdmin2 = comp.long_name.replace(/\s+District$/i, "");
+                }
+                if (!detectedState && types.includes("administrative_area_level_1")) {
+                  detectedState = comp.long_name;
+                }
+              }
+              if ((detectedLocality || detectedAdmin2) && detectedState) {
+                break;
               }
             }
 
+            const rawCity = detectedLocality || detectedPostalTown || detectedAdmin2 || "";
+
             const matchedCity = dynamicCities.find(
               (c) =>
-                c.name.toLowerCase() === detectedCity.toLowerCase() ||
-                detectedCity.toLowerCase().includes(c.name.toLowerCase()) ||
-                c.name.toLowerCase().includes(detectedCity.toLowerCase())
+                (rawCity && c.name.toLowerCase() === rawCity.toLowerCase()) ||
+                (rawCity && rawCity.toLowerCase().includes(c.name.toLowerCase())) ||
+                (rawCity && c.name.toLowerCase().includes(rawCity.toLowerCase()))
             );
 
-            // Default current location city comes directly from Google API (not only added city)
-            const finalCity = detectedCity || (matchedCity ? matchedCity.name : "Raipur");
-            const finalState = detectedState || (matchedCity ? matchedCity.state : "Chhattisgarh");
+            // Default current location city comes directly from matched master city or detected city (not area/neighborhood)
+            const finalCity = (matchedCity ? matchedCity.name : rawCity) || "Raipur";
+            const finalState = (matchedCity ? matchedCity.state : detectedState) || "Chhattisgarh";
             const finalCityId = matchedCity?.id;
             const finalStateId = matchedCity?.state_id;
 
@@ -251,10 +266,14 @@ const Header = () => {
     if (savedLocation) {
       try {
         const location = JSON.parse(savedLocation);
+        if (location.city && location.city.toLowerCase() === "mowa") {
+          location.city = "Raipur";
+          localStorage.setItem("selected_location", JSON.stringify(location));
+        }
         if (location.city) setCurrentCity(location.city);
         if (location.state) setCurrentState(location.state);
-        return;
-      } catch (e) {}
+        if (location.isManual) return;
+      } catch (e) { }
     }
     // Default current location city should come from google API
     detectCurrentLocation(true);
@@ -326,7 +345,7 @@ const Header = () => {
                 }
               });
             }
-          } catch (err) {}
+          } catch (err) { }
         }
 
         // 3. Clean default Cities fallback
@@ -342,6 +361,24 @@ const Header = () => {
         }
 
         setDynamicCities(cityList);
+
+        // Sanitize current city if it was accidentally saved as "Mowa" or another non-city area
+        const currentSaved = localStorage.getItem("selected_location");
+        if (currentSaved) {
+          try {
+            const parsed = JSON.parse(currentSaved);
+            if (parsed.city && parsed.city.toLowerCase() === "mowa") {
+              const raipurCity = cityList.find((c) => c.name.toLowerCase() === "raipur");
+              parsed.city = raipurCity?.name || "Raipur";
+              parsed.state = raipurCity?.state || "Chhattisgarh";
+              parsed.city_id = raipurCity?.id || 1;
+              parsed.state_id = raipurCity?.state_id || 1;
+              localStorage.setItem("selected_location", JSON.stringify(parsed));
+              setCurrentCity(parsed.city);
+              setCurrentState(parsed.state);
+            }
+          } catch (err) { }
+        }
       } catch (e) {
         console.log("Error fetching master cities:", e);
       }
@@ -450,12 +487,12 @@ const Header = () => {
     searchQuery.trim() === ""
       ? []
       : searchServices
-          .filter(
-            (item) =>
-              item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              item.category.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-          .slice(0, 8);
+        .filter(
+          (item) =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.category.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        .slice(0, 8);
 
   const handleSelectService = (serviceItem: any) => {
     const slug = serviceItem.slug || getRouteSlug(serviceItem.name, serviceItem.id);
@@ -560,7 +597,7 @@ const Header = () => {
     let parsedCart = [];
     try {
       parsedCart = savedCart ? JSON.parse(savedCart) : [];
-    } catch (e) {}
+    } catch (e) { }
 
     const hasItems = (parsedCart && parsedCart.length > 0) || (cartItems && cartItems.length > 0);
 
@@ -644,95 +681,93 @@ const Header = () => {
                   {isClient && user ? `Hi, ${userDisplayName || "Customer"}` : (currentState || "Select Location")}
                 </p>
 
-                  {/* Mobile Floating Dropdown */}
-                  {isLocationOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-3 overflow-hidden animate-in fade-in duration-150">
-                      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                          Select City
-                        </span>
-                        <span className="text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full">
-                          {currentCity}
-                        </span>
-                      </div>
+                {/* Mobile Floating Dropdown */}
+                {isLocationOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-3 overflow-hidden animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                        Select City
+                      </span>
+                      <span className="text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded-full">
+                        {currentCity}
+                      </span>
+                    </div>
 
-                      {/* Master State Filters */}
-                      {stateTabs.length > 1 && (
-                        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar py-2 border-b border-gray-100">
-                          {stateTabs.map((st) => (
-                            <button
-                              key={st}
-                              onClick={() => setActiveStateTab(st)}
-                              className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors shrink-0 ${
-                                activeStateTab === st
-                                  ? "bg-orange-500 text-white"
-                                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    {/* Master State Filters */}
+                    {stateTabs.length > 1 && (
+                      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar py-2 border-b border-gray-100">
+                        {stateTabs.map((st) => (
+                          <button
+                            key={st}
+                            onClick={() => setActiveStateTab(st)}
+                            className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors shrink-0 ${activeStateTab === st
+                              ? "bg-orange-500 text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                               }`}
-                            >
-                              {st}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Current Location button */}
-                      <button
-                        type="button"
-                        onClick={() => detectCurrentLocation(true)}
-                        disabled={isDetectingLocation}
-                        className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs cursor-pointer"
-                      >
-                        <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin text-orange-500" : ""}`} />
-                        <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location"}</span>
-                      </button>
-
-                      {/* Search box */}
-                      <div className="my-2">
-                        <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-200">
-                          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <input
-                            type="text"
-                            value={locationSearch}
-                            onChange={(e) => setLocationSearch(e.target.value)}
-                            placeholder="Search city..."
-                            className="w-full text-xs bg-transparent outline-none text-gray-700"
-                          />
-                        </div>
+                          >
+                            {st}
+                          </button>
+                        ))}
                       </div>
+                    )}
 
-                      {/* Cities List ONLY */}
-                      <div className="max-h-60 overflow-y-auto py-1">
-                        {filteredCities.length > 0 ? (
-                          filteredCities.map((city) => {
-                            const isSelected = city.name.toLowerCase() === currentCity.toLowerCase();
-                            return (
-                              <div
-                                key={city.id}
-                                onClick={() => handleCitySelect(city)}
-                                className={`px-3 py-2.5 rounded-xl cursor-pointer flex items-center justify-between text-xs font-medium transition-colors ${
-                                  isSelected
-                                    ? "bg-orange-50 text-orange-600 font-bold"
-                                    : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <MapPin className={`w-3.5 h-3.5 ${isSelected ? "text-orange-500" : "text-gray-400"}`} />
-                                  <span>{city.name}</span>
-                                </div>
-                                {isSelected && <Check className="w-3.5 h-3.5 text-orange-500" />}
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div className="p-3 text-center text-xs text-gray-400">
-                            No cities found
-                          </div>
-                        )}
+                    {/* Current Location button */}
+                    <button
+                      type="button"
+                      onClick={() => detectCurrentLocation(true)}
+                      disabled={isDetectingLocation}
+                      className="w-full my-1.5 px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-orange-200 shadow-2xs cursor-pointer"
+                    >
+                      <Navigation className={`w-3.5 h-3.5 ${isDetectingLocation ? "animate-spin text-orange-500" : ""}`} />
+                      <span>{isDetectingLocation ? "Detecting location..." : "Use Current Location"}</span>
+                    </button>
+
+                    {/* Search box */}
+                    <div className="my-2">
+                      <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-200">
+                        <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <input
+                          type="text"
+                          value={locationSearch}
+                          onChange={(e) => setLocationSearch(e.target.value)}
+                          placeholder="Search city..."
+                          className="w-full text-xs bg-transparent outline-none text-gray-700"
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    {/* Cities List ONLY */}
+                    <div className="max-h-60 overflow-y-auto py-1">
+                      {filteredCities.length > 0 ? (
+                        filteredCities.map((city) => {
+                          const isSelected = city.name.toLowerCase() === currentCity.toLowerCase();
+                          return (
+                            <div
+                              key={city.id}
+                              onClick={() => handleCitySelect(city)}
+                              className={`px-3 py-2.5 rounded-xl cursor-pointer flex items-center justify-between text-xs font-medium transition-colors ${isSelected
+                                ? "bg-orange-50 text-orange-600 font-bold"
+                                : "text-gray-700 hover:bg-gray-50"
+                                }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <MapPin className={`w-3.5 h-3.5 ${isSelected ? "text-orange-500" : "text-gray-400"}`} />
+                                <span>{city.name}</span>
+                              </div>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-orange-500" />}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="p-3 text-center text-xs text-gray-400">
+                          No cities found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
+            </div>
 
             {/* Right: Clean, uncrowded controls */}
             <div className="flex items-center gap-2 shrink-0">
@@ -820,9 +855,8 @@ const Header = () => {
               ) : (
                 <Mic
                   onClick={handleVoiceSearch}
-                  className={`w-4 h-4 cursor-pointer transition-colors ${
-                    isListening ? "text-red-500 animate-pulse" : "text-gray-400 hover:text-orange-500"
-                  }`}
+                  className={`w-4 h-4 cursor-pointer transition-colors ${isListening ? "text-red-500 animate-pulse" : "text-gray-400 hover:text-orange-500"
+                    }`}
                 />
               )}
             </form>
@@ -864,9 +898,8 @@ const Header = () => {
             <div className="grid grid-cols-4 h-16">
               <Link
                 href="/"
-                className={`flex flex-col items-center justify-center ${
-                  pathname === "/" ? "text-orange-500" : "text-gray-500"
-                }`}
+                className={`flex flex-col items-center justify-center ${pathname === "/" ? "text-orange-500" : "text-gray-500"
+                  }`}
               >
                 <House className="w-5 h-5" />
                 <span className="text-[11px] mt-1 font-medium">Home</span>
@@ -874,11 +907,10 @@ const Header = () => {
 
               <Link
                 href="/my-booking"
-                className={`flex flex-col items-center justify-center ${
-                  pathname?.startsWith("/my-booking")
-                    ? "text-orange-500"
-                    : "text-gray-500"
-                }`}
+                className={`flex flex-col items-center justify-center ${pathname?.startsWith("/my-booking")
+                  ? "text-orange-500"
+                  : "text-gray-500"
+                  }`}
               >
                 <ClipboardList className="w-5 h-5" />
                 <span className="text-[11px] mt-1 font-medium">Booking</span>
@@ -886,9 +918,8 @@ const Header = () => {
 
               <Link
                 href="/cart"
-                className={`flex flex-col items-center justify-center relative ${
-                  pathname === "/cart" ? "text-orange-500" : "text-gray-500"
-                }`}
+                className={`flex flex-col items-center justify-center relative ${pathname === "/cart" ? "text-orange-500" : "text-gray-500"
+                  }`}
               >
                 <div className="relative">
                   <ShoppingCart className="w-5 h-5" />
@@ -903,9 +934,8 @@ const Header = () => {
 
               <Link
                 href="/account"
-                className={`flex flex-col items-center justify-center ${
-                  pathname === "/account" ? "text-orange-500" : "text-gray-500"
-                }`}
+                className={`flex flex-col items-center justify-center ${pathname === "/account" ? "text-orange-500" : "text-gray-500"
+                  }`}
               >
                 <UserRound className="w-5 h-5" />
                 <span className="text-[11px] mt-1 font-medium">Account</span>
@@ -968,11 +998,10 @@ const Header = () => {
                         <button
                           key={st}
                           onClick={() => setActiveStateTab(st)}
-                          className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors shrink-0 ${
-                            activeStateTab === st
-                              ? "bg-orange-500 text-white"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
+                          className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors shrink-0 ${activeStateTab === st
+                            ? "bg-orange-500 text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
                         >
                           {st}
                         </button>
@@ -1003,11 +1032,10 @@ const Header = () => {
                           <div
                             key={city.id}
                             onClick={() => handleCitySelect(city)}
-                            className={`px-3 py-2.5 rounded-xl cursor-pointer flex items-center justify-between text-xs font-medium transition-colors ${
-                              isSelected
-                                ? "bg-orange-50 text-orange-600 font-bold"
-                                : "text-gray-700 hover:bg-gray-50"
-                            }`}
+                            className={`px-3 py-2.5 rounded-xl cursor-pointer flex items-center justify-between text-xs font-medium transition-colors ${isSelected
+                              ? "bg-orange-50 text-orange-600 font-bold"
+                              : "text-gray-700 hover:bg-gray-50"
+                              }`}
                           >
                             <div className="flex items-center gap-2">
                               <MapPin className={`w-3.5 h-3.5 ${isSelected ? "text-orange-500" : "text-gray-400"}`} />
@@ -1050,9 +1078,8 @@ const Header = () => {
                 )}
                 <Mic
                   onClick={handleVoiceSearch}
-                  className={`w-4 h-4 cursor-pointer transition-colors ${
-                    isListening ? "text-orange-500 animate-pulse" : "text-gray-600 hover:text-orange-500"
-                  }`}
+                  className={`w-4 h-4 cursor-pointer transition-colors ${isListening ? "text-orange-500 animate-pulse" : "text-gray-600 hover:text-orange-500"
+                    }`}
                 />
               </form>
 
@@ -1126,105 +1153,105 @@ const Header = () => {
 
             {/* Login / Profile */}
             {!isClient ? null : user ? (
-            <div className="relative group flex items-center gap-2 cursor-pointer">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 border border-orange-200/60 flex items-center justify-center bg-orange-50">
-                {(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile) ? (
-                  <img
-                    src={getProfileImage(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile)}
-                    alt={user?.firstName || "Profile"}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = "none";
-                      const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
-                      }
-                    }}
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-orange-100 text-[#FF6A00] flex items-center justify-center font-bold text-xs sm:text-sm">
-                    {user?.firstName ? (
-                      user.firstName.charAt(0).toUpperCase()
-                    ) : (
-                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF6A00]" />
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <span className="hidden lg:text-base text-[10px] md:inline text-gray-700 font-medium">
-                {user.firstName || (user as any)?.name || (user.phone ? `+91 ${user.phone}` : "Account")}
-              </span>
-
-              <ChevronDown className="w-4 h-4 text-gray-500" />
-
-              <div className="absolute right-0 top-10 w-52 bg-white rounded-lg shadow-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 border">
-                <div className="px-4 py-3 border-b">
-                  <p className="font-medium text-gray-900">
-                    {user.firstName && user.lastName
-                      ? `${user.firstName} ${user.lastName}`
-                      : (user.firstName || (user as any)?.name || "User")}
-                  </p>
-
-                  <p className="text-sm text-gray-500">
-                    {user.email || (user.phone ? `+91 ${user.phone}` : "")}
-                  </p>
+              <div className="relative group flex items-center gap-2 cursor-pointer">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden shrink-0 border border-orange-200/60 flex items-center justify-center bg-orange-50">
+                  {(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile) ? (
+                    <img
+                      src={getProfileImage(user?.profileImage || (user as any)?.profile_url || (user as any)?.profile)}
+                      alt={user?.firstName || "Profile"}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = "none";
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+                        }
+                      }}
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-orange-100 text-[#FF6A00] flex items-center justify-center font-bold text-xs sm:text-sm">
+                      {user?.firstName ? (
+                        user.firstName.charAt(0).toUpperCase()
+                      ) : (
+                        <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF6A00]" />
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <Link
-                  href="/my-booking"
-                  onClick={() => {
-                    try {
-                      sessionStorage.removeItem("accountActiveView");
-                    } catch (e) {}
-                  }}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#FF6A00] font-medium transition-colors"
-                >
-                  My Booking
-                </Link>
+                <span className="hidden lg:text-base text-[10px] md:inline text-gray-700 font-medium">
+                  {user.firstName || (user as any)?.name || (user.phone ? `+91 ${user.phone}` : "Account")}
+                </span>
 
-                <Link
-                  href="/account"
-                  onClick={() => {
-                    try {
-                      sessionStorage.removeItem("accountActiveView");
-                    } catch (e) {}
-                  }}
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#FF6A00] font-medium transition-colors"
-                >
-                  Account
-                </Link>
+                <ChevronDown className="w-4 h-4 text-gray-500" />
 
-                <hr className="my-2" />
+                <div className="absolute right-0 top-10 w-52 bg-white rounded-lg shadow-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 border">
+                  <div className="px-4 py-3 border-b">
+                    <p className="font-medium text-gray-900">
+                      {user.firstName && user.lastName
+                        ? `${user.firstName} ${user.lastName}`
+                        : (user.firstName || (user as any)?.name || "User")}
+                    </p>
 
-                <button
-                  onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-orange-50"
-                >
-                  Logout
-                </button>
+                    <p className="text-sm text-gray-500">
+                      {user.email || (user.phone ? `+91 ${user.phone}` : "")}
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/my-booking"
+                    onClick={() => {
+                      try {
+                        sessionStorage.removeItem("accountActiveView");
+                      } catch (e) { }
+                    }}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#FF6A00] font-medium transition-colors"
+                  >
+                    My Booking
+                  </Link>
+
+                  <Link
+                    href="/account"
+                    onClick={() => {
+                      try {
+                        sessionStorage.removeItem("accountActiveView");
+                      } catch (e) { }
+                    }}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#FF6A00] font-medium transition-colors"
+                  >
+                    Account
+                  </Link>
+
+                  <hr className="my-2" />
+
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-orange-50"
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="flex items-center gap-1 sm:gap-2 cursor-pointer outline-none"
-            >
-              <div className="bg-gray-200 p-1.5 sm:p-2 rounded-full">
-                <User className="w-4 h-4 text-gray-600" />
-              </div>
-              <span className="hidden sm:inline text-gray-700 font-medium">Login</span>
-            </button>
-          )}
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center gap-1 sm:gap-2 cursor-pointer outline-none"
+              >
+                <div className="bg-gray-200 p-1.5 sm:p-2 rounded-full">
+                  <User className="w-4 h-4 text-gray-600" />
+                </div>
+                <span className="hidden sm:inline text-gray-700 font-medium">Login</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
 
-    <AuthModal
-      isOpen={isAuthModalOpen}
-      onClose={() => setIsAuthModalOpen(false)}
-    />
-  </header>
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+    </header>
   );
 };
 
