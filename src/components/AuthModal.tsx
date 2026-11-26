@@ -504,7 +504,7 @@ export default function AuthModal({
 
       // If user already authenticated
       if (token && token !== "null" && token !== "undefined") {
-        await axios.post(
+        const profileRes = await axios.post(
           `${API_BASE_URL}/customers/update-profile`,
           {
             first_name: firstName,
@@ -547,8 +547,17 @@ export default function AuthModal({
           );
         } catch (e) {}
 
+        const resolvedId =
+          profileRes?.data?.data?.id ||
+          Number(typeof window !== "undefined" ? localStorage.getItem("customer_id") : 0) ||
+          1;
+
+        try {
+          sessionStorage.removeItem("profilePromptDismissed");
+        } catch (e) {}
+
         login({
-          id: 1,
+          id: resolvedId,
           phone: cleanMobile,
           firstName: firstName,
           lastName: lastName,
@@ -669,13 +678,14 @@ export default function AuthModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
       
       {/* Main Modal Container */}
       <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-[880px] max-h-[92vh] overflow-y-auto md:overflow-hidden relative flex flex-col md:flex-row border border-gray-100 animate-scaleUp">
         
         {/* Circular Close Button on Top Right matching mockups */}
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 z-30 w-8 h-8 bg-white hover:bg-gray-100 text-gray-700 rounded-full flex items-center justify-center transition shadow-md border border-gray-100 cursor-pointer"
           aria-label="Close modal"

@@ -10,6 +10,9 @@ function CompleteProfileModalWrapper() {
   const redirectParam = searchParams.get("redirect");
 
   const handleClose = () => {
+    try {
+      sessionStorage.setItem("profilePromptDismissed", "1");
+    } catch (e) {}
     if (redirectParam) {
       router.push(redirectParam);
     } else {

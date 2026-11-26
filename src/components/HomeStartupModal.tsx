@@ -4,18 +4,18 @@ import { useEffect, useState } from "react";
 import SafeImage from "@/components/SafeImage";
 
 const SERVICES = [
-  { name: "AC Repair", icon: "/10.svg" },
-  { name: "Washing Machine", icon: "/2.svg" },
-  { name: "Gas Stove Repair", icon: "/9.svg" },
-  { name: "Geyser Repair", icon: "/7.svg" },
-  { name: "Water Cooler", icon: "/11.svg" },
-  { name: "Kitchen Chimney", icon: "/6.svg" },
-  { name: "Refrigerator", icon: "/8.svg" },
-  { name: "Microwave", icon: "/5.svg" },
-  { name: "Water Purifier", icon: "/3.svg" },
-  { name: "TV Repair", icon: "/4.svg" },
-  { name: "Computer Repair", icon: "/12.svg" },
-  { name: "Deep Cleaning", icon: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&h=200&fit=crop&q=80" },
+  { name: "AC Repair", icon: "/service-icons/ac.svg" },
+  { name: "Washing Machine", icon: "/service-icons/washing-machine.svg" },
+  { name: "Gas Stove Repair", icon: "/service-icons/gas-stove.svg" },
+  { name: "Geyser Repair", icon: "/service-icons/geyser.svg" },
+  { name: "Water Cooler", icon: "/service-icons/water-cooler.svg" },
+  { name: "Kitchen Chimney", icon: "/service-icons/chimney.svg" },
+  { name: "Refrigerator", icon: "/service-icons/refrigerator.svg" },
+  { name: "Microwave", icon: "/service-icons/microwave.svg" },
+  { name: "Water Purifier", icon: "/service-icons/water-purifier.svg" },
+  { name: "TV Repair", icon: "/service-icons/tv.svg" },
+  { name: "Computer Repair", icon: "/service-icons/computer.svg" },
+  { name: "Deep Cleaning", icon: "/bathroom.png" },
 ];
 
 export default function HomeStartupModal() {
@@ -27,17 +27,22 @@ export default function HomeStartupModal() {
     if (typeof window !== "undefined" && window.location.search.includes("nomodal=1")) {
       return;
     }
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const shown = localStorage.getItem("homeStartupModalShown");
       if (!shown) {
-        setTimeout(() => setOpen(true), 120);
+        timer = setTimeout(() => setOpen(true), 120);
       }
     } catch (e) {
       setOpen(true);
     }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
-  const close = () => {
+  const close = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setOpen(false);
     try {
       localStorage.setItem("homeStartupModalShown", "1");
@@ -50,7 +55,7 @@ export default function HomeStartupModal() {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200"
           aria-modal="true"
         >
           <div
@@ -67,9 +72,10 @@ export default function HomeStartupModal() {
             onClick={(e) => e.stopPropagation()}
           >
             <button
+              type="button"
               onClick={close}
               aria-label="Close"
-              className="absolute top-4 right-4 sm:top-5 sm:right-5 bg-orange-500 hover:bg-orange-600 text-white w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shadow-md transition-all active:scale-95 z-10"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 bg-orange-500 hover:bg-orange-600 text-white w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shadow-md transition-all active:scale-95 z-20 cursor-pointer"
             >
               ✕
             </button>

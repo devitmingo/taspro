@@ -40,7 +40,7 @@ export default function Home() {
 
     const fetchCities = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/cities`);
+        const res = await axios.get(`${API_BASE_URL}/cities`, { timeout: 15000 });
         if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
           const list = res.data.data.map((c: any) => ({
             name: c.name,
@@ -75,14 +75,16 @@ export default function Home() {
             city_name: city,
           },
           headers,
+          timeout: 15000,
         }),
         axios.get(`${API_BASE_URL}/services`, {
           params: {
             state_name: state,
             city_name: city,
           },
+          timeout: 15000,
         }),
-        axios.get(`${API_BASE_URL}/service-categories`),
+        axios.get(`${API_BASE_URL}/service-categories`, { timeout: 15000 }),
       ]);
 
       let categories: any[] = [];
@@ -97,10 +99,13 @@ export default function Home() {
         categories = dashRes.value.data.data.categories;
       }
 
-      setCategoriesData(categories);
+      if (categories.length > 0) {
+        setCategoriesData(categories);
+      }
 
       let servicesList: any[] = [];
       let hasCitySpecificServices = false;
+      const anyServiceCheckSucceeded = servRes.status === "fulfilled" || dashRes.status === "fulfilled";
 
       if (servRes.status === "fulfilled" && servRes.value.data?.data && Array.isArray(servRes.value.data.data) && servRes.value.data.data.length > 0) {
         servicesList = servRes.value.data.data;
@@ -122,9 +127,12 @@ export default function Home() {
         }
       }
 
-      setServicesApiData(servicesList);
+      if (servicesList.length > 0 || anyServiceCheckSucceeded) {
+        setServicesApiData(servicesList);
+      }
 
-      if (!hasCitySpecificServices) {
+      // Only show "No Service" modal when the API actually succeeded and confirmed 0 services (not on network failure/timeout)
+      if (anyServiceCheckSucceeded && !hasCitySpecificServices) {
         setUnservedCity(city || "your city");
         setShowNoServiceModal(true);
       } else {
@@ -163,9 +171,14 @@ export default function Home() {
     };
   }, [loadAllData]);
 
-  // Profile completion redirect
+  // Profile completion redirect (respect dismissal when user clicks X on complete-profile)
+  const [profileDismissed, setProfileDismissed] = useState(false);
+
   useEffect(() => {
-    if (user && !user.profileCompleted) {
+    const dismissed =
+      typeof window !== "undefined" && sessionStorage.getItem("profilePromptDismissed") === "1";
+    setProfileDismissed(dismissed);
+    if (user && !user.profileCompleted && !dismissed) {
       router.push(`/complete-profile?phone=${user.phone}`);
     }
   }, [user, router]);
@@ -189,7 +202,7 @@ export default function Home() {
     );
   };
 
-  if (isMounted && user && !user.profileCompleted) {
+  if (isMounted && user && !user.profileCompleted && !profileDismissed) {
     return null;
   }
 
