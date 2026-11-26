@@ -852,7 +852,7 @@ const ACRepairLayout = () => {
     ),
     originalPrice: Math.round(
       Number(
-        item.strike_price || item.original_price || item.originalPrice || item.base_price || 0,
+        item.originalPrice || item.strike_price || item.original_price || item.base_price || 0,
       ),
     ),
     warrantyDays: item.warranty_days ?? item.warrantyDays,
